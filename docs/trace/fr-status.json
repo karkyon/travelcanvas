@@ -1,7 +1,7 @@
 {
  "_meta": {
   "description": "DOC-10 v6.0 の全59 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v6.0-r59",
+  "revision": "v6.0-r60",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -489,7 +489,7 @@
    "partial": true,
    "e2e": "✓",
    "gates": "SpotMode",
-   "gaps": "エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施。旅帖(思い出)への歩いた順の記録・地図の絵の端末への保存(OpenStreetMap の方針で事前の一括取得はしない)・別行動の集合の共有は未実装"
+   "gaps": "エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存・別行動の集合の共有・旅帖の歩いた順は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施(確認表は縦断シナリオ §10)。地図の絵の端末への保存は OpenStreetMap の方針で一括取得をしない(圏外は方角で見る)"
   }
  }
 }

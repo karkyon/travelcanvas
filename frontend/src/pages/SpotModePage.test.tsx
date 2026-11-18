@@ -13,7 +13,7 @@ import type { SpotArea, SpotItem } from '@/services/api/types/spotAreas';
 
 const m = vi.hoisted(() => ({
   listSpotAreas: vi.fn(), suggestSpotAreas: vi.fn(), createSpotArea: vi.fn(), updateSpotArea: vi.fn(), deleteSpotArea: vi.fn(),
-  addSpotItem: vi.fn(), markSpotVisit: vi.fn(), clearSpotVisit: vi.fn(), setSpotWant: vi.fn(), searchNearby: vi.fn(),
+  addSpotItem: vi.fn(), splitOff: vi.fn(), rejoin: vi.fn(), markSpotVisit: vi.fn(), clearSpotVisit: vi.fn(), setSpotWant: vi.fn(), searchNearby: vi.fn(),
   getCandidates: vi.fn(), getPlanDetail: vi.fn(), createCandidate: vi.fn(), saveSnapshot: vi.fn(), loadSnapshot: vi.fn(),
 }));
 
@@ -47,6 +47,7 @@ const AREA: SpotArea = {
   id: 'a1', title: 'おかげ横丁・おはらい町', day_id: 'd1', local_date: '2026-11-29', timezone_id: 'Asia/Tokyo',
   start_time: '13:00', end_time: '15:30', meet_label: '駐車場', meet_time: '15:30', meet_latitude: 34.4640, meet_longitude: 136.7230,
   center_latitude: 34.4615, center_longitude: 136.7246, radius_m: 400, suggest_on_approach: true, revision: 3, can_edit: true,
+  splits: [{ name: '太郎', is_me: false, meet_label: '駐車場', meet_time: '15:20', note: null, since: null }],
   items: [
     item({}),
     item({ id: 'i2', candidate_id: 'c2', title: '五十鈴川のカフェ', genre: 'cafe', genre_label: 'カフェ', priority: 'maybe',
@@ -136,6 +137,19 @@ describe('スポットモード', () => {
     renderSpot();
     expect(await screen.findByText(/当日 2026-11-29 13:00〜15:30/)).toBeInTheDocument();
     expect(screen.queryByText(/戻り始め/)).toBeNull();
+  });
+
+  it('別行動: みんなの集合の約束を見て、自分の別行動を知らせる(位置は送らない)', async () => {
+    m.splitOff.mockResolvedValue(AREA);
+    renderSpot();
+    const split = await screen.findByRole('region', { name: /別行動と集合/ });
+    expect(within(split).getByRole('list', { name: '別行動の約束' })).toHaveTextContent('太郎: 15:20 に 駐車場 で合流');
+    fireEvent.click(within(split).getByRole('button', { name: '別行動にする' }));
+    expect(within(split).getByLabelText('集合の時刻')).toHaveValue('15:30');
+    fireEvent.change(within(split).getByLabelText('ひとこと(任意)'), { target: { value: '赤福で並びます' } });
+    fireEvent.click(within(split).getByRole('button', { name: 'みんなに知らせる' }));
+    await waitFor(() => expect(m.splitOff).toHaveBeenCalledWith('p1', 'a1',
+      { meet_time: '15:30', meet_label: '駐車場', note: '赤福で並びます' }));
   });
 
   it('通信できない時は端末に保存したエリアを出す', async () => {

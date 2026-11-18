@@ -69,7 +69,7 @@
 | FR-057 | Memory Replan | VERIFIED | ● | ● | ● | ● | ● | ○ | — | ○ | 運用待ち |
 | FR-058 | Entitlement・料金 | INTEGRATED(部分) | ● | ◐ | ◐ | ◐ | ◐ | ○ | ○ | ○ | 設定待ち・未実装・利用者判断待ち |
 | FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ● | ◐ | ◐ | ● | ◐ | ○ | ○ | ○ | 設定待ち・実通信待ち・未実装 |
-| FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | ● | ◐ | ● | ● | ◐ | ○ | ○ | ○ | 実機待ち・実通信待ち・未実装 |
+| FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | ● | ◐ | ● | ● | ◐ | ○ | ○ | ○ | 実機待ち・実通信待ち |
 
 | 集計 | 要件の根拠 | 実装 | 統合試験 | E2E | 権限・失敗系 | 実機 | 実 API | 運用(本番) |
 |---|---|---|---|---|---|---|---|---|
@@ -806,9 +806,10 @@
 - **要求(抜粋):** 旅程に自由に歩くエリアを置き、当日は予定とスポットモードを切り替えて、エリアの中の候補を天気・体調・気分で選んで歩く
 - **受入(抜粋):** エリアを作って当日に予定とスポットを行き来でき、絞り込み・次どこ？・着いた・周りを探す・方角で見るが使え、集合に間に合う戻り始めが分かる
 - **承認済みの変更 2026-11-18:** FR-060 スポットモードを追加(モックアップ「TravelCanvas スポットモード」を利用者が承認)(出典: DOC-10 r59・Gate SpotMode・確度 高)
+- **承認済みの変更 2026-11-18:** 別行動の集合の共有・旅帖の歩いた順を追加(利用者の指示)(出典: DOC-10 r60・Gate SpotMode-2・確度 高)
 - **仕様の参照:** 画面 SC-49・SC-50 / API 群 /plans/{plan_id}/spot-areas
-- **実装:** API `backend/app/api/v1/spot_areas.py` / 画面 `/planner/:planId/spot/:areaId`・`/planner/:planId/spot-areas` / 表 `spot_areas`・`spot_area_items`
+- **実装:** API `backend/app/api/v1/spot_areas.py` / 画面 `/planner/:planId/spot/:areaId`・`/planner/:planId/spot-areas` / 表 `spot_areas`・`spot_area_items`・`spot_area_splits`
 - **試験:** `backend/tests/test_gate_spot_mode.py`・`frontend/src/pages/SpotModePage.test.tsx`・`frontend/src/pages/spot/spotModel.test.ts`・`frontend/e2e/spot-mode.spec.ts`
 - **外部の提供元:** OpenStreetMap(地図の絵)・場所の検索(place_finder。周りを探す)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の位置・地図・画面の大きさの確認の記録なし) / 実 API ○(実の場所の検索での周りを探すの確認なし(CI は模擬)) / 運用(本番) ○(本番での提供なし)
-- **主な不足(fr-status.json):** エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施。旅帖(思い出)への歩いた順の記録・地図の絵の端末への保存(OpenStreetMap の方針で事前の一括取得はしない)・別行動の集合の共有は未実装
+- **主な不足(fr-status.json):** エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存・別行動の集合の共有・旅帖の歩いた順は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施(確認表は縦断シナリオ §10)。地図の絵の端末への保存は OpenStreetMap の方針で一括取得をしない(圏外は方角で見る)

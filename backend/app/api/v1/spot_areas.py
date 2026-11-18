@@ -15,6 +15,8 @@
 - DELETE /spot-areas/{area_id}/items/{item_id}/visit   : 取り消す
 - PUT    /spot-areas/{area_id}/items/{item_id}/want    : 自分の「行きたい」印(viewer 以上。投票の回答と同じ扱い)
 - DELETE /spot-areas/{area_id}/items/{item_id}/want    : 外す
+- PUT    /spot-areas/{area_id}/split         : 別行動にする(自分の集合の場所・時刻・ひとこと)。viewer 以上。メンバーに知らせる
+- DELETE /spot-areas/{area_id}/split         : 合流した(自分の別行動を消す)
 - POST   /spot-areas/{area_id}/nearby        : 今いる場所の周りを探す(押した時だけ。場所の検索の利用枠を使う)。
                                                今いる場所は探すのに使うだけで、保存・監査に残さない
 
@@ -32,9 +34,10 @@ from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
-    OpeningHours, PlaceSpecialHours, PlanCandidate, SpotArea, SpotAreaItem, TravelDay, TravelPlan, User,
+    OpeningHours, PlaceSpecialHours, PlanCandidate, SpotArea, SpotAreaItem, SpotAreaSplit, TravelDay, TravelPlan,
+    User,
 )
-from app.services import place_hours
+from app.services import notify, place_hours
 from app.services import spot_areas as sa
 from app.services.audit_service import record_audit_event
 
@@ -119,6 +122,31 @@ class VisitIn(BaseModel):
     skipped: bool = False
 
 
+class SplitIn(BaseModel):
+    """[Gate SpotMode-2] 別行動の約束。今いる場所は送らない。"""
+    model_config = ConfigDict(extra="forbid")
+    meet_label: Optional[str] = Field(None, max_length=100)
+    meet_time: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=200)
+
+    @field_validator("meet_label", "note")
+    @classmethod
+    def _strip(cls, v):
+        if v is None:
+            return v
+        v = " ".join(v.split())
+        return v or None
+
+    @field_validator("meet_time")
+    @classmethod
+    def _time(cls, v):
+        if v in (None, ""):
+            return None
+        if not sa.TIME_RE.match(v):
+            raise ValueError("時刻は HH:MM で書いてください")
+        return v
+
+
 class NearbyIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     latitude: float = Field(..., ge=-90, le=90)
@@ -163,7 +191,9 @@ def _area_json(db: Session, area: SpotArea, me: User, role: str, days: Dict[Any,
     items = sorted(area.items, key=lambda i: (i.sort_order, str(i.id)))
     day = days.get(area.day_id) if area.day_id else None
     hours = _hours(db, [i.candidate for i in items], day.local_date if day else None)
-    names = _names(db, [i.visited_by_user_id for i in items] + [u for i in items for u in (i.wanted_by or [])])
+    splits = sorted(area.splits, key=lambda s: (s.meet_time, str(s.id)))
+    names = _names(db, [i.visited_by_user_id for i in items] + [u for i in items for u in (i.wanted_by or [])]
+                   + [s.user_id for s in splits])
     pts = [(float(i.candidate.latitude), float(i.candidate.longitude)) for i in items
            if i.candidate.latitude is not None and i.candidate.longitude is not None]
     center = sa.center_of(pts)
@@ -194,6 +224,9 @@ def _area_json(db: Session, area: SpotArea, me: User, role: str, days: Dict[Any,
         "center_longitude": round(center[1], 6) if center else None,
         "radius_m": area.radius_m, "suggest_on_approach": area.suggest_on_approach, "revision": area.revision,
         "items": out_items, "can_edit": role in ("owner", "editor"),
+        "splits": [{"name": names.get(str(s.user_id), "(退会した利用者)"), "is_me": s.user_id == me.id,
+                    "meet_label": s.meet_label, "meet_time": s.meet_time, "note": s.note,
+                    "since": _iso(s.updated_at or s.created_at)} for s in splits],
     }
 
 
@@ -430,6 +463,52 @@ def want_item(plan_id: str, area_id: str, item_id: str, db: Session = Depends(ge
 def unwant_item(plan_id: str, area_id: str, item_id: str, db: Session = Depends(get_db),
                 current_user: User = Depends(get_current_user_or_guest)):
     return _want(plan_id, area_id, item_id, False, db, current_user)
+
+
+# ---- 別行動(集合の約束の共有) ------------------------------------------------------------------------------------
+
+@router.put("/{plan_id}/spot-areas/{area_id}/split")
+def split_off(plan_id: str, area_id: str, body: SplitIn, request: Request, db: Session = Depends(get_db),
+              current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate SpotMode-2] 別行動にする。集合の場所・時刻を省くとエリアの集合を使う。メンバーに知らせる(位置は送らない)。"""
+    from app.services.constraint_evaluation import member_user_ids
+
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    area = _get_area(db, plan, area_id, lock=True)
+    meet_time = body.meet_time or area.meet_time or area.end_time
+    if not meet_time:
+        raise _bad("meet_time_required", "集合の時刻を入れてください(エリアに集合の時刻がありません)")
+    meet_label = body.meet_label or area.meet_label
+    row = db.query(SpotAreaSplit).filter(SpotAreaSplit.area_id == area.id,
+                                         SpotAreaSplit.user_id == current_user.id).first()
+    first = row is None
+    if row is None:
+        row = SpotAreaSplit(id=uuid.uuid4(), area_id=area.id, user_id=current_user.id, meet_time=meet_time)
+        db.add(row)
+    row.meet_label, row.meet_time, row.note = meet_label, meet_time, body.note
+    who = current_user.username or "ゲスト"
+    where = f"{meet_label}で" if meet_label else ""
+    notify.deliver(db, plan, member_user_ids(db, plan) - {current_user.id}, "spot_split",
+                   f"「{area.title}」で別行動", f"{who}さんが別行動にしました。{meet_time}に{where}合流します。"
+                   if first else f"{who}さんの集合が {meet_time}{('・' + meet_label) if meet_label else ''} に変わりました。",
+                   target_type="plan", target_id=None)
+    db.commit()
+    _audit("spot_area_split", request, current_user, area.id, plan.id, {"first": first})
+    return _respond(db, plan, area, current_user, role)
+
+
+@router.delete("/{plan_id}/spot-areas/{area_id}/split")
+def rejoin(plan_id: str, area_id: str, request: Request, db: Session = Depends(get_db),
+           current_user: User = Depends(get_current_user_or_guest)):
+    """[Gate SpotMode-2] 合流した(自分の別行動を消す)。無くても 200(押し直しても困らない)。"""
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    area = _get_area(db, plan, area_id, lock=True)
+    db.query(SpotAreaSplit).filter(SpotAreaSplit.area_id == area.id,
+                                   SpotAreaSplit.user_id == current_user.id).delete(synchronize_session=False)
+    db.commit()
+    _audit("spot_area_rejoin", request, current_user, area.id, plan.id)
+    db.expire(area)
+    return _respond(db, plan, area, current_user, role)
 
 
 # ---- 周りを探す ---------------------------------------------------------------------------------------------------

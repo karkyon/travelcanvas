@@ -166,6 +166,7 @@
 | `locked_relation` | — | — | 確定ロックされた予約との紐付けがあるため削除できません。予約の紐付けのロックを解除してから削除してください。 | services/plan_item_deletion.py |
 | `logo_not_found` | 404 | no | ロゴはまだありません | api/v1/organizations.py |
 | `malware_found` | 422 | no | ファイルから有害なプログラムが見つかったため、受け付けませんでした | api/v1/memories.py |
+| `meet_time_required` | — | — | 集合の時刻を入れてください(エリアに集合の時刻がありません) | api/v1/spot_areas.py |
 | `member_field_hidden` | 403 | no | 旅行の所有者が「…」をあなたに見せない設定にしています | services/member_policy.py |
 | `member_not_found` | 404 | no | メンバーが見つかりません | api/v1/organizations.py |
 | `members_only` | 403 | no | 旅行記の公開は会員だけができます(会員登録すると公開できます) | api/v1/memory_publish.py |

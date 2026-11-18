@@ -144,7 +144,7 @@ VERIFIED の証拠は [v1-verification-ledger.json](v1-verification-ledger.json)
 | FR-056 | 適応型GPS | INTEGRATED(部分) | OS の geofence、電池の計測 |
 | FR-058 | Entitlement・料金 | INTEGRATED(部分) | Stripe のテストモードだけ(本番の鍵 sk_live_ は断る。利用者の決定 2026-11-13)。価格は仮(管理画面で変える)。実の Stripe のテストの鍵での確認は鍵の登録の後。組織でまとめる支払い(FR-041)・指定した支払う人は未実装。E2E は鍵の無い時の案内だけ |
 | FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load(Maps Static)の adapter は Remaining-7(実の鍵での確認・請求の照合は鍵の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する |
-| FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施。旅帖(思い出)への歩いた順の記録・地図の絵の端末への保存(OpenStreetMap の方針で事前の一括取得はしない)・別行動の集合の共有は未実装 |
+| FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存・別行動の集合の共有・旅帖の歩いた順は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施(確認表は縦断シナリオ §10)。地図の絵の端末への保存は OpenStreetMap の方針で一括取得をしない(圏外は方角で見る) |
 
 ## 3. 棚卸しの規則
 

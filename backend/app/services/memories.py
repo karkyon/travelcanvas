@@ -182,10 +182,13 @@ def build_journal_draft(
     include_media: bool = True,
     include_others: bool = False,
     generated_at: Optional[datetime] = None,
+    walks: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """days: [{id, local_date(date), title}] / events: [{id, day_id, title, local_start_time, sort_order}]
     memories: 閲覧者に見える記録 [{id, kind, body, event_id, day_id, occurred_at, place_name, latitude, longitude,
-    video_url, by_me, include_in_journal}](呼出側で見える範囲に絞る)。旅程は変えない。"""
+    video_url, by_me, include_in_journal}](呼出側で見える範囲に絞る)。旅程は変えない。
+    walks: [Gate SpotMode-2] 自由に歩いた順 [{day_id, area_title, stops: [{title, time}]}](spot_areas.walks_for)。
+    位置は入れない。公開する旅行記(memory_publish)には渡さない。"""
     names = [n for n in member_names if n]
     day_by_id = {str(d["id"]): d for d in days}
     event_by_id = {str(e["id"]): e for e in events}
@@ -245,10 +248,15 @@ def build_journal_draft(
         day_notes = [v for v in (view(m) for m in by_day.get(did, [])) if v]
         local_date = d["local_date"]
         date_label = local_date.isoformat() if isinstance(local_date, date) else str(local_date)
+        day_walks = [w for w in (walks or []) if w.get("day_id") == did]
         out_days.append({"day_id": did, "date": date_label, "title": d.get("title"), "entries": entries,
-                         "day_memories": day_notes})
+                         "day_memories": day_notes, "walks": day_walks})
         md.append(f"## {date_label}" + (f" {d['title']}" if d.get("title") else ""))
         md.append("")
+        for w in day_walks:
+            md.append(f"### 自由に歩いた: {w['area_title']}")
+            md.append(" → ".join(f"{s['time']} {s['title']}" for s in w["stops"]))
+            md.append("")
         for v in day_notes:
             md.extend(_md_memory(v))
         if day_notes:
@@ -260,6 +268,11 @@ def build_journal_draft(
             for v in en["memories"]:
                 md.extend(_md_memory(v))
             md.append("")
+    loose_walks = [w for w in (walks or []) if w.get("day_id") not in {str(d["id"]) for d in days}]
+    for w in loose_walks:
+        md.append(f"## 自由に歩いた: {w['area_title']}")
+        md.append(" → ".join(f"{s['time']} {s['title']}" for s in w["stops"]))
+        md.append("")
     other = [v for v in (view(m) for m in loose) if v]
     if other:
         md.append("## そのほかの記録")

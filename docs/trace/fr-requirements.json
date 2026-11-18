@@ -4755,6 +4755,12 @@
      "change": "FR-060 スポットモードを追加(モックアップ「TravelCanvas スポットモード」を利用者が承認)",
      "source": "DOC-10 r59・Gate SpotMode",
      "confidence": "高"
+    },
+    {
+     "date": "2026-11-18",
+     "change": "別行動の集合の共有・旅帖の歩いた順を追加(利用者の指示)",
+     "source": "DOC-10 r60・Gate SpotMode-2",
+     "confidence": "高"
     }
    ],
    "spec_refs": {
@@ -4774,7 +4780,8 @@
     ],
     "tables": [
      "spot_areas",
-     "spot_area_items"
+     "spot_area_items",
+     "spot_area_splits"
     ]
    },
    "tests": [
@@ -4795,7 +4802,7 @@
     },
     "implementation": {
      "state": "partial",
-     "note": "コードあり(旅帖への記録・地図の絵の保存・別行動は未実装)"
+     "note": "コードあり(別行動・旅帖の歩いた順を含む)。実機・実の場所の検索の確認が済むまで(部分)。地図の絵の端末への保存は方針により行わない"
     },
     "integration": {
      "state": "done",
@@ -4824,8 +4831,7 @@
    },
    "gap_categories": [
     "実機待ち",
-    "実通信待ち",
-    "未実装"
+    "実通信待ち"
    ]
   }
  }

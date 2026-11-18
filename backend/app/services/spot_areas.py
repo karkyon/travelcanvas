@@ -4,6 +4,7 @@
 - seats / fit: 座れそうか・屋内か(天気の判定 weather_fit と同じ言葉)。案内の札に使うだけで、確かではない
 - suggest_clusters: 位置のある候補が近くにまとまっている所(既定 400m)を、エリアの案として返す
 - distance_m: 2 点の直線の距離(m)。道順ではない(画面では「直線の目安」と書く)
+- walks_for: 旅帖(旅行記の下書き)に入れる「自由に歩いた順」(着いた時刻の順。その日の時間帯の時刻)
 """
 import math
 import re
@@ -97,4 +98,32 @@ def suggest_clusters(cands: Sequence[Any], used_ids: Iterable[Any] = (), within_
                                     "genre": guess_genre(c.title, c.category, c.note)} for c in group]})
         if len(out) >= limit:
             break
+    return out
+
+
+def walks_for(db: Any, plan_id: Any) -> List[Dict[str, Any]]:
+    """[Gate SpotMode-2] 着いた候補を、エリアごとに着いた時刻の順で返す(旅帖の下書きに使う)。
+    返す物: [{day_id, area_title, stops: [{title, time}]}]。日の無いエリアは day_id=None。位置は入れない。"""
+    from zoneinfo import ZoneInfo
+
+    from app.models.models import SpotArea, SpotAreaItem, TravelDay
+    areas = db.query(SpotArea).filter(SpotArea.plan_id == plan_id).all()
+    if not areas:
+        return []
+    days = {d.id: d for d in db.query(TravelDay).filter(TravelDay.plan_id == plan_id).all()}
+    out: List[Dict[str, Any]] = []
+    for a in sorted(areas, key=lambda x: (x.start_time or "99:99", str(x.id))):
+        visited = db.query(SpotAreaItem).filter(SpotAreaItem.area_id == a.id,
+                                                SpotAreaItem.visited_at.isnot(None)).all()
+        if not visited:
+            continue
+        visited.sort(key=lambda i: (i.visited_at, str(i.id)))
+        day = days.get(a.day_id) if a.day_id else None
+        try:
+            tz = ZoneInfo(day.timezone_id) if day and day.timezone_id else None
+        except Exception:  # noqa: BLE001 - 時間帯が読めなければ UTC のまま
+            tz = None
+        stops = [{"title": i.candidate.title,
+                  "time": (i.visited_at.astimezone(tz) if tz else i.visited_at).strftime("%H:%M")} for i in visited]
+        out.append({"day_id": str(a.day_id) if a.day_id else None, "area_title": a.title, "stops": stops})
     return out

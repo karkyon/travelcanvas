@@ -4257,6 +4257,8 @@ class SpotArea(Base):
 
     items = relationship("SpotAreaItem", cascade="all, delete-orphan", passive_deletes=True,
                          order_by="SpotAreaItem.sort_order")
+    splits = relationship("SpotAreaSplit", cascade="all, delete-orphan", passive_deletes=True,
+                          order_by="SpotAreaSplit.created_at")
 
     __table_args__ = (
         CheckConstraint("radius_m BETWEEN 100 AND 3000", name="ck_spot_areas_radius"),
@@ -4295,4 +4297,26 @@ class SpotAreaItem(Base):
         Index("ix_spot_area_items_area", "area_id", "sort_order"),
         Index("ix_spot_area_items_candidate", "candidate_id"),
         Index("ix_spot_area_items_visited_by", "visited_by_user_id"),
+    )
+
+
+class SpotAreaSplit(Base):
+    """[Gate SpotMode-2] FR-060 別行動の集合の約束(1人1行)。今いる場所は持たない。"""
+    __tablename__ = "spot_area_splits"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("spot_areas.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    meet_label: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    meet_time: Mapped[str] = mapped_column(String(5), nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("area_id", "user_id", name="uq_spot_area_splits_member"),
+        Index("ix_spot_area_splits_area", "area_id"),
+        Index("ix_spot_area_splits_user", "user_id"),
     )
