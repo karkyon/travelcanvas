@@ -1,4 +1,15 @@
 {
  "_comment": "[Gate S1] scripts/security/audit_deps.py の例外一覧。助言の ID 単位で、理由・範囲(build-only / test-only / not-reachable)・期限が必須。期限を過ぎると CI が失敗する。ブラウザへ届く依存は not-reachable で理由のあるものだけ。直したら消すこと。 [Gate G2] DEP-1 で依存を更新し、npm の例外は0件になった(React Router 7・Vite 6・Vitest 4・Tailwind CSS 4・typescript-eslint 8)。",
- "entries": []
+ "entries": [
+  {
+   "ecosystem": "node",
+   "package": "picomatch",
+   "ids": [
+    "GHSA-fc5q-39xc-vjpf"
+   ],
+   "scope": "build-only",
+   "reason": "picomatch 4.0.7 は vite・vitest・tinyglobby・fdir(開発時のビルドと試験のファイル探し)の中だけで使い、ブラウザへ届く依存(RUNTIME_ROOTS)には含まれない。glob の型は repo の設定ファイルが固定で書いたものだけで、利用者の入力は渡らない。2026-11-18 時点で修正版が公開されていない(npm の最新が 4.0.7)。修正版が出たら更新してこの例外を消す",
+   "expires": "2027-01-31"
+  }
+ ]
 }
