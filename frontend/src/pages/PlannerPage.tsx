@@ -95,6 +95,8 @@ interface IncomingSpot {
   location?: { latitude?: number; longitude?: number; address?: string };
   estimated_duration?: number;
   estimated_cost?: number;
+  /** /search/spots の内部候補ID。旅程に追加する際に正規Placeへ採用する */
+  candidate_id?: string;
 }
 
 // 日付から曜日を算出(DaySchedule型にday_of_weekフィールドが存在しないため、DayView.tsxと同じ方式)
@@ -614,19 +616,28 @@ const PlannerPage: React.FC = () => {
         await addDay();
       }
 
-      await usePlanStore.getState().addScheduleItem(0, {
-        title: incomingSpot.name,
-        description: incomingSpot.description,
-        category: (incomingSpot.category as EventCategory) || 'sightseeing',
-        location_name: incomingSpot.name,
-        address: incomingSpot.address || incomingSpot.location?.address,
-        latitude: incomingSpot.location?.latitude,
-        longitude: incomingSpot.location?.longitude,
-        duration: incomingSpot.estimated_duration,
-        cost: incomingSpot.estimated_cost,
-      });
-
-      addToast({ message: `${incomingSpot.name}をプランに追加しました`, type: 'success' });
+      if (incomingSpot.candidate_id) {
+        // /search/spots の候補は、Placeへ採用してから place_id 付きで予定にする。
+        // 汎用の addScheduleItem へ流すと候補との紐付けが失われ、営業時間確認等へ連携できない。
+        const added = await usePlanStore.getState().addScheduleItemFromCandidate(
+          0, incomingSpot.candidate_id, incomingSpot.name
+        );
+        if (!added) return; // storeが失敗を通知する。モーダルを残し再試行可能にする。
+      } else {
+        // 登録済み個人スポットなど、SearchCandidate を持たない入口は手入力として追加する。
+        await usePlanStore.getState().addScheduleItem(0, {
+          title: incomingSpot.name,
+          description: incomingSpot.description,
+          category: (incomingSpot.category as EventCategory) || 'sightseeing',
+          location_name: incomingSpot.name,
+          address: incomingSpot.address || incomingSpot.location?.address,
+          latitude: incomingSpot.location?.latitude,
+          longitude: incomingSpot.location?.longitude,
+          duration: incomingSpot.estimated_duration,
+          cost: incomingSpot.estimated_cost,
+        });
+        addToast({ message: `${incomingSpot.name}をプランに追加しました`, type: 'success' });
+      }
       setIsAddSpotModalOpen(false);
       navigate(`/planner/${plan.id}`, { replace: true, state: null });
     } catch (error) {
