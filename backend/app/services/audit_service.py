@@ -36,10 +36,10 @@ _SENSITIVE_DETAIL_PARTS = (
     "reservation", "confirmation", "passenger", "ticket", "qr", "pin",
 )
 _INLINE_SECRET_RE = re.compile(
-    r"(?i)\\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|authorization)\\s*[:=]\\s*[^\\s,;]+"
+    r"(?i)\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|authorization)\s*[:=]\s*[^\s,;]+"
 )
-_BEARER_RE = re.compile(r"(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]+")
-_JWT_RE = re.compile(r"\\b[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b")
+_BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
+_JWT_RE = re.compile(r"\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
 
 
 def sanitize_audit_details(details: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -61,7 +61,9 @@ def sanitize_audit_details(details: Optional[Dict[str, Any]]) -> Optional[Dict[s
             return [clean(item) for item in value]
         if isinstance(value, str):
             value = _BEARER_RE.sub("Bearer [REDACTED]", value)
-            value = _INLINE_SECRET_RE.sub(lambda m: m.group(0).split("=")[0].split(":")[0] + "=[REDACTED]", value)
+            value = _INLINE_SECRET_RE.sub(
+                lambda match: match.group(0).split("=")[0].split(":")[0] + "=[REDACTED]", value
+            )
             return _JWT_RE.sub("[REDACTED]", value)
         return value
 
