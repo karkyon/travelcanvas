@@ -105,7 +105,7 @@ interface PlanState {
     dayIndex: number,
     candidateId: string,
     fallbackTitle?: string
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   /** [Gate C1] 保存の結果(conflict = 他の変更と競合し、最新を読み直した。入力は呼出側に残す) */
   updateScheduleItem: (itemId: string, item: Partial<ScheduleItem>) => Promise<ItemSaveResult>;
   /**
@@ -704,10 +704,10 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // 保存済み)とは明確に分離された、確定的な操作。
   addScheduleItemFromCandidate: async (dayIndex: number, candidateId: string, fallbackTitle?: string) => {
     const state = get();
-    if (!state.currentPlan || !state.currentPlan.days[dayIndex]) return;
+    if (!state.currentPlan || !state.currentPlan.days[dayIndex]) return false;
     if (state.currentPlan.revision === undefined) {
       toast.error('このプランはまだ正規化データを読み込んでいません。再読み込みしてください。');
-      return;
+      return false;
     }
 
     const plan = state.currentPlan;
