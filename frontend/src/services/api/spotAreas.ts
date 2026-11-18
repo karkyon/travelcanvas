@@ -31,6 +31,9 @@ export const spotArea: Decoder<SpotArea> = object<SpotArea>({
   meet_latitude: nullable(num), meet_longitude: nullable(num), center_latitude: nullable(num),
   center_longitude: nullable(num), radius_m: num, suggest_on_approach: bool, revision: num, items: arrayOf(item),
   can_edit: bool,
+  splits: (v, path) => (v === undefined ? [] : arrayOf(object({
+    name: str, is_me: bool, meet_label: nullable(str), meet_time: str, note: nullable(str), since: nullable(str),
+  }))(v, path)),
 });
 
 const areaList: Decoder<SpotAreaList> = object<SpotAreaList>({
@@ -104,4 +107,16 @@ export async function searchNearby(planId: string, areaId: string, input: {
 }): Promise<NearbyResponse> {
   const r = await api.post(`/plans/${planId}/spot-areas/${areaId}/nearby`, input, SILENT);
   return decodeResponse(r.data, nearbyResponse, 'POST /plans/{plan_id}/spot-areas/{area_id}/nearby');
+}
+
+/** [Gate SpotMode-2] 別行動にする(集合の場所・時刻を省くとエリアの集合)。今いる場所は送らない */
+export async function splitOff(planId: string, areaId: string, input: { meet_label?: string; meet_time?: string; note?: string }): Promise<SpotArea> {
+  const r = await api.put(`/plans/${planId}/spot-areas/${areaId}/split`, input, SILENT);
+  return decodeResponse(r.data, spotArea, 'PUT /plans/{plan_id}/spot-areas/{area_id}/split');
+}
+
+/** [Gate SpotMode-2] 合流した */
+export async function rejoin(planId: string, areaId: string): Promise<SpotArea> {
+  const r = await api.delete(`/plans/${planId}/spot-areas/${areaId}/split`, SILENT);
+  return decodeResponse(r.data, spotArea, 'DELETE /plans/{plan_id}/spot-areas/{area_id}/split');
 }

@@ -49,6 +49,17 @@ export interface SpotArea {
   revision: number;
   items: SpotItem[];
   can_edit: boolean;
+  /** [Gate SpotMode-2] 別行動の集合の約束(今いる場所は持たない) */
+  splits: SpotSplit[];
+}
+
+export interface SpotSplit {
+  name: string;
+  is_me: boolean;
+  meet_label: string | null;
+  meet_time: string;
+  note: string | null;
+  since: string | null;
 }
 
 export interface SpotAreaList {

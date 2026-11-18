@@ -679,5 +679,7 @@ def journal_draft(plan_id: str, body: JournalOptions, db: Session = Depends(get_
         others,
         include_locations=body.include_locations, include_media=body.include_media,
         include_others=body.include_others, generated_at=_now(),
+        # [Gate SpotMode-2] 自由に歩いた順(着いた時刻の順。位置は入れない)
+        walks=__import__("app.services.spot_areas", fromlist=["walks_for"]).walks_for(db, plan.id),
     )
     return draft

@@ -82,6 +82,9 @@ const TodaySpotStrip: React.FC<{ planId: string; todayDate: string | null; timeZ
               <span>気分で {a.items.length - wants}</span>
               {a.meet_label && <span>集合 {a.meet_time ?? ''} {a.meet_label}</span>}
             </div>
+            {a.splits.length > 0 && (
+              <p className="tc-spot-card__text">別行動: {a.splits.map((s) => `${s.is_me ? '自分' : s.name} ${s.meet_time}${s.meet_label ? ` ${s.meet_label}` : ''}`).join('・')}</p>
+            )}
             <Link className="tc-spot-card__go" to={`/planner/${planId}/spot/${a.id}`}><MapIcon size={18} aria-hidden="true" />スポットモードで歩く</Link>
           </section>
         );

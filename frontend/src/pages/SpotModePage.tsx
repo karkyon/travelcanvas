@@ -14,7 +14,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock, Compass, Crosshair, List, Map as MapIcon, Maximize2, Search, Sparkles } from 'lucide-react';
 import { api, extractApiErrorDetailMessage } from '@/services/api';
 import {
-  addSpotItem, clearSpotVisit, listSpotAreas, markSpotVisit, searchNearby, setSpotWant,
+  addSpotItem, clearSpotVisit, listSpotAreas, markSpotVisit, rejoin, searchNearby, setSpotWant, splitOff,
 } from '@/services/api/spotAreas';
 import type { NearbyKind, NearbyResult, SpotArea, SpotGenre, SpotItem } from '@/services/api/types/spotAreas';
 import { currentOfflineSession } from '@/utils/offlineSession';
@@ -23,7 +23,7 @@ import {
   GENRE_META, GENRE_ORDER, RETURN_LABEL, areaCenter, distanceM, hhmm, isDone, nowIn, planChain, pointOf, rankNext,
   sortItems, timeState, walkMinutes, type LatLng, type Mood, type SortMode,
 } from './spot/spotModel';
-import { CompassList, GroupMarks, NearbyPanel, NextPick, SpotDetail, SpotList } from './spot/SpotPanels';
+import { CompassList, GroupMarks, NearbyPanel, NextPick, SplitPanel, SpotDetail, SpotList } from './spot/SpotPanels';
 import '@/styles/spot-mode.css';
 
 const SpotLeafletMap = React.lazy(() => import('./spot/SpotLeafletMap'));
@@ -243,6 +243,10 @@ const SpotModePage: React.FC = () => {
               onSelect={(id) => setSelectedId(id === selectedId ? null : id)} onGo={go}
               onVisit={(i) => void act(i.id, () => markSpotVisit(planId, area.id, i.id), `「${i.title}」に着きました`)} />
             <GroupMarks items={items} />
+            <SplitPanel splits={area.splits} defaultTime={area.meet_time ?? area.end_time} defaultLabel={area.meet_label}
+              busy={busy === 'split'}
+              onSplit={(input) => void act('split', () => splitOff(planId, area.id, input), '別行動をメンバーに知らせました')}
+              onRejoin={() => void act('split', () => rejoin(planId, area.id), '合流しました')} />
           </>
         )}
         {view === 'detail' && selected && (

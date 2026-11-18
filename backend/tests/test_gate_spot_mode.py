@@ -203,3 +203,65 @@ def test_service_genre_and_distance_helpers():
     assert sa.guess_genre("なにか") == "other"
     assert 120 < sa.distance_m((34.4610, 136.7247), (34.4622, 136.7249)) < 140
     assert sa.radius_for((34.4610, 136.7247), [(34.4610, 136.7247)]) == 200
+
+
+# ---------------------------------------------------------------- [Gate SpotMode-2] 別行動・旅帖の歩いた順
+
+def test_split_off_and_rejoin_shares_only_the_promise(auth_client, make_user, db_session):
+    from app.models.models import Notification, SpotAreaSplit
+    client, p, owner, editor, viewer, ids, far, day = _setup(auth_client, make_user, db_session)
+    a = _area(client, p, ids, day).json()
+    url = f"/api/v1/plans/{p}/spot-areas/{a['id']}/split"
+    _act_as(viewer)  # 閲覧者も自分の別行動は決められる
+    r = client.put(url, json={})  # 省くとエリアの集合
+    assert r.status_code == 200, r.text
+    s = r.json()["splits"]
+    assert len(s) == 1 and s[0]["is_me"] and s[0]["meet_time"] == "15:30" and s[0]["meet_label"] == "駐車場"
+    assert set(s[0]) == {"name", "is_me", "meet_label", "meet_time", "note", "since"}  # 位置は持たない
+    r = client.put(url, json={"meet_time": "15:20", "meet_label": "おかげ横丁の入口", "note": "赤福で並びます"})
+    assert r.json()["splits"][0]["meet_time"] == "15:20"
+    assert client.put(url, json={"meet_time": "3:20"}).status_code == 422
+    assert client.put(url, json={"latitude": 34.0}).status_code == 422  # 位置は受け取らない
+    db_session.expire_all()
+    notes = db_session.query(Notification).filter(Notification.type == "spot_split").all()
+    assert notes and all(n.user_id != viewer.id for n in notes)
+    assert any("15:20" in n.message for n in notes)
+    _act_as(owner)
+    mine = client.get(f"/api/v1/plans/{p}/spot-areas").json()["areas"][0]["splits"]
+    assert len(mine) == 1 and mine[0]["is_me"] is False
+    _act_as(viewer)
+    assert client.delete(url).json()["splits"] == []
+    assert client.delete(url).status_code == 200  # 押し直しても困らない
+    assert db_session.query(SpotAreaSplit).count() == 0
+
+
+def test_split_needs_a_meet_time(auth_client, make_user, db_session):
+    client, p, owner, editor, viewer, ids, far, day = _setup(auth_client, make_user, db_session)
+    a = _area(client, p, ids, day, meet_time=None, end_time=None).json()
+    url = f"/api/v1/plans/{p}/spot-areas/{a['id']}/split"
+    r = client.put(url, json={})
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "meet_time_required"
+    assert client.put(url, json={"meet_time": "15:00"}).status_code == 200
+
+
+def test_journal_draft_includes_walked_order_without_locations(auth_client, make_user, db_session):
+    from datetime import datetime, timezone
+    from app.models.models import SpotAreaItem
+    client, p, owner, editor, viewer, ids, far, day = _setup(auth_client, make_user, db_session)
+    a = _area(client, p, ids, day).json()
+    order = [(a["items"][3]["id"], 4, 31), (a["items"][1]["id"], 4, 52), (a["items"][0]["id"], 5, 10)]
+    for item_id, h, m in order:
+        row = db_session.query(SpotAreaItem).filter(SpotAreaItem.id == uuid.UUID(item_id)).one()
+        row.visited_at = datetime(2026, 11, 29, h, m, tzinfo=timezone.utc)
+    db_session.commit()
+    r = client.post(f"/api/v1/plans/{p}/memories/journal-draft", json={})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    walks = d["days"][0]["walks"]
+    assert walks[0]["area_title"] == "おかげ横丁・おはらい町"
+    assert [(s["time"], s["title"]) for s in walks[0]["stops"]] == [("13:31", "招き猫の店"), ("13:52", "豚捨"),
+                                                                    ("14:10", "赤福 本店")]
+    assert "### 自由に歩いた: おかげ横丁・おはらい町" in d["markdown"]
+    assert "13:31 招き猫の店 → 13:52 豚捨 → 14:10 赤福 本店" in d["markdown"]
+    assert sum(len(w["stops"]) for dd in d["days"] for w in dd["walks"]) == 3
+    assert "34.46" not in d["markdown"]  # 位置は入れない

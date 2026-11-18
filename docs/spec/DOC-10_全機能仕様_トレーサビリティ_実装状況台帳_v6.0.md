@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v6.0(正本)
 
-> 文書ID: DOC-10 / 版: **v6.0-r59** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
+> 文書ID: DOC-10 / 版: **v6.0-r60** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -18,7 +18,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `d8bd1b7`(PR #60 Gate MockFit。2026-11-05 に版をそろえた時点の main) |
-| Alembic head | `c4d8e2f6a9b1`(単一の head。SpotMode で spot_areas(自由に歩くエリア)と spot_area_items(エリアの候補・着いた・行きたい印)を追加。追加だけ。その前は `b7e3c9a1d5f4` ChatConsensus の polls.mode・source_comment_id) |
+| Alembic head | `d5e9f3a7b2c6`(単一の head。SpotMode-2 で spot_area_splits(別行動の集合の約束。位置は持たない)を追加。追加だけ。その前は `c4d8e2f6a9b1` spot_areas・spot_area_items) |
 | 基準の試験の実測(`d8bd1b7`) | backend pytest 1603 合格・1 飛ばし / frontend vitest 1057 合格(196 ファイル) / E2E 100 合格 / 最初に読む JS 428.39 kB(上限 430 kB)。GitHub Actions の main の push run 41880257997 |
 | GitHub Actions(`d8bd1b7`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41880257997)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -146,7 +146,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-057 | Memory Replan | VERIFIED | ✓ | P17・G7 | 実際の旅の記録が増えた時の傾向の確かめ(RELEASE-1) |
 | FR-058 | Entitlement・料金 | INTEGRATED(部分) | 一部 | Remaining-4 | Stripe のテストモードだけ(本番の鍵 sk_live_ は断る。利用者の決定 2026-11-13)。価格は仮(管理画面で変える)。実の Stripe のテストの鍵での確認は鍵の登録の後。組織でまとめる支払い(FR-041)・指定した支払う人は未実装。E2E は鍵の無い時の案内だけ |
 | FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load(Maps Static)の adapter は Remaining-7(実の鍵での確認・請求の照合は鍵の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する |
-| FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | ✓ | SpotMode | エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施。旅帖(思い出)への歩いた順の記録・地図の絵の端末への保存(OpenStreetMap の方針で事前の一括取得はしない)・別行動の集合の共有は未実装 |
+| FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | ✓ | SpotMode | エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存・別行動の集合の共有・旅帖の歩いた順は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施(確認表は縦断シナリオ §10)。地図の絵の端末への保存は OpenStreetMap の方針で一括取得をしない(圏外は方角で見る) |
 <!-- /generated:fr-table -->
 
 ## 4. 主要な縦切り(J-01〜J-07)
@@ -282,7 +282,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | **r56** | 2026-11-17 | `14065fe`+Hardening-A+DocsV6 | **資料の体系を v6.0 へ(利用者の指示 2026-11-17「完全に更新し旧バージョンは保管へ」): 本書を `DOC-10_*_v6.0.md`(版 v6.0-r56。r の番号は続ける)、FR-059 正本を v6.0 の名前へ。DOC-02 要件定義書 v6.0 をリポジトリの正本として作成(FR 59 件・プランB・FR-059・承認済みの変更を本文へ。FC・NFR・AC・EX は削らず引き継ぎ)。資料体系の README v6.0(`docs/spec/README.md`)・保管の索引(`docs/spec/archive/v5.1/`)。FR の状態の遷移なし** |
 | r57 | 2026-11-17 | `167f266`+DocsV6-2 | **資料の体系 v6.0 の段階 2: DOC-04 画面仕様 v6.0(画面 ID と実装の経路の対応 §19、実装済みの画面 SC-44 旅行箱・SC-45 旅行相談・SC-46 旅行の下書き・SC-47 料金と利用枠・SC-48 写真の投稿を追加、SC-17 をプランBへ、今日の画面を旅帖ライブに、DOC04-A を §20 へ統合)、DOC-13 用語集 v6.0(プランB・旅行箱・旅帖・利用枠・移動手段・移動時間の出どころ・地図の線の言葉、エラーの code の正本を error-catalog に)。v5.1 は保管。FR の状態の遷移なし** |
 | r58 | 2026-11-17 | DocsV6-2+ChatConsensus | **相談を話し合い中心にする(利用者の決定 2026-11-17): 画面はタブなしで「決まったこと」「投票」「話し合い」。発言の「これで決まり」(投票なしで記録・旅程へ反映)・「投票にする」(題名と選択肢の下書き)・かんたん投票を既定(1人1つ)・4段階・定足数・不可は「詳しい設定」・AI の選択肢の案(任意・同意と枠・名前を送らない・伏せ字・根拠の無い案を捨てる・保存しない)。API: POST /polls/decision・POST /polls/suggest-options、polls.mode・source_comment_id(Alembic `b7e3c9a1d5f4`)。DOC-02 FR-022・FC-065、DOC-04 SC-19・SC-20、DOC-13 §20 を更新。FR-022 は VERIFIED のまま(試験 backend/tests/test_gate_chat_consensus.py・frontend/e2e/discussion.spec.ts を証拠に追加)** |
-| **r59** | 2026-11-18 | ChatConsensus+SpotMode | **FR-060 スポットモード(自由に歩くエリア)を追加(利用者の決定 2026-11-18。モックアップを承認): 旅程に順番を決めない「自由に歩くエリア」を置き、当日は予定 ⇄ スポットを切り替え、地図・ジャンルの絞り込み・候補の詳しい所(歩く時間・方角・道順の目安・地図アプリ)・着いた/今日はやめる・行きたい印・次どこ？(気分・近さ・行きたい・営業時間・残り時間。AI なし)・回れる道順の案・周りを探す(位置を保存しない)・方角で見る・端末への暗号化保存・タブレット横の左右の配置・戻り始め。準備(SC-50)は候補箱で近くにまとまった候補からエリアの案。API /plans/{id}/spot-areas(11 経路)、表 spot_areas・spot_area_items(Alembic `c4d8e2f6a9b1`)。DOC-02 FR-060・DOC-04 SC-49/50・DOC-13 §21。FR-060 は INTEGRATED(部分)(実機・実の場所の検索・旅帖への記録は未)** |
+| r59 | 2026-11-18 | ChatConsensus+SpotMode | **FR-060 スポットモード(自由に歩くエリア)を追加(利用者の決定 2026-11-18。モックアップを承認): 旅程に順番を決めない「自由に歩くエリア」を置き、当日は予定 ⇄ スポットを切り替え、地図・ジャンルの絞り込み・候補の詳しい所(歩く時間・方角・道順の目安・地図アプリ)・着いた/今日はやめる・行きたい印・次どこ？(気分・近さ・行きたい・営業時間・残り時間。AI なし)・回れる道順の案・周りを探す(位置を保存しない)・方角で見る・端末への暗号化保存・タブレット横の左右の配置・戻り始め。準備(SC-50)は候補箱で近くにまとまった候補からエリアの案。API /plans/{id}/spot-areas(11 経路)、表 spot_areas・spot_area_items(Alembic `c4d8e2f6a9b1`)。DOC-02 FR-060・DOC-04 SC-49/50・DOC-13 §21。FR-060 は INTEGRATED(部分)(実機・実の場所の検索・旅帖への記録は未)** |
+| **r60** | 2026-11-18 | SpotMode-2 | **FR-060 の残りの未実装を実装(利用者の指示): 別行動の集合の共有(PUT/DELETE /spot-areas/{id}/split。集合の時刻・場所・ひとことだけをメンバーに知らせる。位置は共有しない。閲覧者も自分の分。当日の札にも表示)・旅帖の下書きに日ごとの「自由に歩いた」(着いた時刻の順。位置なし。公開の旅行記には入れない)。表 spot_area_splits(Alembic `d5e9f3a7b2c6`)。実機の確認表を縦断シナリオ §10 に。FR-060 の残りは実機待ち・実通信待ちだけ** |
 
 ## 10. 台帳の更新の規則
 

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Check, Compass, Footprints, MapPin, Navigation, Plus, Route, Search, Sparkles, Star, Undo2, X } from 'lucide-react';
 import { safeExternalUrl } from '@/utils/safeNavigation';
-import type { NearbyKind, NearbyResult, SpotItem } from '@/services/api/types/spotAreas';
+import type { NearbyKind, NearbyResult, SpotItem, SpotSplit } from '@/services/api/types/spotAreas';
 import {
   GENRE_META, MOODS, bearingDeg, directionWord, distanceM, formatDistance, hhmm, isDone, openAt, pointOf, walkMinutes,
   appleWalkUrl, googleWalkUrl, type Chain, type LatLng, type Mood, type Ranked,
@@ -327,6 +327,61 @@ export const GroupMarks: React.FC<{ items: SpotItem[] }> = ({ items }) => {
         <p>今日歩いた順: {visited.map((i) => `${i.title}${i.visited_by ? `(${i.visited_by})` : ''}`).join(' → ')}</p>
       )}
       {wants.length > 0 && <p>行きたい印: {wants.map((i) => `${i.title} ${i.wanted_by.length}`).join('・')}</p>}
+    </section>
+  );
+};
+
+/**
+ * [Gate SpotMode-2] 別行動: 集合の場所・時刻だけを決めて分かれる。みんなの約束を一覧で見る。今いる場所は共有しない。
+ */
+export const SplitPanel: React.FC<{
+  splits: SpotSplit[]; defaultTime: string | null; defaultLabel: string | null; busy: boolean;
+  onSplit: (input: { meet_label?: string; meet_time?: string; note?: string }) => void; onRejoin: () => void;
+}> = ({ splits, defaultTime, defaultLabel, busy, onSplit, onRejoin }) => {
+  const mine = splits.find((s) => s.is_me) ?? null;
+  const [open, setOpen] = useState(false);
+  const [time, setTime] = useState(mine?.meet_time ?? defaultTime ?? '');
+  const [label, setLabel] = useState(mine?.meet_label ?? defaultLabel ?? '');
+  const [note, setNote] = useState(mine?.note ?? '');
+  return (
+    <section className="tc-spot-split" aria-labelledby="spot-split-title">
+      <h3 id="spot-split-title">別行動と集合(位置は共有しません)</h3>
+      {splits.length > 0 ? (
+        <ul className="tc-spot-split__list" aria-label="別行動の約束">
+          {splits.map((s) => (
+            <li key={`${s.name}${s.meet_time}`}>
+              <b>{s.is_me ? `${s.name}(自分)` : s.name}</b>: {s.meet_time}{s.meet_label ? ` に ${s.meet_label}` : ''} で合流
+              {s.note ? ` ・ ${s.note}` : ''}
+            </li>
+          ))}
+        </ul>
+      ) : <p className="tc-spot-note">別行動の人はいません。</p>}
+      {!open && (
+        <div className="tc-spot-grid2">
+          <button type="button" className="tc-spot-btn" onClick={() => setOpen(true)}>{mine ? '集合を変える' : '別行動にする'}</button>
+          {mine && <button type="button" className="tc-spot-btn tc-spot-btn--primary" disabled={busy} onClick={onRejoin}>合流した</button>}
+        </div>
+      )}
+      {open && (
+        <form className="tc-spot-split__form" onSubmit={(e) => {
+          e.preventDefault();
+          onSplit({ ...(time ? { meet_time: time } : {}), ...(label.trim() ? { meet_label: label.trim() } : {}),
+            ...(note.trim() ? { note: note.trim() } : {}) });
+          setOpen(false);
+        }}>
+          <label htmlFor="split-time">集合の時刻</label>
+          <input id="split-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <label htmlFor="split-label">集合の場所</label>
+          <input id="split-label" value={label} maxLength={100} placeholder="例: 駐車場" onChange={(e) => setLabel(e.target.value)} />
+          <label htmlFor="split-note">ひとこと(任意)</label>
+          <input id="split-note" value={note} maxLength={200} placeholder="例: 赤福で並びます" onChange={(e) => setNote(e.target.value)} />
+          <div className="tc-spot-grid2">
+            <button type="submit" className="tc-spot-btn tc-spot-btn--primary" disabled={busy}>みんなに知らせる</button>
+            <button type="button" className="tc-spot-btn" onClick={() => setOpen(false)}>やめる</button>
+          </div>
+          <p className="tc-spot-fine">集合の約束だけをメンバーに知らせます。今いる場所は送りません。</p>
+        </form>
+      )}
     </section>
   );
 };

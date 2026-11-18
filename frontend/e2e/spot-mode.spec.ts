@@ -79,6 +79,17 @@ test('スポットモード: 候補をエリアにまとめ、地図と一覧で
   expect((await visited).status()).toBe(200);
   await expect(list.getByRole('button', { name: /豚捨\(訪問済み\)/ })).toBeVisible();
 
+  // 別行動: 集合の約束だけを知らせる(位置は送らない)
+  const split = page.getByRole('region', { name: /別行動と集合/ });
+  await split.getByRole('button', { name: '別行動にする' }).click();
+  await split.getByLabel('ひとこと(任意)').fill('赤福で並びます');
+  const splitRes = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/split$/.test(new URL(r.url()).pathname));
+  await split.getByRole('button', { name: 'みんなに知らせる' }).click();
+  expect((await splitRes).status()).toBe(200);
+  await expect(split.getByRole('list', { name: '別行動の約束' })).toContainText('15:30 に 駐車場 で合流');
+  await split.getByRole('button', { name: '合流した' }).click();
+  await expect(split).toContainText('別行動の人はいません');
+
   await page.getByRole('button', { name: /次どこ？/ }).click();
   const next = page.getByRole('region', { name: '次どこ行く？' });
   await next.getByRole('button', { name: '雨・屋内' }).click();
