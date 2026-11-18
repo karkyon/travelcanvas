@@ -22,6 +22,7 @@ const IndoorDialog: React.FC<Props> = ({ planId, isOpen, variant, revision, onCl
   const [target, setTarget] = useState<string>('');
   const [rows, setRows] = useState<IndoorCandidate[] | null>(null);
   const [region, setRegion] = useState<string | null>(null);
+  const [failedCount, setFailedCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -38,6 +39,7 @@ const IndoorDialog: React.FC<Props> = ({ planId, isOpen, variant, revision, onCl
     indoorCandidates(planId, variant.day_id, target || null).then((r) => {
       if (!live) return;
       setRows(r.candidates);
+      setFailedCount(r.failed_providers?.length ?? 0);
       setRegion(r.message ?? (r.region ? `${r.region.label}${r.region.radius_km ? `(約${r.region.radius_km}km)` : ''}` : null));
     }).catch((e) => { if (live) { setRows([]); setError(errorDetailMessage(e, '候補を探せませんでした')); } });
     return () => { live = false; };
@@ -73,7 +75,9 @@ const IndoorDialog: React.FC<Props> = ({ planId, isOpen, variant, revision, onCl
           {region && <p className="tc-variant-hint">{`探した範囲: ${region}`}</p>}
           {error && <p role="alert" className="text-sm text-danger">{error}</p>}
           {rows === null ? <p className="tc-variant-hint" role="status">探しています…</p> : rows.length === 0 ? (
-            <p className="tc-variant-hint">屋内の候補が見つかりませんでした。予定の追加の「名前で検索」でも探せます。</p>
+            failedCount > 0
+              ? <p role="alert" className="text-sm text-danger" data-testid="indoor-provider-failed">場所の検索サービスに繋がらず、候補を取れませんでした(0件という意味ではありません)。少し待って開き直してください。</p>
+              : <p className="tc-variant-hint">屋内の候補が見つかりませんでした。予定の追加の「名前で検索」でも探せます。</p>
           ) : (
             <ul className="tc-variant-checks" data-testid="indoor-list">
               {rows.map((c) => (
