@@ -90,7 +90,7 @@ export async function saveOfflinePack(
 export async function loadOfflinePack<T = unknown>(planId: string, session: OfflinePackSession | null): Promise<T | null> {
   const record = await idbGet<StoredPack | LegacyPack>(PACKS_STORE, planId);
   if (!record) return null;
-  if (Date.now() > record.expiresAt) {
+  if (Date.now() >= record.expiresAt) {
     await deleteOfflinePack(planId);
     return null;
   }
@@ -123,6 +123,17 @@ export async function loadOfflinePack<T = unknown>(planId: string, session: Offl
 
 export async function deleteOfflinePack(planId: string): Promise<void> {
   await idbDelete(PACKS_STORE, planId);
+}
+
+/** 保存したオフラインパックの期限案内。期限切れの内容は消すが、画面には期限切れを知らせられる。 */
+export async function getOfflinePackExpiry(
+  planId: string,
+): Promise<{ expiresAt: number; expired: boolean } | null> {
+  const record = await idbGet<StoredPack | LegacyPack>(PACKS_STORE, planId);
+  if (!record) return null;
+  const expired = Date.now() >= record.expiresAt;
+  if (expired) await deleteOfflinePack(planId);
+  return { expiresAt: record.expiresAt, expired };
 }
 
 export async function isOfflinePackAvailable(planId: string): Promise<boolean> {
