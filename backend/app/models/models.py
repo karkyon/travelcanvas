@@ -4225,3 +4225,74 @@ class ConstraintUndoSnapshot(Base):
         Index("ix_constraint_undo_snapshots_plan", "plan_id", "created_at"),
         Index("ix_constraint_undo_snapshots_actor", "actor_user_id"),
     )
+
+
+class SpotArea(Base):
+    """[Gate SpotMode] FR-060 自由に歩くエリア(DOC-02 v6.0 FR-060・DOC-04 SC-49/50)。
+
+    旅程の中で順番を決めずに歩く範囲。中の候補(SpotAreaItem)は候補箱を指す。時刻は日の現地の時刻(HH:MM)。
+    """
+    __tablename__ = "spot_areas"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    day_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_days.id", ondelete="SET NULL"), nullable=True)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    start_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    end_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    meet_label: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    meet_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    meet_latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    meet_longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    radius_m: Mapped[int] = mapped_column(Integer, nullable=False, default=400, server_default="400")
+    suggest_on_approach: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True,
+                                                      server_default=text("true"))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+
+    items = relationship("SpotAreaItem", cascade="all, delete-orphan", passive_deletes=True,
+                         order_by="SpotAreaItem.sort_order")
+
+    __table_args__ = (
+        CheckConstraint("radius_m BETWEEN 100 AND 3000", name="ck_spot_areas_radius"),
+        Index("ix_spot_areas_plan", "plan_id"),
+        Index("ix_spot_areas_day", "day_id"),
+        Index("ix_spot_areas_created_by", "created_by_user_id"),
+    )
+
+
+class SpotAreaItem(Base):
+    """[Gate SpotMode] FR-060 エリアの候補。着いた・今日はやめる・行きたい印はここに持つ(候補箱の状態は変えない)。"""
+    __tablename__ = "spot_area_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("spot_areas.id", ondelete="CASCADE"), nullable=False)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_candidates.id", ondelete="CASCADE"), nullable=False)
+    genre: Mapped[str] = mapped_column(String(8), nullable=False, default="other", server_default="other")
+    priority: Mapped[str] = mapped_column(String(5), nullable=False, default="maybe", server_default="maybe")
+    stay_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=20, server_default="20")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    visited_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    visited_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    skipped: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    wanted_by: Mapped[Any] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+
+    candidate = relationship("PlanCandidate")
+
+    __table_args__ = (
+        CheckConstraint("genre IN ('food','cafe','gift','sight','rest','other')", name="ck_spot_area_items_genre"),
+        CheckConstraint("priority IN ('want','maybe')", name="ck_spot_area_items_priority"),
+        CheckConstraint("stay_minutes BETWEEN 5 AND 240", name="ck_spot_area_items_stay"),
+        UniqueConstraint("area_id", "candidate_id", name="uq_spot_area_items_candidate"),
+        Index("ix_spot_area_items_area", "area_id", "sort_order"),
+        Index("ix_spot_area_items_candidate", "candidate_id"),
+        Index("ix_spot_area_items_visited_by", "visited_by_user_id"),
+    )

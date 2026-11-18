@@ -22,6 +22,8 @@ vi.mock('@/services/api', () => ({
 }));
 // [Gate K1] 当日画面の保存は利用者ごとの鍵で暗号化する(offlineVault)
 const SESSION = { userId: 'user-today', sessionTag: 'login-1', legacyToken: null };
+// [Gate SpotMode] 自由に歩くエリアの札(この旅行にエリアは無い)
+vi.mock('@/services/api/spotAreas', () => ({ listSpotAreas: vi.fn(async () => ({ areas: [], can_edit: true, genres: {} })) }));
 vi.mock('@/utils/offlineSession', () => ({ currentOfflineSession: () => SESSION }));
 vi.mock('./today/TodaySwitchPanel', () => ({ default: () => null }));
 // [Gate TDay] 当日の地図(Leaflet・後から読む)はこの試験の対象外

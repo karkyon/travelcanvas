@@ -1376,6 +1376,15 @@ const PlannerPage: React.FC = () => {
                 >
                   相談・投票
                 </Button>
+                {/* [Gate SpotMode] FR-060 自由に歩くエリア */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/planner/${currentPlan.id}/spot-areas`)}
+                  icon={<UiIcon icon={MapIcon} />}
+                >
+                  自由に歩くエリア
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

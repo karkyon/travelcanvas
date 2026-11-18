@@ -1,4 +1,4 @@
-# 全59 FR の要求の追跡(Gate Hardening-A・監査 G-01/G-03)
+# 全60 FR の要求の追跡(Gate Hardening-A・監査 G-01/G-03。FR-060 は Gate SpotMode)
 
 > この文書は `python3 scripts/ci/render_fr_trace.py` が `docs/trace/fr-requirements.json` と `docs/trace/fr-status.json` から作る(手で直さない)。
 > 要求の原文の正本は DOC-02 v6.0(`docs/spec/DOC-02_要件定義書_v6.0.md`。所在の一覧は [CANONICAL-SOURCES.md](../spec/CANONICAL-SOURCES.md))。ここの要約・受入は抜粋の言い換え。
@@ -69,12 +69,13 @@
 | FR-057 | Memory Replan | VERIFIED | ● | ● | ● | ● | ● | ○ | — | ○ | 運用待ち |
 | FR-058 | Entitlement・料金 | INTEGRATED(部分) | ● | ◐ | ◐ | ◐ | ◐ | ○ | ○ | ○ | 設定待ち・未実装・利用者判断待ち |
 | FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ● | ◐ | ◐ | ● | ◐ | ○ | ○ | ○ | 設定待ち・実通信待ち・未実装 |
+| FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | ● | ◐ | ● | ● | ◐ | ○ | ○ | ○ | 実機待ち・実通信待ち・未実装 |
 
 | 集計 | 要件の根拠 | 実装 | 統合試験 | E2E | 権限・失敗系 | 実機 | 実 API | 運用(本番) |
 |---|---|---|---|---|---|---|---|---|
-| ● 証拠あり | 59 | 44 | 44 | 56 | 38 | 0 | 0 | 0 |
-| ◐ 一部 | 0 | 15 | 15 | 3 | 21 | 0 | 0 | 0 |
-| ○ 未実施・未確認 | 0 | 0 | 0 | 0 | 0 | 59 | 24 | 59 |
+| ● 証拠あり | 60 | 44 | 45 | 57 | 38 | 0 | 0 | 0 |
+| ◐ 一部 | 0 | 16 | 15 | 3 | 22 | 0 | 0 | 0 |
+| ○ 未実施・未確認 | 0 | 0 | 0 | 0 | 0 | 60 | 25 | 60 |
 | — 対象外(理由を書く) | 0 | 0 | 0 | 0 | 0 | 0 | 35 | 0 |
 
 ## 2. FR ごとの要求の根拠と対応
@@ -798,3 +799,16 @@
 - **外部の提供元:** OpenAI(ai.generate)・Google Places・Google Routes・Google Maps Static
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API ○(実の提供元での確認なし(CI は模擬): OpenAI(ai.generate)・Google Places・Google Routes・Google Maps Static) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load(Maps Static)の adapter は Remaining-7(実の鍵での確認・請求の照合は鍵の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する
+
+### FR-060 スポットモード(自由に歩くエリア)
+
+- **出典:** DOC-02 FR-060(v6.0 で追加。利用者の決定 2026-11-18。v5.1 には無かった)(優先度 SHOULD・段階 —)
+- **要求(抜粋):** 旅程に自由に歩くエリアを置き、当日は予定とスポットモードを切り替えて、エリアの中の候補を天気・体調・気分で選んで歩く
+- **受入(抜粋):** エリアを作って当日に予定とスポットを行き来でき、絞り込み・次どこ？・着いた・周りを探す・方角で見るが使え、集合に間に合う戻り始めが分かる
+- **承認済みの変更 2026-11-18:** FR-060 スポットモードを追加(モックアップ「TravelCanvas スポットモード」を利用者が承認)(出典: DOC-10 r59・Gate SpotMode・確度 高)
+- **仕様の参照:** 画面 SC-49・SC-50 / API 群 /plans/{plan_id}/spot-areas
+- **実装:** API `backend/app/api/v1/spot_areas.py` / 画面 `/planner/:planId/spot/:areaId`・`/planner/:planId/spot-areas` / 表 `spot_areas`・`spot_area_items`
+- **試験:** `backend/tests/test_gate_spot_mode.py`・`frontend/src/pages/SpotModePage.test.tsx`・`frontend/src/pages/spot/spotModel.test.ts`・`frontend/e2e/spot-mode.spec.ts`
+- **外部の提供元:** OpenStreetMap(地図の絵)・場所の検索(place_finder。周りを探す)
+- **証拠:** 実機 ○(実機(iPhone・Android・iPad)の位置・地図・画面の大きさの確認の記録なし) / 実 API ○(実の場所の検索での周りを探すの確認なし(CI は模擬)) / 運用(本番) ○(本番での提供なし)
+- **主な不足(fr-status.json):** エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施。旅帖(思い出)への歩いた順の記録・地図の絵の端末への保存(OpenStreetMap の方針で事前の一括取得はしない)・別行動の集合の共有は未実装

@@ -53,6 +53,9 @@ const TripKitRoute = lazyPage(() => import('@/pages/TripKitRoute'));
 const ImportsPage = lazyPage(() => import('@/pages/ImportsPage'));
 const DocumentsPage = lazyPage(() => import('@/pages/DocumentsPage'));
 const TodayPage = lazyPage(() => import('@/pages/TodayPage'));
+// [Gate SpotMode] FR-060 スポットモード(SC-49)・自由に歩くエリアの準備(SC-50)
+const SpotModePage = lazyPage(() => import('@/pages/SpotModePage'));
+const SpotAreasPage = lazyPage(() => import('@/pages/SpotAreasPage'));
 const SegmentsPage = lazyPage(() => import('@/pages/SegmentsPage'));
 const RouteOptionsPage = lazyPage(() => import('@/pages/RouteOptionsPage'));
 const ConstraintsPage = lazyPage(() => import('@/pages/ConstraintsPage'));
@@ -203,6 +206,15 @@ export const router = createBrowserRouter([
       {
         path: 'planner/:planId/today',
         element: guard(<TodayPage />),
+      },
+      // [Gate SpotMode] FR-060 スポットモード(SC-49)と自由に歩くエリアの準備(SC-50)
+      {
+        path: 'planner/:planId/spot/:areaId',
+        element: guard(<SpotModePage />),
+      },
+      {
+        path: 'planner/:planId/spot-areas',
+        element: guard(<SpotAreasPage />),
       },
 
       // 🚶 [Gate M2] 移動区間(FR-014)。backend(Gate M1)は実装済みだった

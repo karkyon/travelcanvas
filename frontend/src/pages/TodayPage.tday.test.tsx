@@ -40,6 +40,8 @@ vi.mock('@/services/api/travelDay', () => ({
 vi.mock('@/services/api/dayVariants', () => ({ getWeather: m.getWeather }));
 vi.mock('@/services/api/photoFeatures', () => ({ getMemoryThumbnail: vi.fn(async () => { throw new Error('x'); }) }));
 vi.mock('@/services/api/tripIntent', () => ({ getAreaImages: vi.fn(async () => ({})) }));
+// [Gate SpotMode] 自由に歩くエリアの札(この旅行にエリアは無い)
+vi.mock('@/services/api/spotAreas', () => ({ listSpotAreas: vi.fn(async () => ({ areas: [], can_edit: true, genres: {} })) }));
 vi.mock('@/utils/offlineSession', () => ({ currentOfflineSession: () => ({ userId: 'u', sessionTag: 's', legacyToken: null }) }));
 vi.mock('./today/TodaySwitchPanel', () => ({ default: () => null }));
 vi.mock('./today/live/TodayMap', () => ({ default: () => <div data-testid="today-map">地図</div> }));

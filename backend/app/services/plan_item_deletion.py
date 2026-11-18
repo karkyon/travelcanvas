@@ -58,6 +58,8 @@ DAY_REFERENCE_POLICY: Dict[tuple, str] = {
     ("travel_events", "day_id"): "delete",  # 予定ごとに EVENT_REFERENCE_POLICY を適用する
     # [Gate PlanB] 写した元の案(日の行)。元を消しても写した案は残す(外部キーは ON DELETE SET NULL)
     ("travel_days", "copied_from_day_id"): "unlink",
+    # [Gate SpotMode] 自由に歩くエリアの日。日を消してもエリアは残し、日なしにする(外部キーは ON DELETE SET NULL)
+    ("spot_areas", "day_id"): "unlink",
 }
 ROUTE_OPTION_REFERENCE_POLICY: Dict[tuple, str] = {
     ("travel_segments", "route_option_id"): "unlink",
