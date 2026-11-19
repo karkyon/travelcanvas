@@ -118,6 +118,21 @@ def test_bundle_roundtrip_is_encrypted_and_wrong_pass_fails(monkeypatch, tmp_pat
         mod.unpack(out, bad, "wrong-pass-phrase-1")
 
 
+def test_unpack_garbage_after_padding_collision_is_transfer_error(monkeypatch, tmp_path):
+    """誤った合言葉が約 1/256 で padding 検査を通り tar でない中身になっても、TransferError で断る(CI #786 の不安定の再現)。"""
+    mod = _load(monkeypatch, tmp_path, tmp_path / "art")
+
+    def fake_decrypt(src, dst, passphrase):
+        Path(dst).write_bytes(b"garbage-not-a-tar" * 40)
+
+    monkeypatch.setattr(mod, "decrypt", fake_decrypt)
+    dest = tmp_path / "in3"
+    dest.mkdir()
+    with pytest.raises(mod.TransferError, match="復号できません"):
+        mod.unpack(tmp_path / "x.enc", dest, "whatever")
+    assert not (dest / "bundle.tar").exists()
+
+
 def test_unpack_rejects_paths_outside(monkeypatch, tmp_path):
     mod = _load(monkeypatch, tmp_path, tmp_path / "art")
     plain = tmp_path / "evil.tar"

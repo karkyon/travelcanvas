@@ -306,7 +306,13 @@ def pack(work: Path, bid: str, key_lines: Dict[str, Optional[str]], meta: Dict[s
 def unpack(enc: Path, work: Path, passphrase: str) -> Tuple[Dict[str, object], Dict[str, Optional[str]]]:
     plain = work / "bundle.tar"
     decrypt(enc, plain, passphrase)
-    with tarfile.open(plain, "r") as tar:
+    try:
+        tar = tarfile.open(plain, "r")
+    except tarfile.ReadError as e:
+        # 誤った合言葉でも約 1/256 は openssl の padding 検査を通り、壊れた中身になる。同じ「復号できません」で断る
+        plain.unlink(missing_ok=True)
+        raise TransferError("復号できません(合言葉が違うか、束が壊れています)") from e
+    with tar:
         members = tar.getmembers()
         for m in members:
             if not m.isfile() or "/" in m.name or m.name.startswith(".") or m.name in ("", ".."):
