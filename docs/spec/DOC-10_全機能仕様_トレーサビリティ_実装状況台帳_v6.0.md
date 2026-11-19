@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v6.0(正本)
 
-> 文書ID: DOC-10 / 版: **v6.0-r60** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
+> 文書ID: DOC-10 / 版: **v6.0-r61** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -30,12 +30,12 @@
 
 | 成果物 | 役割 | 同期の規則 |
 |---|---|---|
-| `docs/trace/fr-status.json` | 全59 FR の状態・(部分)・主な不足の**機械が読む正本** | 状態を変える Gate は同じ commit でこれを直し、`python3 scripts/ci/render_doc10.py` で本書の表を作り直す |
+| `docs/trace/fr-status.json` | 全60 FR の状態・(部分)・主な不足の**機械が読む正本** | 状態を変える Gate は同じ commit でこれを直し、`python3 scripts/ci/render_doc10.py` で本書の表を作り直す |
 | `docs/trace/v1-verification-ledger.json` | VERIFIED の**証拠**(E2E・権限・競合・セキュリティ・運用の試験) | CI が、参照した試験の実在(`test_gate_v1_verification_ledger.py`)と、**その実行での合格**(`scripts/ci/check_ledger_results.py`)を確かめる |
 | 本書(DOC-10) | 人が読む正本(状態の判定規則・集計・リリース・次工程) | 生成部分は手で直さない(CI が落ちる) |
 | `docs/spec/FR-059_*.md` | FR-059(外部 API の原価上限・利用者クラス別 quota)の要件・データ・API・運用の正本 | 資料室の DOC-02/04/05/06/07/09/11/13 の該当箇所より優先する(同書 §12)。policy の版を変える時は同書と本書を同じ PR で直す |
 | `docs/spec/canonical-sources.json`(人が読む版 `CANONICAL-SOURCES.md`) | 資料室の正本(DOC-01〜15)の所在・版・状態と、リポジトリの正本との優先の順(Hardening-A) | 資料室の文書の版が変わったら直し、`python3 scripts/ci/render_fr_trace.py` |
-| `docs/trace/fr-requirements.json`(人が読む版 `docs/trace/FR-TRACE.md`) | 全59 FR の要求の出典・受入・承認済みの変更・画面/API/表/試験・証拠の区分(要件根拠/実装/統合/E2E/権限・失敗/実機/実 API/運用)・残件の分類 | FR の状態・残件を変える Gate は同じ commit で直す。実機・実 API・運用を「済」にするには証拠のファイルが要る(`test_gate_hardening_trace.py`) |
+| `docs/trace/fr-requirements.json`(人が読む版 `docs/trace/FR-TRACE.md`) | 全60 FR の要求の出典・受入・承認済みの変更・画面/API/表/試験・証拠の区分(要件根拠/実装/統合/E2E/権限・失敗/実機/実 API/運用)・残件の分類 | FR の状態・残件を変える Gate は同じ commit で直す。実機・実 API・運用を「済」にするには証拠のファイルが要る(`test_gate_hardening_trace.py`) |
 | `docs/security/SECURITY-TRACE.md` | DOC-11 の項目・SEC-001〜020 と実装・試験・本番の証跡の対応 | 参照の実在を CI で確かめる |
 | `docs/trace/gate-*-trace.md` | Gate ごとの要件の証拠(当時の状態) | 後の Gate で解消した行には `SUPERSEDED BY` を書く。今の状態の索引は `docs/trace/INDEX.md` |
 | 作業継続のハンドオフ(資料室) | 会話をまたぐ作業の引き継ぎ | 本書の版と commit を書く。状態の数字は本書から写す |
@@ -64,7 +64,7 @@
 - **E2E 列:** ✓=Playwright の実ブラウザ試験あり、一部=一部の能力だけ、✗=なし。E2E が無い機能は VERIFIED にしない。
 - 段を飛ばさない(SCAFFOLDED から VERIFIED へ一気に上げない)。後退する時は理由を §9 に残す。
 
-## 2. 集計(全59 FR)
+## 2. 集計(全60 FR)
 
 <!-- generated:summary -->
 | 見方 | 値 |
@@ -79,7 +79,7 @@
 VERIFIED の一覧: 001/002/003/004/005/006/009/010/012/013/016/017/019/020/021/022/023/025/026/027/028/029/031/032/033/034/038/039/040/043/044/045/047/048/050/051/053/057。
 <!-- /generated:summary -->
 
-## 3. 親機能のトレーサビリティ(全59 FR)
+## 3. 親機能のトレーサビリティ(全60 FR)
 
 画面・DB・API・試験の対応の詳細は各 Gate の trace(`docs/trace/gate-*-trace.md`)と ADR(`docs/adr/`)。
 VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
@@ -250,7 +250,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r24 | 2026-10-28 | `540955d`+G11-Media | Gate G11-Planner(G11 の段階2): 予定ごとの営業時間の照合(`GET /plans/{id}/hours-check`。時間内・閉店間際・最終入場・ラストオーダー・滞在中に閉まる・休業・未確認・古い出典)と予定のカードの帯、予定へ着く移動の名前(新幹線・ヘリを足す。migration `b8d4f6a0c3e5`)・日の現地の時刻帯・時差をまたぐ区間の両端の現地の日時、触って使う並べ替え(上へ・下へ)と再確認の知らせ、全日程の横断チャート。FR の状態の遷移なし(FR-005 の実機のタッチ・FR-014 の外部の時刻表は残る)。`docs/trace/gate-g11-planner-trace.md` |
 | r25 | 2026-10-28 | `b21e47b`+G11-Planner | Gate G11-Discover(G11 の段階3): 外部の画像・SNS の provider の interface(設定で止められる。値を作らない)、Wikimedia Commons の写真の候補(作者・ライセンス・出典。CC0・PD・CC BY・CC BY-SA だけ取り込める)と非公開の記録への取り込み(記録と同じ検査・撮影情報の除去・暗号化。出典を残す)、YouTube・TikTok の公式 oEmbed による SNS の投稿の確認(投稿へ直接つながない。取れない時は URL とメモ)と候補箱への social の保存、予定のカードの写真、近くの検索のカテゴリ・半径・距離・Overpass の正規表現の逃がし。migration なし(G11-Media で用意した列を使う)。FR-007 の gaps を「SNS 以外の URL の題名・画像の取得」に狭めた(部分のまま)。`docs/trace/gate-g11-discover-trace.md`・`docs/adr/ADR-media-providers.md` |
 | r26 | 2026-10-29 | `1c25a37` | Gate G11-Planner2(G11 の段階6): 路線バス・高速バスの区別(migration `c4e8a1f3b7d2` で区間の mode に express_bus)、移動の区間をタイムラインの独立した行に出し並べ替えで合わなくなった区間を知らせる、並べ替えの影響(順・営業時間・区間)と元に戻す、確定の予定を動かさない(確定の予定がある日の並べ替えが 409 で失敗していた不具合を直した)。G11-Style・G11-Intake(段階4・5)はDOC-10 を変えていない。FR の状態の遷移なし。`docs/trace/gate-g11-planner2-trace.md` |
-| r27 | 2026-10-29 | `6571fc5` | Gate FR059-A: 外部 API の原価上限(1旅行 50円・全 provider の合計・ちょうど 50円は許可・40円で警告)と利用者クラス別 quota(Guest 0・Free 月1旅行/50円・Trip Pass 対象の1旅行・Plus 月5旅行/250円・Family/Group 人数で増えない・Pro/B2B 契約)を正本 `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md` にし、FR-059 を SPECIFIED で登録(全59 FR)。FR-058 は価格・決済に絞った。資料室の追補との差異は同書 §13。docs だけ。`docs/trace/gate-fr059a-trace.md` |
+| r27 | 2026-10-29 | `6571fc5` | Gate FR059-A: 外部 API の原価上限(1旅行 50円・全 provider の合計・ちょうど 50円は許可・40円で警告)と利用者クラス別 quota(Guest 0・Free 月1旅行/50円・Trip Pass 対象の1旅行・Plus 月5旅行/250円・Family/Group 人数で増えない・Pro/B2B 契約)を正本 `docs/spec/FR-059_旅程相談API原価上限_利用者クラス別Quota_v6.0.md` にし、FR-059 を SPECIFIED で登録(全60 FR)。FR-058 は価格・決済に絞った。資料室の追補との差異は同書 §13。docs だけ。`docs/trace/gate-fr059a-trace.md` |
 | r28 | 2026-10-29 | `6571fc5`+FR059-A | Gate FR059-B: 外部 API の原価の守りをサーバーに実装(migration `d5f9b2c8e1a3`: entitlements・usage_policy_profiles(policy 2026-10-29.1 の6クラス)・usage_budget_accounts・provider_usage_reservations・provider_usage_events)。クラスの解決(Guest 0・Free・Trip Pass・Plus・Family・Pro の契約の例外は二者の承認の後だけ)、旅行・月の口座の行の鍵による原子的な予約(ちょうど 50円は許可)、回数・token の上限、冪等・確定・解放・期限切れの回復、再試行1回、見込みの超過と請求の照合の差で provider を止める、`GET /entitlements`・`GET /plans/{id}/planning-usage`・`POST /plans/{id}/planning-actions/estimate`・管理の申請と承認、旅程・下書き・旅行相談の利用枠の表示。FR-059 を INTEGRATED(部分)(外部の有料 provider は未接続)。`docs/trace/gate-fr059b-trace.md` |
 | r29 | 2026-10-29 | `6571fc5`+FR059-B | Gate G11-Vote(G11 の段階8): 候補箱で家族・グループが候補に投票する(合意形成 FR-022 の投票の選択肢を候補にする仕組みを使う。新しい表なし)。FR-007 の gaps から「候補への投票」を外した(OCR・音声認識・URL の題名が残るため(部分)のまま)。間の Gate CI-429(接続元の点数の log)・G11-Preview(並べ替えの案)は DOC-10 を変えていない。`docs/trace/gate-g11-vote-trace.md` |
 | r30 | 2026-10-30 | `b75c645`+G11-Layout | Gate FR059-C: FR-059 正本 §13 D14 provider の停止(見込みの超過・請求の照合の差)を Redis の印で全ての worker・運用のコマンドが共有する(届かない間は process の中で止め、届いた時に送る)。運用者の再開 `tcops.py security provider-resume`(理由が必須)。FR-059 の gaps から D14 を外した(外部の有料 provider は未接続のため INTEGRATED(部分)のまま)。間の Gate G11-Layout(一覧のずれ・競合の後の読み直し)・UX6-Icons(旅程の中の移動の絵文字)は DOC-10 を変えていない。`docs/trace/gate-fr059c-trace.md` |
@@ -278,12 +278,13 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | **r52** | 2026-11-14 | `PR #110` | **Remaining-6: パスワードの再設定(忘れた時)・メールの確認の API と画面(FR-003)、1 通の予約メールを予約ごとに分ける(FR-011)、SNS 以外の URL の題名・説明・場所(FR-007)、写真の地図の印のまとめ(FR-037)、Atlas のテーマ別(FR-052)、GCP 配備の準備(開発の image の字体・購読 URL の https)。古い残り(FR-012 のバーコード・FR-032/048 の sw.js)を直す** |
 | **r53** | 2026-11-14 | `PR #111` | **Remaining-7: passkey(FR-003)・画像と声からの候補(FR-007)・Gmail の連携(FR-011)・候補の層と地図タイル(FR-049)・予定の経路と軌跡の比べ(FR-054)・場所の詳細/写真/静的な地図/AI の Web 検索の adapter(FR-059)・制約の Undo(FR-016)と区間・経路の Undo の E2E(FR-014/015)・予算との連動(FR-026)・ゲストを既存のアカウントへまとめる(FR-002)。migration `e8a2c4f6b1d3`** |
 | **r54** | 2026-11-16 | `dev/tripkit-ui` | **TripKitUI・HomePlace・HomeRoute: 旅行箱の 6 画面(概要・予約・準備・予算・文書・予約の取込)と検索の見出し・まとめの札・一覧の行・切り替えを同じ部品にそろえる。自宅の場所(本人だけ・暗号化。登録・地図に出す・経路に使う・提供元へ送るを本人が選ぶ)。旅程の地図に前の夜の宿・今夜の宿(連泊)・自宅の印と線(宿=紫・予定の間=緑・自宅=青)。migration `a3c7e9f1b5d2`** |
-| **r55** | 2026-11-17 | `a2c419d`+Hardening-A | **製品固めゲート監査(2026-11-17)の是正: 共通正本(DOC-02/04/05/06/11/13)は資料室の v5.1(2026-09-03 発効)にあることを記録し所在を `docs/spec/CANONICAL-SOURCES.md` に(G-01・G-09)、全59 FR の要求の根拠・承認済みの変更・8 区分の証拠・残件の分類を `docs/trace/FR-TRACE.md` に(G-01・G-03)、DOC-11 の対応 `docs/security/SECURITY-TRACE.md`、SEC-009 の判定を差し替えない試験、開発の環境の間の同じ鍵の移し方を本番・ステージングで止める(G-10)、総合テストの縦断シナリオ `docs/test/integrated-acceptance-scenarios.md`、再判定とゲート判定 `docs/audit/2026-11-17_product-hardening-gate_addendum.md`。FR の状態の遷移なし。`docs/trace/gate-hardening-trace.md`** |
+| **r55** | 2026-11-17 | `a2c419d`+Hardening-A | **製品固めゲート監査(2026-11-17)の是正: 共通正本(DOC-02/04/05/06/11/13)は資料室の v5.1(2026-09-03 発効)にあることを記録し所在を `docs/spec/CANONICAL-SOURCES.md` に(G-01・G-09)、全60 FR の要求の根拠・承認済みの変更・8 区分の証拠・残件の分類を `docs/trace/FR-TRACE.md` に(G-01・G-03)、DOC-11 の対応 `docs/security/SECURITY-TRACE.md`、SEC-009 の判定を差し替えない試験、開発の環境の間の同じ鍵の移し方を本番・ステージングで止める(G-10)、総合テストの縦断シナリオ `docs/test/integrated-acceptance-scenarios.md`、再判定とゲート判定 `docs/audit/2026-11-17_product-hardening-gate_addendum.md`。FR の状態の遷移なし。`docs/trace/gate-hardening-trace.md`** |
 | **r56** | 2026-11-17 | `14065fe`+Hardening-A+DocsV6 | **資料の体系を v6.0 へ(利用者の指示 2026-11-17「完全に更新し旧バージョンは保管へ」): 本書を `DOC-10_*_v6.0.md`(版 v6.0-r56。r の番号は続ける)、FR-059 正本を v6.0 の名前へ。DOC-02 要件定義書 v6.0 をリポジトリの正本として作成(FR 59 件・プランB・FR-059・承認済みの変更を本文へ。FC・NFR・AC・EX は削らず引き継ぎ)。資料体系の README v6.0(`docs/spec/README.md`)・保管の索引(`docs/spec/archive/v5.1/`)。FR の状態の遷移なし** |
 | r57 | 2026-11-17 | `167f266`+DocsV6-2 | **資料の体系 v6.0 の段階 2: DOC-04 画面仕様 v6.0(画面 ID と実装の経路の対応 §19、実装済みの画面 SC-44 旅行箱・SC-45 旅行相談・SC-46 旅行の下書き・SC-47 料金と利用枠・SC-48 写真の投稿を追加、SC-17 をプランBへ、今日の画面を旅帖ライブに、DOC04-A を §20 へ統合)、DOC-13 用語集 v6.0(プランB・旅行箱・旅帖・利用枠・移動手段・移動時間の出どころ・地図の線の言葉、エラーの code の正本を error-catalog に)。v5.1 は保管。FR の状態の遷移なし** |
 | r58 | 2026-11-17 | DocsV6-2+ChatConsensus | **相談を話し合い中心にする(利用者の決定 2026-11-17): 画面はタブなしで「決まったこと」「投票」「話し合い」。発言の「これで決まり」(投票なしで記録・旅程へ反映)・「投票にする」(題名と選択肢の下書き)・かんたん投票を既定(1人1つ)・4段階・定足数・不可は「詳しい設定」・AI の選択肢の案(任意・同意と枠・名前を送らない・伏せ字・根拠の無い案を捨てる・保存しない)。API: POST /polls/decision・POST /polls/suggest-options、polls.mode・source_comment_id(Alembic `b7e3c9a1d5f4`)。DOC-02 FR-022・FC-065、DOC-04 SC-19・SC-20、DOC-13 §20 を更新。FR-022 は VERIFIED のまま(試験 backend/tests/test_gate_chat_consensus.py・frontend/e2e/discussion.spec.ts を証拠に追加)** |
 | r59 | 2026-11-18 | ChatConsensus+SpotMode | **FR-060 スポットモード(自由に歩くエリア)を追加(利用者の決定 2026-11-18。モックアップを承認): 旅程に順番を決めない「自由に歩くエリア」を置き、当日は予定 ⇄ スポットを切り替え、地図・ジャンルの絞り込み・候補の詳しい所(歩く時間・方角・道順の目安・地図アプリ)・着いた/今日はやめる・行きたい印・次どこ？(気分・近さ・行きたい・営業時間・残り時間。AI なし)・回れる道順の案・周りを探す(位置を保存しない)・方角で見る・端末への暗号化保存・タブレット横の左右の配置・戻り始め。準備(SC-50)は候補箱で近くにまとまった候補からエリアの案。API /plans/{id}/spot-areas(11 経路)、表 spot_areas・spot_area_items(Alembic `c4d8e2f6a9b1`)。DOC-02 FR-060・DOC-04 SC-49/50・DOC-13 §21。FR-060 は INTEGRATED(部分)(実機・実の場所の検索・旅帖への記録は未)** |
-| **r60** | 2026-11-18 | SpotMode-2 | **FR-060 の残りの未実装を実装(利用者の指示): 別行動の集合の共有(PUT/DELETE /spot-areas/{id}/split。集合の時刻・場所・ひとことだけをメンバーに知らせる。位置は共有しない。閲覧者も自分の分。当日の札にも表示)・旅帖の下書きに日ごとの「自由に歩いた」(着いた時刻の順。位置なし。公開の旅行記には入れない)。表 spot_area_splits(Alembic `d5e9f3a7b2c6`)。実機の確認表を縦断シナリオ §10 に。FR-060 の残りは実機待ち・実通信待ちだけ** |
+| r60 | 2026-11-18 | SpotMode-2 | **FR-060 の残りの未実装を実装(利用者の指示): 別行動の集合の共有(PUT/DELETE /spot-areas/{id}/split。集合の時刻・場所・ひとことだけをメンバーに知らせる。位置は共有しない。閲覧者も自分の分。当日の札にも表示)・旅帖の下書きに日ごとの「自由に歩いた」(着いた時刻の順。位置なし。公開の旅行記には入れない)。表 spot_area_splits(Alembic `d5e9f3a7b2c6`)。実機の確認表を縦断シナリオ §10 に。FR-060 の残りは実機待ち・実通信待ちだけ** |
+| **r61** | 2026-11-18 | Gate2-Docs | **製品固めゲート②(G2-09): 文書の件数・基準の食い違いを直した。DOC-10 の「全59 FR」(§0・§2・§3 の見出しと正本の表の説明)を実際の 60 件に、fr-status.json・fr-requirements.json の説明を 60 件に、FR-TRACE・縦断シナリオ・fr-requirements の基準 commit を `32c7db6`(PR #127 のマージ)に。FR の状態の遷移なし・コード・DB(Alembic head は `d5e9f3a7b2c6` のまま)の変更なし。実機・実 API の証拠は増えていない(FR-060 は INTEGRATED(部分)のまま)。`docs/audit/2026-11-18_gate2_ledger.md`** |
 
 ## 10. 台帳の更新の規則
 
