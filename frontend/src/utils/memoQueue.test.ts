@@ -39,9 +39,20 @@ describe('memoQueue', () => {
     await queueMemo(S, 'p', { ...base, kind: 'note', body: 'a' });
     await queueMemo(S, 'p', { ...base, kind: 'note', body: 'b' });
     await queueMemo(S, 'p', { ...base, kind: 'note', body: 'c' });
-    addNote.mockRejectedValueOnce({ response: { status: 403 } }).mockRejectedValueOnce({ code: 'ERR_NETWORK' });
+    addNote.mockRejectedValueOnce({ response: { status: 422 } }).mockRejectedValueOnce({ code: 'ERR_NETWORK' });
     expect(await flushMemoQueue(S, 'p')).toEqual({ sent: 0, dropped: 1, left: 2 });
     expect((await loadMemoQueue(S, 'p')).map((m) => m.body)).toEqual(['b', 'c']);
+  });
+
+  it('[Gate2 G2-05] ログイン切れ・権限・混雑・サーバーの不調では捨てずに残し、そこで止める', async () => {
+    for (const status of [401, 403, 429, 500, 503]) {
+      await queueMemo(S, 'q' + status, { ...base, kind: 'note', body: 'a' });
+      await queueMemo(S, 'q' + status, { ...base, kind: 'note', body: 'b' });
+      addNote.mockReset();
+      addNote.mockRejectedValueOnce({ response: { status } });
+      expect(await flushMemoQueue(S, 'q' + status)).toEqual({ sent: 0, dropped: 0, left: 2 });
+      expect((await loadMemoQueue(S, 'q' + status)).map((m) => m.body)).toEqual(['a', 'b']);
+    }
   });
 
   it('数と大きさの上限を超えたら置かない', async () => {

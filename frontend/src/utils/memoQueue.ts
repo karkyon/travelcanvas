@@ -103,7 +103,11 @@ export async function flushMemoQueue(session: OfflineSession | null, planId: str
       }
       sent += 1;
     } catch (e) {
-      if (isNetworkError(e)) { stopped = true; rest.push(m); } else dropped += 1;
+      // [Gate2 G2-05] 通信の失敗だけでなく、ログインの期限切れ・権限の一時的な外れ(401/403)・混雑(408/429)・サーバーの不調(5xx)でも
+      // 端末の写真・ひとことは捨てずに残す(以前は 403 や 500 で黙って捨てていた)。サーバーが内容を断った時(400/413/422 など)だけ捨てる
+      const status = (e as { response?: { status?: number } } | null)?.response?.status;
+      const keep = status === 401 || status === 403 || status === 408 || status === 429 || (status !== undefined && status >= 500);
+      if (isNetworkError(e) || keep) { stopped = true; rest.push(m); } else dropped += 1;
     }
   }
   await saveSnapshot(session, name(planId), rest);
