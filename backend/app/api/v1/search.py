@@ -229,8 +229,14 @@ async def adopt_candidate(
     FieldSourceとして記録し、候補が持つSourceRecordをPlaceにも
     紐づける(source継承)。"""
     # [Gate C2] 以前は他の人の検索結果も ID だけで採用できた(IDOR)。本人の検索結果だけを採用できる
-    candidate = db.query(SearchCandidate).filter(SearchCandidate.id == candidate_id,
-                                                 SearchCandidate.searched_by_user_id == current_user.id).first()
+    # [Gate② G2-01-B] 候補の行を FOR UPDATE で押さえ、同じ候補の採用を直列にする。並列に2件届いても、後の要求は
+    # 先の要求が確定するまで待ち、確定後に下の「作成済みか」の確認で同じ Place へ収束する(migration は不要)
+    candidate = (
+        db.query(SearchCandidate)
+        .filter(SearchCandidate.id == candidate_id, SearchCandidate.searched_by_user_id == current_user.id)
+        .with_for_update()
+        .first()
+    )
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候補が見つかりません")
 
