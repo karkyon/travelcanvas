@@ -520,3 +520,52 @@ def test_utils_permissions_module_no_longer_exists(auth_client):
 
     spec = importlib.util.find_spec("app.utils.permissions")
     assert spec is None, "app/utils/permissions.py が依然として存在します(認可正本が二重化しています)"
+
+
+def test_invitation_matches_email_case_insensitively(client, make_user, db_session):
+    """[Gate② FC-061] 招待は大文字小文字の違うメールアドレスでも本人に届き、承諾できる。
+    以前は招待の email を入力のまま保存し、一覧・承諾・辞退・退会時の整理がすべて大文字小文字を区別して比べていたため、
+    「Friend@Example.com」宛の招待が「friend@example.com」で登録した本人に見えず、承諾もできなかった。
+    別人(ローカル部が違う)の招待は従来どおり見えず、承諾できない(誤参加の防止)。"""
+    from app.main import app
+    from app.models.models import PlanCollaborator
+
+    owner, _ = make_user()
+    invitee, _ = make_user(email=f"friend_{owner.id.hex[:8]}@example.com")
+    stranger, _ = make_user()
+
+    _act_as(app, owner)
+    plan_id = _create_plan(client, title="大文字小文字の招待")
+    shouted = invitee.email.upper()
+    res = client.post(f"/api/v1/travel-plans/{plan_id}/collaborators",
+                      json={"email": f"  {shouted} ", "role": "viewer"})
+    assert res.status_code == 200, res.text
+    collab_id = res.json()["id"]
+    collab = db_session.query(PlanCollaborator).filter(PlanCollaborator.id == collab_id).one()
+    assert collab.email == invitee.email  # 前後の空白を除き、小文字にそろえて保存する
+    assert collab.user_id == invitee.id  # 登録済みの本人に結び付く
+
+    # 同じ人を大文字小文字だけ変えて二重に招待できない
+    res = client.post(f"/api/v1/travel-plans/{plan_id}/collaborators", json={"email": invitee.email, "role": "viewer"})
+    assert res.status_code == 409
+
+    _act_as(app, stranger)
+    assert all(i["id"] != collab_id for i in client.get("/api/v1/travel-plans/invitations").json())
+    assert client.post(f"/api/v1/travel-plans/invitations/{collab_id}/accept").status_code == 404
+
+    _act_as(app, invitee)
+    assert any(i["id"] == collab_id for i in client.get("/api/v1/travel-plans/invitations").json())
+    res = client.post(f"/api/v1/travel-plans/invitations/{collab_id}/accept")
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "accepted"
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_invitation_rejects_malformed_email(auth_client):
+    """[Gate② FC-061] メールアドレスの形でない宛先は招待できない(以前は任意の文字列を保存していた)。"""
+    client, _user = auth_client
+    plan_id = _create_plan(client)
+    for bad in ("not-an-email", "a@", "@example.com", ""):
+        res = client.post(f"/api/v1/travel-plans/{plan_id}/collaborators", json={"email": bad, "role": "viewer"})
+        assert res.status_code == 400, (bad, res.text)

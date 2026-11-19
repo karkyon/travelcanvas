@@ -168,6 +168,12 @@ export function groupTrips(trips: DashboardTrip[]): Array<{ phase: TripPhase; tr
  * 以前は計画中の旅行のうち「出発まで」の日数がある最初の旅行で見出しを作っていたため、旅行中の旅行があっても
  * 別の旅行(旅行前)の「次の旅まで あと 13 日」を出していた。旅行中を最優先にする。
  */
+/**
+ * [Gate②] 旅行を読み込んだ後の見出し(下の homeTitle の、旅行がある時の 4 つの段階)に合う形。E2E が読み込みを待つのに使う
+ * (ux/baselineData.ts)。試験を走らせる日で段階が変わるため、段階を決め打ちしない。読み込み前の見出しには合わない。
+ */
+export const HOME_TITLE = /^(次の旅まで あと |明日から旅行です|旅行中 ・ |旅のあとに)/;
+
 export function homeTitle(focus: DashboardTrip | null, planning: DashboardTrip[]): string {
   const live = focus?.phase === 'ongoing' ? focus : planning.find((t) => t.phase === 'ongoing') ?? null;
   if (live && (!focus || focus.phase === 'ongoing' || focus.id === live.id)) {

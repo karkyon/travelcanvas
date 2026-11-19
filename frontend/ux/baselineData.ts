@@ -49,3 +49,7 @@ export async function seedBaseline(page: Page, label: string): Promise<{ planId:
     type: 'restaurant', provider_name: '祇園の料亭', event_id: ids[2], confirmation_number: 'UXBASE1234', total_amount: 6000, currency: 'JPY' });
   return { planId: plan.id, send };
 }
+
+// [Gate②] ダッシュボードの見出し(旅行を読み込んだ後)は試験を走らせる日と上の旅行(2026-11-21〜22)の日付で変わる。
+// 形は製品の決まり(homeTitle)の隣に置き、単体試験で一致を確かめる
+export { HOME_TITLE } from '../src/pages/dashboard/dashboardModel';

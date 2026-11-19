@@ -32,6 +32,14 @@ export interface Reservation {
   revision: number;
   created_at: string;
   updated_at: string | null;
+  /** [Gate② FC-042] 同じ予約かもしれない相手(一覧だけ。自動では消さない) */
+  duplicate_candidates?: ReservationDuplicateHint[];
+}
+
+export interface ReservationDuplicateHint {
+  reservation_id: string;
+  /** same_confirmation_number(予約番号が同じ) / same_provider_and_date(予約先と日が同じ) */
+  reason: string;
 }
 
 export interface ReservationRevealResult {

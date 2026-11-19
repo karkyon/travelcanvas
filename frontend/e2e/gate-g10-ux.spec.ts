@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { expectNoAxeViolations } from './support/axe';
 import { apiClient } from './support/api';
 import { startGuestPlanViaApi } from './support/guestPlan';
-import { seedBaseline } from '../ux/baselineData';
+import { HOME_TITLE, seedBaseline } from '../ux/baselineData';
 
 /**
  * [Gate G10-UX] UX-5 当日の画面・UX-6 共通の部品・UX-8 暗い見た目を全ての画面へ の browser E2E。
@@ -34,7 +34,8 @@ test('UX-8 設定で選んだ暗い見た目が全ての画面に効き、読み
 
   const screens = [
     // [Gate HomeV2] 計画中の旅行があると見出しは「おかえりなさい。次の旅まで あと N 日」
-    { name: 'ダッシュボード', path: '/dashboard', h1: /次の旅/ as RegExp | string | null },
+    // [Gate②] 試験を走らせる日と旅行の日付で見出しが変わる(明日から・旅行中・旅のあと)ため、どの段階でも合うように
+    { name: 'ダッシュボード', path: '/dashboard', h1: HOME_TITLE as RegExp | string | null },
     { name: 'プランナー', path: `/planner/${planId}`, h1: '京都 紅葉の1泊2日' as RegExp | string | null },
     // [Gate TripDayNav] 見出しは旅の当日らしく(当日の題・当日まであと何日・旅のあと)。表示によって変わるため形だけ確かめる
     { name: '旅の当日', path: `/planner/${planId}/today`, h1: null as RegExp | string | null },
