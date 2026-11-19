@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr, validator
 from passlib.context import CryptContext
 import jwt  # [Gate S1] python-jose(保守停止・未修正の脆弱性あり)から PyJWT へ
 from app.core.password_policy import PasswordPolicyError, validate_password
+from app.core.user_email import email_in_use, email_key, find_user_by_email
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List, Literal, Union
 import hashlib
@@ -420,9 +421,9 @@ async def upgrade_guest_to_user(
     _enforce_password_policy(upgrade_data.password, email=upgrade_data.email, username=upgrade_data.username)
 
     try:
-        existing_user = db.query(User).filter(
-            (User.email == upgrade_data.email) |
-            (User.username == upgrade_data.username)
+        # [Gate②] メールは大文字小文字を区別せずに重複を確かめる(app/core/user_email.py)
+        existing_user = email_in_use(db, upgrade_data.email) or db.query(User).filter(
+            User.username == upgrade_data.username
         ).first()
 
         if existing_user:
@@ -498,9 +499,9 @@ async def register(
 
     try:
         # ユーザー重複チェック
-        existing_user = db.query(User).filter(
-            (User.email == user_data.email) |
-            (User.username == user_data.username)
+        # [Gate②] メールは大文字小文字を区別せずに重複を確かめる(app/core/user_email.py)
+        existing_user = email_in_use(db, user_data.email) or db.query(User).filter(
+            User.username == user_data.username
         ).first()
 
         if existing_user:
@@ -625,7 +626,7 @@ async def login(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="ログイン試行回数が上限に達しました。しばらく待ってから再試行してください。"
         )
-    if not check_rate_limit(f"login_email:{login_data.email}", settings.RATE_LIMIT_AUTH, 60):
+    if not check_rate_limit(f"login_email:{email_key(login_data.email)}", settings.RATE_LIMIT_AUTH, 60):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="ログイン試行回数が上限に達しました。しばらく待ってから再試行してください。"
@@ -633,7 +634,8 @@ async def login(
 
     try:
         # ユーザー取得
-        user = db.query(User).filter(User.email == login_data.email).first()
+        # [Gate②] 大文字小文字だけ違うメールでもログインできる(完全一致を優先。app/core/user_email.py)
+        user = find_user_by_email(db, login_data.email)
 
         if not user or not verify_password(login_data.password, user.hashed_password):
             # [Gate R2-7] 監査ログ: ログイン失敗。総当り調査のためメール
@@ -952,11 +954,7 @@ async def update_me(
             current_user.username = update_data.username
 
         if update_data.email is not None and update_data.email != current_user.email:
-            existing = db.query(User).filter(
-                User.email == update_data.email,
-                User.id != current_user.id
-            ).first()
-            if existing:
+            if email_in_use(db, update_data.email, exclude_user_id=current_user.id):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="このメールアドレスは既に使用されています"

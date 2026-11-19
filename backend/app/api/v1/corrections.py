@@ -24,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, TypeAdapter, ValidationError, field_validator
 from sqlalchemy.orm import Session
 
+from app.core.user_email import email_in_use
 from app.core import crypto
 from app.core.auth import auth_manager, get_current_session_id, get_current_user_or_guest
 from app.core.config import settings
@@ -179,8 +180,7 @@ def _apply_value(db: Session, user: Any, field: str, value: str, request: Reques
                                                          "message": "この表示名は既に使われています"})
         user.username = value
         return
-    taken = db.query(User).filter(User.email == value, User.id != user.id).first()
-    if taken:
+    if email_in_use(db, value, exclude_user_id=user.id):  # [Gate②] 大文字小文字を区別しない
         raise HTTPException(status_code=409, detail={"code": "email_taken",
                                                      "message": "このメールアドレスは既に使われています"})
     user.email = value

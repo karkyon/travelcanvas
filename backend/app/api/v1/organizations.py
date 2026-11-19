@@ -12,6 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Request, Re
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.user_email import find_user_by_email
 from app.core.auth import get_current_active_user
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
@@ -167,7 +168,7 @@ async def add_member(org_id: uuid.UUID, request: Request, payload: Optional[dict
     email = p.get("email")
     if not isinstance(email, str) or "@" not in email or len(email) > 320:
         raise bad("invalid_email", "メールアドレスを入力してください")
-    target = db.query(User).filter(User.email == email.strip(), User.is_active.is_(True)).first()
+    target = find_user_by_email(db, email, User.is_active.is_(True))  # [Gate②] 大文字小文字を区別しない
     if not target or target.user_type == "guest":
         raise bad("user_not_found", "このメールアドレスの会員が見つかりません。先に会員登録してもらってください", 404)
     if orgs.membership(db, org.id, target):

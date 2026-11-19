@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
+from app.core.user_email import email_key, find_user_by_email
 from app.api.v1 import auth as auth_api
 from app.core.auth import auth_manager, get_current_user_or_guest
 from app.core.config import settings
@@ -45,9 +46,9 @@ async def merge_guest_into_account(payload: GuestMergeRequest, request: Request,
     ip = request.client.host if request.client else "unknown"
     email = str(payload.email)
     if not check_rate_limit(f"login_ip:{ip}", settings.RATE_LIMIT_AUTH, 60) or \
-            not check_rate_limit(f"login_email:{email}", settings.RATE_LIMIT_AUTH, 60):
+            not check_rate_limit(f"login_email:{email_key(email)}", settings.RATE_LIMIT_AUTH, 60):
         raise _bad("too_many_requests", "試行回数が上限に達しました。しばらく待ってから試してください", 429)
-    target = db.query(User).filter(User.email == email).first()
+    target = find_user_by_email(db, email)  # [Gate②] 大文字小文字を区別しない(ログインと同じ)
     if target is None or not target.hashed_password or not verify_password(payload.password, target.hashed_password):
         record_audit_event(action="login_failed", resource_type="user", user_id=target.id if target else None,
                            ip_address=ip, details={"email": email, "via": "guest_merge"})
