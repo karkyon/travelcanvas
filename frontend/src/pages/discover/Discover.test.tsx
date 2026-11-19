@@ -171,6 +171,16 @@ describe('外部の写真', () => {
   });
 });
 
+describe('[Gate2 G2-10] 外部の写真: 提供元の失敗は「写真が無い」と区別する', () => {
+  it('全ての提供元に繋がらず0件の時は、見つからないとは言わない', async () => {
+    api.searchExternalImages.mockResolvedValue({ images: [], unavailable: ['wikimedia_commons'], retrieved_at: '2026-11-19T00:00:00+00:00' });
+    render(<ExternalPhotoPicker isOpen onClose={vi.fn()} planId="p1" initialQuery="清水寺" onImported={vi.fn()} purposeLabel="旅行の表紙" />);
+    fireEvent.click(screen.getByRole('button', { name: '探す' }));
+    expect(await screen.findByText(/写真が無いという意味ではありません/)).toBeInTheDocument();
+    expect(screen.queryByText(/^見つかりませんでした/)).toBeNull();
+  });
+});
+
 describe('予定の写真', () => {
   it('旅行の写真から選んで予定に使い、外す', async () => {
     api.getMemories.mockResolvedValue({ memories: [{ id: 'm1', kind: 'photo', has_media: true, visibility: 'private',
