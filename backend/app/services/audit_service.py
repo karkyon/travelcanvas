@@ -20,6 +20,7 @@ app/core/logging.py の log_security_event() 等はファイル/標準出力へ�
 """
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any, Dict, Optional
 
@@ -28,6 +29,52 @@ from app.core.logging import get_logger
 from app.models.models import AuditLog
 
 logger = get_logger(__name__)
+
+_SENSITIVE_DETAIL_PARTS = (
+    "password", "passwd", "secret", "token", "authorization", "cookie", "apikey", "credential",
+    "email", "phone", "telephone", "address", "latitude", "longitude", "coordinate",
+    "reservation", "confirmation", "passenger", "ticket", "qr",
+)
+# 部分一致だと mapping 等まで伏せるため、短い語は完全一致だけで判定する
+_SENSITIVE_EXACT_KEYS = frozenset({"pin", "pincode"})
+_INLINE_SECRET_RE = re.compile(
+    r"(?i)\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret"
+    r"|authorization(?!\s*[:=]\s*Bearer\b))\s*[:=]\s*[^\s,;]+"
+)
+_BEARER_RE = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+")
+_JWT_RE = re.compile(r"\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
+
+
+def sanitize_audit_details(details: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """監査ログdetailsから機密値・旅行個人情報を除き、文字列内の認証値も伏せる。"""
+    if not details:
+        return None
+
+    def clean(value: Any) -> Any:
+        if isinstance(value, dict):
+            result: Dict[str, Any] = {}
+            for key, item in value.items():
+                normalized = re.sub(r"[^a-z0-9]", "", str(key).lower())
+                is_quota_count = "token" in normalized and isinstance(item, (int, float)) and not isinstance(item, bool)
+                if normalized in _SENSITIVE_EXACT_KEYS or (
+                    not is_quota_count and any(part in normalized for part in _SENSITIVE_DETAIL_PARTS)
+                ):
+                    result[str(key)] = "[REDACTED]"
+                else:
+                    result[str(key)] = clean(item)
+            return result
+        if isinstance(value, (list, tuple)):
+            return [clean(item) for item in value]
+        if isinstance(value, str):
+            value = _BEARER_RE.sub("Bearer [REDACTED]", value)
+            value = _INLINE_SECRET_RE.sub(
+                lambda match: match.group(0).split("=")[0].split(":")[0] + "=[REDACTED]", value
+            )
+            return _JWT_RE.sub("[REDACTED]", value)
+        return value
+
+    sanitized = clean(details)
+    return sanitized if sanitized else None
 
 
 def record_audit_event(
@@ -55,7 +102,7 @@ def record_audit_event(
             resource_id=resource_id,
             ip_address=(ip_address[:255] if ip_address else None),
             user_agent=(user_agent[:500] if user_agent else None),
-            details=details or None,
+            details=sanitize_audit_details(details),
         )
         session.add(entry)
         session.commit()

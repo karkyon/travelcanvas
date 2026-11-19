@@ -29,6 +29,8 @@ import { usePlanStore } from '@/store/planStore';
 import { useAuthStore } from '@/store/authStore';
 import { api } from '@/services/api';
 import type { TravelPlan } from '@/types';
+import * as offlinePack from '@/utils/offlinePack';
+import * as offlineVault from '@/utils/offlineVault';
 // [Gate BookingBadge] 予約の札の読み込み(旅程の予定ごと)は空にする
 vi.mock('@/services/api/bookingStatus', () => ({
   getBookingStatus: vi.fn().mockResolvedValue({ party_size: null, events: {} }), linkReservationToEvent: vi.fn(),
@@ -49,7 +51,8 @@ const setupMocks = () => {
   const loadPlan = vi.fn<(planId: string) => Promise<boolean>>().mockResolvedValue(true);
   const loadPlans = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   const clearCurrentPlan = vi.fn<() => void>();
-  const checkOfflineAvailability = vi.fn<(planId: string) => Promise<boolean>>().mockResolvedValue(false);
+  const getOfflinePackExpiry = vi.spyOn(offlinePack, 'getOfflinePackExpiry').mockResolvedValue(null);
+  vi.spyOn(offlineVault, 'getStoredOfflineKeyExpiry').mockResolvedValue(null);
   usePlanStore.setState({
     plans: [],
     currentPlan: null,
@@ -58,7 +61,6 @@ const setupMocks = () => {
     loadPlan,
     loadPlans,
     clearCurrentPlan,
-    checkOfflineAvailability,
   });
   useAuthStore.setState({ isAuthenticated: true, isGuest: false });
   // [Gate C1] 共同編集の知らせ(この試験の対象外。通信しない)
@@ -77,12 +79,12 @@ const setupMocks = () => {
   const getRoutePreview = vi
     .spyOn(api, 'getRoutePreview')
     .mockResolvedValue({ legs: [] } as unknown as Awaited<ReturnType<typeof api.getRoutePreview>>);
-  return { loadPlan, loadPlans, clearCurrentPlan, checkOfflineAvailability, getRoutePreview };
+  return { loadPlan, loadPlans, clearCurrentPlan, getOfflinePackExpiry, getRoutePreview };
 };
 
 describe('PlannerPage effects (Gate M9-FE-B3)', () => {
   it('詳細画面ではloadPlanを1回だけ呼び、プラン更新ではオフライン判定・移動概算を再取得しない', async () => {
-    const { loadPlan, loadPlans, clearCurrentPlan, checkOfflineAvailability, getRoutePreview } = setupMocks();
+    const { loadPlan, loadPlans, clearCurrentPlan, getOfflinePackExpiry, getRoutePreview } = setupMocks();
     render(
       <ToastProvider>
         <MemoryRouter initialEntries={['/planner/plan-1']}>
@@ -101,8 +103,8 @@ describe('PlannerPage effects (Gate M9-FE-B3)', () => {
     act(() => {
       usePlanStore.setState({ currentPlan: makePlan(['day-a', 'day-b']) });
     });
-    await waitFor(() => expect(checkOfflineAvailability).toHaveBeenCalledTimes(1));
-    expect(checkOfflineAvailability).toHaveBeenCalledWith('plan-1');
+    await waitFor(() => expect(getOfflinePackExpiry).toHaveBeenCalledTimes(1));
+    expect(getOfflinePackExpiry).toHaveBeenCalledWith('plan-1');
     await waitFor(() => expect(getRoutePreview).toHaveBeenCalledTimes(1));
     expect(getRoutePreview).toHaveBeenCalledWith('plan-1', 'day-a', 'walking');
 
@@ -111,7 +113,7 @@ describe('PlannerPage effects (Gate M9-FE-B3)', () => {
       usePlanStore.setState({ currentPlan: makePlan(['day-a', 'day-b', 'day-c'], 'renamed') });
     });
     await sleep(50);
-    expect(checkOfflineAvailability).toHaveBeenCalledTimes(1);
+    expect(getOfflinePackExpiry).toHaveBeenCalledTimes(1);
     expect(getRoutePreview).toHaveBeenCalledTimes(1);
     expect(loadPlan).toHaveBeenCalledTimes(1);
 
@@ -122,7 +124,7 @@ describe('PlannerPage effects (Gate M9-FE-B3)', () => {
     await waitFor(() => expect(getRoutePreview).toHaveBeenCalledTimes(2));
     expect(getRoutePreview).toHaveBeenLastCalledWith('plan-1', 'day-b', 'walking');
     await sleep(50);
-    expect(checkOfflineAvailability).toHaveBeenCalledTimes(1);
+    expect(getOfflinePackExpiry).toHaveBeenCalledTimes(1);
   });
 
   it('一覧画面ではloadPlansとclearCurrentPlanを1回ずつ呼ぶ', async () => {
