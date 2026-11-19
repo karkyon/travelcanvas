@@ -24,6 +24,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, cast
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.models import (
@@ -62,7 +63,9 @@ def _memberships(db: Session, user: User) -> List[PlanCollaborator]:
     q = db.query(PlanCollaborator).filter(PlanCollaborator.user_id == user.id)
     rows = {c.id: c for c in q.all()}
     if user.email:
-        for c in db.query(PlanCollaborator).filter(PlanCollaborator.email == user.email).all():
+        # [Gate② FC-061] 招待の宛先は大文字小文字を区別しない(share.normalize_invite_email と同じ)
+        mine = user.email.strip().lower()
+        for c in db.query(PlanCollaborator).filter(func.lower(PlanCollaborator.email) == mine).all():
             rows[c.id] = c
     return list(rows.values())
 
