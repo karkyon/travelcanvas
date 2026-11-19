@@ -175,7 +175,10 @@ const SpotModePage: React.FC = () => {
     try {
       const r = await searchNearby(planId, area.id, { latitude: me[0], longitude: me[1], radius_m: q.radius,
         within_area: q.withinArea, kind: q.kind, ...(q.query ? { query: q.query } : {}) });
-      setNearby({ results: r.results, message: r.message });
+      const down = r.results.length === 0 && r.failed_providers.length > 0;
+      setNearby({ results: r.results, message: down
+        ? '場所の検索サービスに繋がらず、探せませんでした(周りに何もないという意味ではありません)。少し待って、もう一度探してください'
+        : r.message });
     } catch (e) {
       setNearby({ results: null, message: errorMessage(e, '探せませんでした。しばらくしてから試してください') });
     } finally {
