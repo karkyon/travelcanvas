@@ -168,6 +168,7 @@ export const reservation: Decoder<Reservation> = object<Reservation>({
   revision: int,
   created_at: str,
   updated_at: nullable(str),
+  duplicate_candidates: optional(arrayOf(object({ reservation_id: str, reason: str }))),
 });
 
 export const reservationParticipant: Decoder<ReservationParticipant> = object<ReservationParticipant>({
