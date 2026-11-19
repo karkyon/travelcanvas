@@ -111,9 +111,9 @@
 |---|---|---|
 | #128 | mainへ取込済み | main CI #757 はスクリーンショット時点で queued。PR側 CI #756 は成功 |
 | #129 | open / 未マージ | CI #753 成功。画面の現在位置表示・検索時のみ位置取得・位置送信先の説明 |
-| #130 | open / 未マージ | 初回CI #754 はlint失敗。原因はテストの未使用importと2行の長さ。ブランチ上で是正し、再実行#758はlint成功、backend pytest全件は確認時点で実行中。完了扱いしない |
+| #130 | open / 未マージ | 初回CI #754 はlint失敗(未使用importと長行)。是正後、head `42b0af04a1` の全6 check(e2e・backend・frontend・dependency-audit・secret-scan・GitGuardian)が成功(2026-11-19 確認) |
 | #131 | open / 未マージ | CI #755 成功。provider失敗と検索0件の表示区別 |
-| Gate②追加是正PR | #132 open / 未マージ、head `23fecbc7258e4b58fd0ebe2564574142e5fd418c` | 候補→正規Place→予定ID接続、オフライン期限案内/境界統一、監査ログdetailsマスキング試験、会員・料金の提案とコード状態の説明。初回CI #759はfrontend型検査で失敗(return型にundefined経路)、修正済み。修正後CIは再実行待ち |
+| Gate②追加是正PR | #132 open / 未マージ、head `23fecbc7258e4b58fd0ebe2564574142e5fd418c` | 候補→正規Place→予定ID接続、オフライン期限案内/境界統一、監査ログdetailsマスキング試験、会員・料金の提案とコード状態の説明。CIは3段階で失敗→是正: (1) #759 frontend型検査(returnにundefined経路)→boolean統一、(2) head `4884f3e` frontendのvitestが失敗(候補採用失敗の試験がconsole.errorを捕まえていない。併せて、IndexedDB不可の環境でPlannerPageの期限読み取りが未処理のPromise拒否になる実欠陥を発見し、catchで「保存なし」扱いに)、(3) head `e1c88d2` backendのflake8(E501)失敗→行分割。最終head `8e40eb0` は e2e・backend・frontend・dependency-audit・secret-scan・GitGuardian が全て成功(2026-11-19 確認。台帳追記コミット後のCIは別途確認) |
 
 ### 7.1 会員クラスの現物照合（G2-07）
 
@@ -129,9 +129,9 @@
 
 | ID | 変更内容 | 検証状態 |
 |---|---|---|
-| G2-01-B | 検索候補から正規Placeを採用し、予定へ `place_id` を引き継ぐ。採用失敗時はリンク無しイベントを作らない | ブランチ上の単体試験追加。CI未実施 |
-| G2-05-C | Offline Pack/key期限を表示し、期限切れ警告から保存し直せる状態を案内。期限境界を `now >= expiresAt` に統一 | 単体試験追加。画面CI未実施、実機未確認 |
-| G2-08-B | 監査detailsを再帰マスキングし、Authorization/Bearer/JWT等の文字列も伏せる試験 | Bearerを先に伏せた後にAuthorizationラベルが上書きされないよう正規表現を修正。初回CIは別件のfrontend型エラーで失敗し、returnをbooleanに統一して再push。マスキング試験は修正後CIで再確認待ち |
+| G2-01-B | 検索候補から正規Placeを採用し、予定へ `place_id` を引き継ぐ。採用失敗時はリンク無しイベントを作らない | 単体試験追加。最終headのCI全job成功。実旅行での確認は未実施 |
+| G2-05-C | Offline Pack/key期限を表示し、期限切れ警告から保存し直せる状態を案内。期限境界を `now >= expiresAt` に統一 | 単体試験追加。最終headのCI全job成功。実機(機内モード等)は未確認 |
+| G2-08-B | 監査detailsを再帰マスキングし、Authorization/Bearer/JWT等の文字列も伏せる試験 | Bearerを先に伏せた後にAuthorizationラベルが上書きされないよう正規表現を修正。flake8のE501を是正し、短い語(`pin`)の部分一致による過剰マスキングを完全一致へ、トークン数量(`max_tokens`等の数値)は保持するよう調整。試験3件(ネスト/配列/非辞書/Unicodeキー/長大文字列/書込み不例外)。最終headのbackend全件成功 |
 | G2-07-B | 内部quotaと公開課金を分けた販売案・未確定項目を文書化 | 文書追記。承認価格ではない |
 
 ### 7.3 ゲート状態（この追記時点）
