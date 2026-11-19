@@ -59,6 +59,7 @@ const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, sta
       const r = await geocodeAddress(q, { ...(near ?? {}), plan_id: usePlanStore.getState().currentPlan?.id ?? null });
       const c = r.candidates[0];
       if (c) { set({ latitude: c.latitude, longitude: c.longitude }); setGeo({ busy: false, note: `「${c.address ?? q}」の位置にしました` }); }
+      else if (r.unavailable) setGeo({ busy: false, note: '住所の検索サービスに繋がらず、位置を取れませんでした(住所が間違っているという意味ではありません)。少し待ってもう一度試してください' });
       else setGeo({ busy: false, note: 'この住所の位置が見つかりませんでした。住所の書き方を確かめてください' });
     } catch {
       setGeo({ busy: false, note: '位置を読めませんでした' });

@@ -67,7 +67,7 @@ export const travelAPI = {
     draftId: string,
     deviceToken: string,
     idempotencyKey: string,
-    opts?: { target_plan_id?: string; base_revision?: number },
+    opts?: { target_plan_id?: string; base_revision?: number; timezone_id?: string },
   ) => api.promoteQuickDraft(draftId, deviceToken, idempotencyKey, opts),
   searchSpots: (request: SearchRequest) => api.searchSpots(request),
   getSpots: (category?: string, limit?: number) => api.getSpots(category, limit),

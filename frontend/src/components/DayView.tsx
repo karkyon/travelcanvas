@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import DayZoneNotice from './planner/DayZoneNotice';
 import { nextEventIndexFor } from './planner/nextEventModel';
 import { getHoursCheck } from '../services/api/g11planner';
 import type { EventHoursCheck } from '../services/api/types/g11planner';
@@ -911,6 +912,7 @@ const DayView: React.FC<DayViewProps> = ({
       </div>
 
       <div className="tc-day-body" data-testid="day-body">
+        <DayZoneNotice dayId={day.id} dayZone={day.timezone_id} />
 
       {photoFor && (
         <EventPhotoDialog isOpen onClose={() => setPhotoFor(null)} planId={planId} eventId={photoFor.id}

@@ -295,7 +295,7 @@ export const TabichoCard: React.FC<{ ctx: TodayCtx }> = ({ ctx }) => {
             doneIds={ctx.doneIds} stamps={ctx.stamps} rainIds={ctx.rainIds} />
         </div>
       )}
-      <p className="tl-mute tl-small">{`印 ${pressed} ・ 写真 ${photos}${ctx.memoPending > 0 ? ` ・ 送信待ち ${ctx.memoPending}件` : ''} ・ 記録は自分で選んだ相手だけに見せます`}</p>
+      <p className="tl-mute tl-small">{`印 ${pressed} ・ 写真 ${photos}${ctx.memoPending > 0 ? ` ・ 送信待ち ${ctx.memoPending}件` : ''}${ctx.memoDropped > 0 ? ` ・ 送れなかった ${ctx.memoDropped}件(サーバーが受け付けませんでした)` : ''} ・ 記録は自分で選んだ相手だけに見せます`}</p>
     </section>
   );
 };

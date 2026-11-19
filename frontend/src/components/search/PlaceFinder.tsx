@@ -118,7 +118,10 @@ const PlaceFinder: React.FC<Props> = ({ tab, onTab, onPick, withWish = false, pi
         key: `f${i}-${c.name}`, name: c.name, address: c.address, latitude: c.latitude, longitude: c.longitude, category: c.category,
         description: null, sourceUrl: null, source: '', genre: c.genre_label, distanceKm: c.distance_km,
       })));
-      if (r.candidates.length === 0) {
+      if (r.candidates.length === 0 && r.failed_providers.length > 0) {
+        // 検索サービスが応答しなかった場合を「見つからない」と同じ表示にしない
+        setNote(`${r.region.label}の検索サービスに繋がらず、探せませんでした(見つからないという意味ではありません)。少し待ってもう一度試すか、手で入力してください`);
+      } else if (r.candidates.length === 0) {
         setNote(r.keyed_providers.length === 0
           ? `${r.region.label}では見つかりませんでした。店・施設の検索(Yahoo!・ホットペッパー)の鍵が未登録のため、OpenStreetMap だけで探しています(運用コンソールで登録できます)`
           : `${r.region.label}では見つかりませんでした。言葉・ジャンルを変えるか、範囲を広げてください`);

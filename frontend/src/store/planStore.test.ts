@@ -63,6 +63,8 @@ vi.mock('react-hot-toast', () => ({
 interface MockedApiMethods {
   getPlan: ReturnType<typeof vi.fn>;
   getPlanDetail: ReturnType<typeof vi.fn>;
+  createDay: ReturnType<typeof vi.fn>;
+  updateDay: ReturnType<typeof vi.fn>;
   createEvent: ReturnType<typeof vi.fn>;
   updateEvent: ReturnType<typeof vi.fn>;
   moveEvent: ReturnType<typeof vi.fn>;
@@ -218,7 +220,9 @@ describe('createQuickPlan [Gate #38 / Gate R2-4]', () => {
       expect.any(String)
     );
     expect(mockedTravelApi.promoteQuickDraft).toHaveBeenCalledWith(
-      'draft-1', 'stored-device-token', expect.any(String)
+      'draft-1', 'stored-device-token', expect.any(String),
+      // [Gate2 G2-04] 新しい旅行の日は端末の時刻帯で作る(送らないとサーバーの既定の UTC になり、今日がずれる)
+      { timezone_id: Intl.DateTimeFormat().resolvedOptions().timeZone }
     );
     expect(result?.days[0]?.events).toHaveLength(1);
   });
@@ -260,6 +264,34 @@ describe('createQuickPlan [Gate #38 / Gate R2-4]', () => {
 
     expect(result).toBeNull();
     expect(consoleError).toHaveBeenCalled();
+  });
+});
+
+describe('[Gate2 G2-04] addDay / setDayTimeZone の時刻帯', () => {
+  it('日を足す時は、前の日と同じ時刻帯を送る(海外の旅行で後の日が UTC に戻らない)', async () => {
+    await seedLoadedPlan(1);
+    mockedApi.getPlanDetail.mockResolvedValue({
+      success: true,
+      data: { id: PLAN_ID, title: 'テストプラン', revision: 1, days: [{ id: DAY_ID, local_date: '2026-10-01', timezone_id: 'Europe/London', sort_order: 0, events: [] }] },
+    });
+    await usePlanStore.getState().loadPlan(PLAN_ID);
+    mockedApi.createDay.mockResolvedValue({ id: 'day-2', local_date: '2026-10-02', timezone_id: 'Europe/London', sort_order: 1, events: [] });
+    await usePlanStore.getState().addDay();
+    expect(mockedApi.createDay).toHaveBeenCalledWith(
+      PLAN_ID, expect.objectContaining({ local_date: '2026-10-02', timezone_id: 'Europe/London' }), expect.any(String));
+  });
+
+  it('setDayTimeZone は現在の revision で updateDay を呼び、読み直す', async () => {
+    await seedLoadedPlan(4);
+    mockedApi.updateDay.mockResolvedValue({ id: DAY_ID, local_date: '2026-10-01', timezone_id: 'Asia/Tokyo', sort_order: 0, events: [] });
+    expect(await usePlanStore.getState().setDayTimeZone(DAY_ID, 'Asia/Tokyo')).toBe(true);
+    expect(mockedApi.updateDay).toHaveBeenCalledWith(PLAN_ID, DAY_ID, { timezone_id: 'Asia/Tokyo' }, 4);
+  });
+
+  it('setDayTimeZone は失敗したら false を返す(画面が理由を出す)', async () => {
+    await seedLoadedPlan(4);
+    mockedApi.updateDay.mockRejectedValue(new Error('403'));
+    expect(await usePlanStore.getState().setDayTimeZone(DAY_ID, 'Asia/Tokyo')).toBe(false);
   });
 });
 

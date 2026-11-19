@@ -139,6 +139,17 @@ describe('PlaceFinder の写真・文', () => {
     expect(screen.getByTestId('finder-search')).not.toBeDisabled();
   });
 
+  it('[Gate2 G2-10] 名前で検索: 検索サービスの失敗は「見つからない」と区別して出す', async () => {
+    m.findPlaces.mockResolvedValue({ query: '菰野', genre: 'cafe', genre_label: 'カフェ', scope: 'area',
+      region: { label: 'この旅行の範囲', radius_km: 8 }, candidates: [], sources: [], keyed_providers: ['yahoo_local'],
+      failed_providers: ['yahoo_local'] });
+    render(<PlaceFinder tab="search" onTab={vi.fn()} onPick={vi.fn()} planId="p1" />);
+    fireEvent.change(screen.getByLabelText('場所の名前'), { target: { value: '菰野' } });
+    fireEvent.click(screen.getByTestId('finder-search'));
+    expect(await screen.findByText(/見つからないという意味ではありません/)).toBeInTheDocument();
+    expect(screen.queryByText(/では見つかりませんでした/)).toBeNull();
+  });
+
   it('[PlaceFinderArea] 写真: 撮影場所が無ければ(同意済みなら)すぐ写真から見分け、旅行の範囲の外に印。範囲で同じ種類も探せる', async () => {
     localStorage.setItem('tc-ai-photo-consent', '1');
     m.aiPlacesFromImage.mockResolvedValue([

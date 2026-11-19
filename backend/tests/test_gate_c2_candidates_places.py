@@ -9,6 +9,7 @@
   使う全ての旅行を編集できる人だけが直せる。見られない場所は予定に付けられない(以前の IDOR)
 - 場所の項目・営業時間を直すと、出典が「利用者の入力」になる。監査に名前・URL を残さない
 """
+import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
@@ -261,3 +262,97 @@ def test_from_search_only_own_results(auth_client, make_user, db_session):
                        json={"search_candidate_id": str(theirs.id)}).status_code == 404
     # 他の人の検索結果は採用もできない(以前の IDOR)
     assert client.post(f"/api/v1/search/candidates/{theirs.id}/adopt").status_code == 404
+
+
+def test_adopt_candidate_is_idempotent_and_does_not_leak_between_users(auth_client, make_user, db_session):
+    """[Gate② G2-01-B] 同じ候補の再送で、Place・出典・項目ごとの出典を増やさない。他の人の候補は404のまま。"""
+    from app.models.models import FieldSource, Place
+    client, owner = auth_client
+    now = datetime(2026, 11, 19, tzinfo=timezone.utc)
+    cand = SearchCandidate(query="神宮", provider="nominatim", external_id="n1", name="伊勢神宮", latitude=34.455,
+                           longitude=136.725, searched_by_user_id=owner.id, retrieved_at=now)
+    db_session.add(cand)
+    db_session.flush()
+    db_session.add(SourceRecord(candidate_id=cand.id, provider="nominatim", retrieved_at=now))
+    db_session.commit()
+    first = client.post(f"/api/v1/search/candidates/{cand.id}/adopt")
+    second = client.post(f"/api/v1/search/candidates/{cand.id}/adopt")
+    assert first.status_code == 200 and second.status_code == 200
+    assert first.json() == second.json()
+    places = db_session.query(Place).filter(Place.adopted_from_candidate_id == cand.id).all()
+    assert len(places) == 1
+    assert db_session.query(SourceRecord).filter(SourceRecord.place_id == places[0].id).count() == 1
+    sources_after_first_two = db_session.query(FieldSource).filter(FieldSource.place_id == places[0].id).count()
+    client.post(f"/api/v1/search/candidates/{cand.id}/adopt")
+    assert db_session.query(FieldSource).filter(FieldSource.place_id == places[0].id).count() == sources_after_first_two
+    # 外部ID(提供元)と自社の Place ID は別物
+    assert first.json()["id"] != cand.external_id
+
+
+def test_adopt_candidate_concurrent_requests_converge_to_one_place():
+    """[Gate② G2-01-B] 同じ候補の採用が並列に届いても、Place・出典を1組だけ作り、全応答が同じ Place を返す。
+    試験用の共通セッション(1つのトランザクション)では競合を再現できないため、別々の接続で実際に並列実行し、
+    終わったらデータを片付ける。"""
+    import threading
+    from app.api.v1.search import adopt_candidate
+    from app.core.database import SessionLocal
+    from app.models.models import FieldSource, Place, User, UserType
+    from app.api.v1.auth import hash_password
+
+    now = datetime(2026, 11, 19, tzinfo=timezone.utc)
+    setup = SessionLocal()
+    suffix = uuid.uuid4().hex[:8]
+    user = User(email=f"adopt-race-{suffix}@example.test", username=f"adoptrace{suffix}",
+                hashed_password=hash_password("Test-Pass-12345!"), user_type=UserType.REGISTERED)
+    setup.add(user)
+    setup.flush()
+    cand = SearchCandidate(query="神宮", provider="nominatim", external_id=f"race-{suffix}", name="伊勢神宮",
+                           latitude=34.455, longitude=136.725, searched_by_user_id=user.id, retrieved_at=now)
+    setup.add(cand)
+    setup.flush()
+    setup.add(SourceRecord(candidate_id=cand.id, provider="nominatim", retrieved_at=now))
+    setup.commit()
+    user_id, cand_id = user.id, cand.id
+    setup.close()
+
+    results, errors = [], []
+    barrier = threading.Barrier(4)
+
+    def worker():
+        s = SessionLocal()
+        try:
+            me = s.query(User).filter(User.id == user_id).one()
+            barrier.wait(timeout=10)
+            results.append(asyncio.run(adopt_candidate(cand_id, current_user=me, db=s)))
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+        finally:
+            s.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(timeout=30)
+
+    check = SessionLocal()
+    try:
+        place_ids = [p.id for p in check.query(Place).filter(Place.adopted_from_candidate_id == cand_id).all()]
+        n_sources = check.query(SourceRecord).filter(SourceRecord.place_id.in_(place_ids)).count() if place_ids else 0
+        n_fields = check.query(FieldSource).filter(FieldSource.place_id.in_(place_ids)).count() if place_ids else 0
+        assert errors == []
+        assert len(results) == 4
+        assert len(place_ids) == 1
+        assert {r["id"] for r in results} == {str(place_ids[0])}
+        assert n_sources == 1
+        assert n_fields == 3  # 名前・緯度・経度(カテゴリと住所は候補に無い)
+    finally:
+        if place_ids:
+            check.query(FieldSource).filter(FieldSource.place_id.in_(place_ids)).delete(synchronize_session=False)
+            check.query(SourceRecord).filter(SourceRecord.place_id.in_(place_ids)).delete(synchronize_session=False)
+            check.query(Place).filter(Place.id.in_(place_ids)).delete(synchronize_session=False)
+        check.query(SourceRecord).filter(SourceRecord.candidate_id == cand_id).delete(synchronize_session=False)
+        check.query(SearchCandidate).filter(SearchCandidate.id == cand_id).delete(synchronize_session=False)
+        check.query(User).filter(User.id == user_id).delete(synchronize_session=False)
+        check.commit()
+        check.close()

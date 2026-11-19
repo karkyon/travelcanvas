@@ -167,6 +167,14 @@ describe('[Next] 予報・屋内の候補・AI の確かめ', () => {
       latitude: 34.4, longitude: 136.7, event_type: 'sightseeing' });
   });
 
+  it('[Gate2 G2-10] 屋内の候補: 検索サービスの失敗は「0件」と区別して出す', async () => {
+    m.indoorCandidates.mockResolvedValue({ candidates: [], region: null, failed_providers: ['yahoo_local'] });
+    const v = { ...B, conditions: { scaffold: [{ kind: 'rain' as const, event_id: 'e9', title: 'BBQ', text: '', fit: 'outdoor' as const }] } };
+    render(<IndoorDialog planId="p" isOpen variant={v} revision={8} onClose={vi.fn()} onDone={vi.fn()} />);
+    expect(await screen.findByTestId('indoor-provider-failed')).toHaveTextContent('0件という意味ではありません');
+    expect(screen.queryByText(/屋内の候補が見つかりませんでした/)).toBeNull();
+  });
+
   it('AI の確かめ: 結果を出し、断られた時は理由を出す', async () => {
     m.aiCheckVariant.mockResolvedValueOnce({ result: { text: '大きな問題はありません' }, notice: '要確認' });
     const { unmount } = render(<AiCheckDialog planId="p" isOpen variant={B} onClose={vi.fn()} />);

@@ -21,6 +21,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from zoneinfo import ZoneInfo
+
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -125,6 +127,19 @@ class PromoteRequest(BaseModel):
     target_plan_id: Optional[str] = None
     base_revision: Optional[int] = None
     device_token: str
+    # [Gate2 G2-04] 新しい日に付ける時刻帯(IANA)。送らない時は既存の日の時刻帯、無ければ UTC(従来どおり)
+    timezone_id: Optional[str] = None
+
+    @field_validator("timezone_id")
+    @classmethod
+    def _tz(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        try:
+            ZoneInfo(v)
+        except Exception:
+            raise ValueError("時刻帯は Asia/Tokyo のような IANA の名前で指定してください")
+        return v
 
 
 class PromoteResponse(BaseModel):
@@ -315,13 +330,16 @@ def _decrypt_draft_payload(draft: QuickDraft) -> dict:
     return json.loads(plaintext.decode("utf-8"))
 
 
-def _apply_draft_to_plan(db: Session, plan: TravelPlan, payload: dict) -> None:
+def _apply_draft_to_plan(db: Session, plan: TravelPlan, payload: dict, timezone_id: Optional[str] = None) -> None:
     """decrypt済みQuickDraft payload(title/start_date/end_date/events)を
     TravelDay/TravelEventとしてplanへ書き込む。同一local_dateのTravelDayが
     既存なら再利用し、無ければ新規作成する(全-or-nothingはSAVEPOINTで
     呼び出し側が保証する)。"""
     events = payload.get("events") or []
     day_cache: dict = {}
+    if not timezone_id:
+        first = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).order_by(TravelDay.sort_order).first()
+        timezone_id = first.timezone_id if first is not None else "UTC"
 
     def _parse_date(value: Optional[str]) -> date_cls:
         return date_cls.fromisoformat(value) if value else date_cls.today()
@@ -342,6 +360,7 @@ def _apply_draft_to_plan(db: Session, plan: TravelPlan, payload: dict) -> None:
         day = TravelDay(
             plan_id=plan.id,
             local_date=parsed,
+            timezone_id=timezone_id,
             sort_order=len(day_cache),
         )
         db.add(day)
@@ -456,7 +475,7 @@ async def promote_quick_draft(
                 db.add(plan)
                 db.flush()
 
-            _apply_draft_to_plan(db, plan, payload)
+            _apply_draft_to_plan(db, plan, payload, body.timezone_id)
 
             plan.revision = (plan.revision or 1) + 1
             draft.status = "PROMOTED"

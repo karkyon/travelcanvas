@@ -140,7 +140,9 @@ const ExternalPhotoPicker: React.FC<ExternalPhotoPickerProps> = ({
         {error && <p role="alert" className="rounded-md bg-danger-soft p-3 text-sm text-danger">{error}</p>}
         {unavailable && <p role="status" className="text-xs text-warning">{unavailable}</p>}
         {images && images.length === 0 && !error && (
-          <p className="text-sm text-ink-700" role="status">見つかりませんでした。言葉を変えて探してください。</p>
+          <p className="text-sm text-ink-700" role="status">
+            {unavailable ? '提供元に繋がらず探せませんでした(写真が無いという意味ではありません)。少し待ってもう一度試してください。' : '見つかりませんでした。言葉を変えて探してください。'}
+          </p>
         )}
         {images && images.length > 0 && (
           <ul className="grid grid-cols-2 gap-3 md:grid-cols-3" aria-label="外部の写真の候補">

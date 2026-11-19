@@ -90,7 +90,7 @@ export class PlansApi extends SpotsApi {
     draftId: string,
     deviceToken: string,
     idempotencyKey: string,
-    opts?: { target_plan_id?: string; base_revision?: number },
+    opts?: { target_plan_id?: string; base_revision?: number; timezone_id?: string },
   ): Promise<PromoteQuickDraftResult> {
     const response = await this.client.post(
       `/quick-drafts/${draftId}/promote`,
@@ -122,7 +122,7 @@ export class PlansApi extends SpotsApi {
 
   async updateDay(
     planId: string, dayId: string,
-    data: { title?: string; notes?: string; sort_order?: number },
+    data: { title?: string; notes?: string; sort_order?: number; timezone_id?: string },
     ifMatch: number
   ): Promise<NormalizedDay> {
     const response = await this.client.put(
