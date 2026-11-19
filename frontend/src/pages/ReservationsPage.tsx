@@ -636,6 +636,18 @@ const ReservationsPage: React.FC = () => {
                     onClick={() => navigate(`/planner/${planId}/discussion?target=reservation&id=${r.id}`)}
                   >この予約へのコメント</button>
                 </div>
+                {/* [Gate② FC-042] 同じ予約かもしれない相手を示す。消すかどうかは利用者が決める(自動では消さない) */}
+                {(r.duplicate_candidates?.length ?? 0) > 0 && (
+                  <p className="tc-kit-resrow__why" data-testid={`reservation-dup-${r.id}`}>
+                    <span className="tc-kit-why">
+                      {`同じ予約かもしれません: ${(r.duplicate_candidates ?? []).map((d) => {
+                        const o = reservations.find((x) => x.id === d.reservation_id);
+                        const name = o ? (o.provider_name || typeLabel(o.type)) : '別の予約';
+                        return `${name}(${d.reason === 'same_confirmation_number' ? '予約番号が同じ' : '予約先と日が同じ'})`;
+                      }).join('、')}。確かめて、要らない方を消してください(自動では消しません)`}
+                    </span>
+                  </p>
+                )}
                 {why.length > 0 && (
                   <div className="tc-kit-resrow__why">
                     <span className="tc-kit-why">{`要確認: ${why.join('・')}`}</span>

@@ -35,6 +35,7 @@ from app.core.crypto import (
     plan_subject,
 )
 from app.core.database import get_db
+from app.services import reservation_duplicates  # [Gate② FC-042]
 from app.services import member_policy  # [Gate G2] FR-045 同行者向けの項目の規則
 from app.models.models import (
     EventReservation,
@@ -139,6 +140,13 @@ class ReservationUpdateRequest(BaseModel):
         return v
 
 
+class DuplicateHint(BaseModel):
+    """[Gate② FC-042] 同じ予約かもしれない相手(自動では消さない)。reason は same_confirmation_number /
+    same_provider_and_date。"""
+    reservation_id: str
+    reason: str
+
+
 class ReservationResponse(BaseModel):
     id: str
     plan_id: str
@@ -165,6 +173,8 @@ class ReservationResponse(BaseModel):
     revision: int
     created_at: datetime
     updated_at: Optional[datetime]
+    # [Gate② FC-042] 一覧(GET /reservations)だけで計算する。他の応答では空
+    duplicate_candidates: List[DuplicateHint] = []
 
 
 class ReservationRevealResponse(BaseModel):
@@ -455,7 +465,16 @@ def list_reservations(
         .order_by(Reservation.start_at.asc().nullslast(), Reservation.created_at.asc())
         .all()
     )
-    return [_to_response(r) for r in rows]
+    # [Gate② FC-042] 同じ予約かもしれない組を添える(予約番号は blind index の一致だけを見る。自動では消さない)
+    holders = {str(r.id): _decrypt_or_none(r.holder_name_ciphertext) for r in rows}
+    dups = reservation_duplicates.find_duplicates(rows, holder_of=lambda r: holders.get(str(r.id)))
+    out = []
+    for r in rows:
+        resp = _to_response(r)
+        resp.duplicate_candidates = [DuplicateHint(reservation_id=rid, reason=why)
+                                     for rid, why in dups.get(str(r.id), [])]
+        out.append(resp)
+    return out
 
 
 @router.get("/{plan_id}/reservations/search", response_model=List[ReservationResponse])
