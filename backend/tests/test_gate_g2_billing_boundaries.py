@@ -43,7 +43,7 @@ def _as(user):
     app.dependency_overrides[get_current_user] = lambda: AuthResult(user=user, is_authenticated=True, is_guest=False)
 
 
-def test_other_user_cannot_cancel_or_resume_my_subscription(auth_client, db_session, stripe, make_user):
+def test_other_user_cannot_cancel_or_resume_my_subscription(auth_client, db_session, stripe, make_user):  # noqa: F811
     client, owner = auth_client
     _buy_subscription(client, db_session, owner)
     sub = client.get("/api/v1/billing/me").json()["subscriptions"][0]
@@ -62,7 +62,7 @@ def test_other_user_cannot_cancel_or_resume_my_subscription(auth_client, db_sess
     assert cost_guard.user_class(db_session, other) == ("free", "default")
 
 
-def test_other_user_cannot_sync_my_checkout_session(auth_client, db_session, stripe, make_user):
+def test_other_user_cannot_sync_my_checkout_session(auth_client, db_session, stripe, make_user):  # noqa: F811
     client, owner = auth_client
     res = _buy_subscription(client, db_session, owner)
     other, _pw = make_user()
@@ -76,7 +76,7 @@ def test_other_user_cannot_sync_my_checkout_session(auth_client, db_session, str
     assert res["payment_id"]
 
 
-def test_webhook_without_or_with_garbled_signature_is_400(auth_client, stripe):
+def test_webhook_without_or_with_garbled_signature_is_400(auth_client, stripe):  # noqa: F811
     client, _user = auth_client
     payload = json.dumps({"id": "evt_n", "type": "invoice.paid", "data": {"object": {}}}).encode()
     r = client.post("/api/v1/billing/stripe/webhook", content=payload, headers={"Content-Type": "application/json"})
@@ -91,13 +91,13 @@ def test_webhook_without_or_with_garbled_signature_is_400(auth_client, stripe):
     ("get", "/api/v1/admin/billing/payments", None),
     ("post", "/api/v1/admin/billing/payments/00000000-0000-0000-0000-000000000000/refund", {"reason": "x"}),
 ])
-def test_non_admin_cannot_use_admin_billing(auth_client, stripe, method, path, body):
+def test_non_admin_cannot_use_admin_billing(auth_client, stripe, method, path, body):  # noqa: F811
     client, _user = auth_client
     r = getattr(client, method)(path, **({"json": body} if body is not None else {}))
     assert r.status_code in (401, 403), r.text
 
 
-def test_expired_entitlement_returns_to_free(auth_client, db_session, stripe):
+def test_expired_entitlement_returns_to_free(auth_client, db_session, stripe):  # noqa: F811
     client, user = auth_client
     _buy_subscription(client, db_session, user)
     assert cost_guard.user_class(db_session, user) == ("journey", "subscription")
@@ -110,7 +110,7 @@ def test_expired_entitlement_returns_to_free(auth_client, db_session, stripe):
     assert cost_guard.user_class(db_session, user) == ("free", "default")
 
 
-def test_inactive_product_cannot_be_bought(auth_client, db_session, stripe):
+def test_inactive_product_cannot_be_bought(auth_client, db_session, stripe):  # noqa: F811
     client, _user = auth_client
     product = _product(db_session, "trip_month")
     product.active = False
