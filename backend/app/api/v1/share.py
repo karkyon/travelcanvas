@@ -27,12 +27,14 @@
 発行・変更・失効・削除を監査へ記録する(トークン・合言葉・内容は残さず、項目名と設定の有無だけ)。
 """
 import hashlib
+import re
 import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -47,6 +49,21 @@ from app.services.audit_service import record_audit_event
 from app.api.v1.public_share import build_public_view
 
 router = APIRouter(prefix="/travel-plans", tags=["share"])
+
+
+# [Gate② FC-061] 招待の宛先は前後の空白を除き小文字にそろえて保存し、比べる時も大文字小文字を区別しない。
+# 以前は入力のまま保存・比較していたため、「Friend@Example.com」宛の招待が「friend@example.com」の本人に届かなかった。
+# ローカル部が違う別人には従来どおり届かない(誤参加の防止)。
+_EMAIL_SHAPE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def normalize_invite_email(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def invite_is_for(collab: PlanCollaborator, user: User) -> bool:
+    mine = normalize_invite_email(user.email)
+    return bool(mine) and normalize_invite_email(collab.email) == mine
 
 
 def _get_owned_plan(db: Session, plan_id: uuid.UUID, user: User) -> TravelPlan:
@@ -412,22 +429,24 @@ async def invite_collaborator(
     何も通知されない(pending状態のレコードが作成されるのみ)。"""
     plan = _get_owned_plan(db, plan_id, current_user)
 
-    email = payload.get("email")
+    email = normalize_invite_email(payload.get("email"))
     if not email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="emailは必須です")
+    if not _EMAIL_SHAPE.match(email):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="メールアドレスの形ではありません")
     role = payload.get("role", "viewer")
     if role not in ("viewer", "editor"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="roleはviewer/editorのいずれかです")
 
     existing = (
         db.query(PlanCollaborator)
-        .filter(PlanCollaborator.plan_id == plan.id, PlanCollaborator.email == email)
+        .filter(PlanCollaborator.plan_id == plan.id, func.lower(PlanCollaborator.email) == email)
         .first()
     )
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="このメールアドレスは既に招待されています")
 
-    invited_user = db.query(User).filter(User.email == email).first()
+    invited_user = db.query(User).filter(func.lower(User.email) == email).first()
 
     collab = PlanCollaborator(
         id=uuid.uuid4(),
@@ -535,7 +554,7 @@ async def list_my_invitations(
     accepted/declinedも含めて返す)。"""
     invitations = (
         db.query(PlanCollaborator)
-        .filter(PlanCollaborator.email == current_user.email)
+        .filter(func.lower(PlanCollaborator.email) == normalize_invite_email(current_user.email))
         .order_by(PlanCollaborator.created_at.desc())
         .all()
     )
@@ -557,7 +576,7 @@ async def accept_invitation(
     db: Session = Depends(get_db),
 ):
     collab = db.query(PlanCollaborator).filter(PlanCollaborator.id == collaborator_id).first()
-    if not collab or collab.email != current_user.email or _plan_is_deleted(db, collab.plan_id):
+    if not collab or not invite_is_for(collab, current_user) or _plan_is_deleted(db, collab.plan_id):
         # 他人宛の招待IDを推測されてもstatusを変更できないよう、存在有無を
         # 問わず同一の404で応答する(IDOR対策)。論理削除済みプランへの招待も同じ扱い。
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="招待が見つかりません")
@@ -579,7 +598,7 @@ async def decline_invitation(
     db: Session = Depends(get_db),
 ):
     collab = db.query(PlanCollaborator).filter(PlanCollaborator.id == collaborator_id).first()
-    if not collab or collab.email != current_user.email or _plan_is_deleted(db, collab.plan_id):
+    if not collab or not invite_is_for(collab, current_user) or _plan_is_deleted(db, collab.plan_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="招待が見つかりません")
     if collab.status != "pending":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="この招待は既に処理済みです")
