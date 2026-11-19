@@ -50,8 +50,8 @@ def test_other_user_cannot_cancel_or_resume_my_subscription(auth_client, db_sess
     other, _pw = make_user()
     _as(other)
     for path in ("cancel", "resume"):
-        body = {} if path == "cancel" else None
-        r = client.post(f"/api/v1/billing/subscriptions/{sub['id']}/{path}", **({"json": body} if body is not None else {}))
+        kwargs = {"json": {}} if path == "cancel" else {}
+        r = client.post(f"/api/v1/billing/subscriptions/{sub['id']}/{path}", **kwargs)
         assert r.status_code == 404 and r.json()["detail"]["code"] == "subscription_not_found"
     # 相手の購読は変わらず、Stripe へ取り消しも送られていない
     assert not any(c[1].startswith("/v1/subscriptions/") for c in stripe["calls"])
