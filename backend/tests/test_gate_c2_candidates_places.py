@@ -261,3 +261,28 @@ def test_from_search_only_own_results(auth_client, make_user, db_session):
                        json={"search_candidate_id": str(theirs.id)}).status_code == 404
     # 他の人の検索結果は採用もできない(以前の IDOR)
     assert client.post(f"/api/v1/search/candidates/{theirs.id}/adopt").status_code == 404
+
+
+def test_adopt_candidate_is_idempotent_and_does_not_leak_between_users(auth_client, make_user, db_session):
+    """[Gate② G2-01-B] 同じ候補の再送で、Place・出典・項目ごとの出典を増やさない。他の人の候補は404のまま。"""
+    from app.models.models import FieldSource, Place
+    client, owner = auth_client
+    now = datetime(2026, 11, 19, tzinfo=timezone.utc)
+    cand = SearchCandidate(query="神宮", provider="nominatim", external_id="n1", name="伊勢神宮", latitude=34.455,
+                           longitude=136.725, searched_by_user_id=owner.id, retrieved_at=now)
+    db_session.add(cand)
+    db_session.flush()
+    db_session.add(SourceRecord(candidate_id=cand.id, provider="nominatim", retrieved_at=now))
+    db_session.commit()
+    first = client.post(f"/api/v1/search/candidates/{cand.id}/adopt")
+    second = client.post(f"/api/v1/search/candidates/{cand.id}/adopt")
+    assert first.status_code == 200 and second.status_code == 200
+    assert first.json() == second.json()
+    places = db_session.query(Place).filter(Place.adopted_from_candidate_id == cand.id).all()
+    assert len(places) == 1
+    assert db_session.query(SourceRecord).filter(SourceRecord.place_id == places[0].id).count() == 1
+    sources_after_first_two = db_session.query(FieldSource).filter(FieldSource.place_id == places[0].id).count()
+    client.post(f"/api/v1/search/candidates/{cand.id}/adopt")
+    assert db_session.query(FieldSource).filter(FieldSource.place_id == places[0].id).count() == sources_after_first_two
+    # 外部ID(提供元)と自社の Place ID は別物
+    assert first.json()["id"] != cand.external_id

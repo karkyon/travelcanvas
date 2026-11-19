@@ -205,6 +205,20 @@ async def search_spots(
     }
 
 
+def _adopted_place_response(place: Place, candidate_id: uuid.UUID) -> dict:
+    return {
+        "id": str(place.id),
+        "name": place.name,
+        "category": place.category,
+        "location": {
+            "latitude": place.latitude,
+            "longitude": place.longitude,
+            "address": place.address,
+        },
+        "adopted_from_candidate_id": str(candidate_id),
+    }
+
+
 @router.post("/candidates/{candidate_id}/adopt")
 async def adopt_candidate(
     candidate_id: uuid.UUID,
@@ -219,6 +233,17 @@ async def adopt_candidate(
                                                  SearchCandidate.searched_by_user_id == current_user.id).first()
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候補が見つかりません")
+
+    # [Gate② G2-01-B] 同じ候補を再送(通信の再試行・連打・予定の作成に失敗した後のやり直し)しても、
+    # Place・出典を増やさず、先に作ったPlaceを返す(冪等)
+    existing = (
+        db.query(Place)
+        .filter(Place.adopted_from_candidate_id == candidate.id, Place.created_by == current_user.id)
+        .order_by(Place.created_at.asc())
+        .first()
+    )
+    if existing is not None:
+        return _adopted_place_response(existing, candidate.id)
 
     source_record = (
         db.query(SourceRecord)
@@ -273,17 +298,7 @@ async def adopt_candidate(
     db.commit()
     db.refresh(place)
 
-    return {
-        "id": str(place.id),
-        "name": place.name,
-        "category": place.category,
-        "location": {
-            "latitude": place.latitude,
-            "longitude": place.longitude,
-            "address": place.address,
-        },
-        "adopted_from_candidate_id": str(candidate.id),
-    }
+    return _adopted_place_response(place, candidate.id)
 
 
 @router.get("/places/{place_id}")
