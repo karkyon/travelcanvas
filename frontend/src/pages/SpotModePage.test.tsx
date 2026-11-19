@@ -132,6 +132,19 @@ describe('スポットモード', () => {
     expect(m.searchNearby).not.toHaveBeenCalled();
   });
 
+  it('[Gate2 G2-04] 周りを探すは、座標を検索サービスへ送ることを探す前に示す(メンバーには送らない)', async () => {
+    const watchPosition = vi.fn((ok: (p: { coords: { latitude: number; longitude: number; accuracy: number } }) => void) => {
+      ok({ coords: { latitude: 34.4614, longitude: 136.7244, accuracy: 10 } });
+      return 1;
+    });
+    Object.defineProperty(navigator, 'geolocation', { value: { watchPosition, clearWatch: vi.fn() }, configurable: true });
+    renderSpot();
+    fireEvent.click(await screen.findByRole('button', { name: '周りを探す' }));
+    fireEvent.click(await screen.findByRole('button', { name: '現在地を使う' }));
+    expect(await screen.findByTestId('spot-nearby-privacy')).toHaveTextContent('場所の検索サービスへ送ります');
+    expect(screen.getByTestId('spot-nearby-privacy')).toHaveTextContent('メンバーには送りません');
+  });
+
   it('その日でなければ残り時間を出さず、時間枠を示す', async () => {
     vi.setSystemTime(new Date('2026-11-20T04:48:00Z'));
     renderSpot();
