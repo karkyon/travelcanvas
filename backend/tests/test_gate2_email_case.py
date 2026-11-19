@@ -31,7 +31,8 @@ def test_login_ignores_case_and_duplicate_signup_is_rejected(client):
     # 大文字小文字だけ違う 2 つ目のアカウントは作れない
     assert _register(client, stored.upper()).status_code == 400
     # 違うパスワードは従来どおり 401
-    assert client.post("/api/v1/auth/login", json={"email": stored.lower(), "password": "wrong-Pass-1"}).status_code == 401
+    wrong = client.post("/api/v1/auth/login", json={"email": stored.lower(), "password": "wrong-Pass-1"})
+    assert wrong.status_code == 401
 
 
 def test_lookup_prefers_exact_and_refuses_ambiguous(db_session, make_user):
