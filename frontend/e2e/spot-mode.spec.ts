@@ -26,6 +26,9 @@ function apiClient(request: APIRequestContext, base: string, token: string) {
 }
 
 test('スポットモード: 候補をエリアにまとめ、地図と一覧で気分に合わせて選び、着いたを付ける', async ({ page, context }) => {
+  // 準備→スポットモード→別行動→次どこ？→タブレット横を 1 本で通し、axe を 5 回走らせる長い旅。
+  // 既定の 30 秒では CI の混み具合で 1 回目だけ超える(CI #791 で 1 回目 31.2 秒・再試行 11.4 秒)ため、他の長い E2E と同じく伸ばす。
+  test.setTimeout(90_000);
   const { planId, apiBase, token } = await startGuestPlanViaApi(page, `スポットE2E-${Date.now()}`);
   const send = apiClient(context.request, apiBase, token);
   await send(`/plans/${planId}/days`, { local_date: '2026-11-29', timezone_id: 'Asia/Tokyo' });
