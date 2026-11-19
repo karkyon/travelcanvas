@@ -47,7 +47,7 @@ vi.mock('@/services/api', () => ({
 }));
 
 import {
-  saveOfflinePack, loadOfflinePack, deleteOfflinePack, isOfflinePackAvailable, listOfflinePacks, clearAllOfflinePacks,
+  saveOfflinePack, loadOfflinePack, deleteOfflinePack, isOfflinePackAvailable, getOfflinePackExpiry, listOfflinePacks, clearAllOfflinePacks,
 } from './offlinePack';
 import {
   forgetOfflineKeys, loadSnapshot, obtainOfflineKey, offlineDeviceId, resetOfflineKeyMemoForTesting, saveSnapshot,
@@ -151,6 +151,18 @@ describe('offlinePack (Gate #36 / K1)', () => {
     bytes[0] = (bytes[0] ?? 0) ^ 0xff;
     await idbPut(PACKS_STORE, { ...raw, ciphertext: bytes.buffer });
     expect(await loadOfflinePack('plan-1', A())).toBeNull();
+  });
+
+  it('期限と期限切れを案内用に返し、期限切れのパックは端末から消す', async () => {
+    await saveOfflinePack('plan-1', 't', planData, A(), 60_000);
+    const valid = await getOfflinePackExpiry('plan-1');
+    expect(valid?.expired).toBe(false);
+    expect((valid?.expiresAt ?? 0) - Date.now()).toBeGreaterThan(0);
+
+    await saveOfflinePack('plan-2', 't', planData, A(), -1000);
+    const expired = await getOfflinePackExpiry('plan-2');
+    expect(expired?.expired).toBe(true);
+    expect(await isOfflinePackAvailable('plan-2')).toBe(false);
   });
 
   it('期限切れのパックは読み出し時に削除される', async () => {
