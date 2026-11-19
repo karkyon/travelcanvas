@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { expectNoAxeViolations } from './support/axe';
-import { seedBaseline } from '../ux/baselineData';
+import { HOME_TITLE, seedBaseline } from '../ux/baselineData';
 
 /**
  * [Gate G11] 段階4 見た目の系統(docs/ux/G11_UIUX全範囲_実装仕様.md §3.4、UIX-M01・UIX-M11)の browser E2E。
@@ -82,8 +82,10 @@ test('見た目の系統 × 明るい・暗い で主な画面に axe の違反�
   test.setTimeout(900_000);
   const { planId } = await seedBaseline(page, 'g11styleaxe');
   const screens = [
-    // [Gate HomeV2] 計画中の旅行があると「おかえりなさい。次の旅まで あと N 日」(読み込みの前は「次の旅を、楽しみに変える」)
-    { name: 'ダッシュボード', path: '/dashboard', h1: /次の旅まで あと (\d+ 日|約)/ as RegExp | string | null },
+    // [Gate HomeV2] 計画中の旅行があると「次の旅まで あと N 日」(読み込みの前は「次の旅を、楽しみに変える」)。
+    // [Gate②] 見出しは試験を走らせる日と旅行の日付で変わる(dashboardModel.homeTitle: 明日から・旅行中・旅のあと)。
+    // 以前は「次の旅まで」だけを待ち、旅行(2026-11-21)の前日の CI #793 で「明日から旅行です」になって落ちた
+    { name: 'ダッシュボード', path: '/dashboard', h1: HOME_TITLE as RegExp | string | null },
     { name: 'プランナー', path: `/planner/${planId}`, h1: '京都 紅葉の1泊2日' as RegExp | string | null },
     { name: '設定', path: '/settings?tab=preferences', h1: null as RegExp | string | null },
   ];

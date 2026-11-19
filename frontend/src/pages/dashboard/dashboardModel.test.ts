@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import type { DashboardTrip } from '@/services/api/types/g9';
 import {
-  eventTime, groupTrips, homeTitle, minutesLabel, quickActions, shortDate, spanTitle, statusLabel, tripDateLabel,
+  HOME_TITLE, eventTime, groupTrips, homeTitle, minutesLabel, quickActions, shortDate, spanTitle, statusLabel, tripDateLabel,
 } from './dashboardModel';
 
 const base: DashboardTrip = {
@@ -99,5 +99,13 @@ describe('[HomeLive] ホームの見出し', () => {
   it('旅行後・旅行が無い', () => {
     expect(homeTitle({ ...base, phase: 'past', days_until_start: null, days_since_end: 2 }, [])).toBe('旅のあとに: 記録と精算');
     expect(homeTitle(null, [])).toBe('次の旅を、楽しみに変える');
+  });
+  it('[Gate②] E2E が待つ見出しの形(ux/baselineData の HOME_TITLE)は、旅行がある時のどの段階の見出しにも合う', () => {
+    // 試験を走らせる日によって段階が変わるため、E2E は段階を決め打ちしない(CI #793 の「明日から旅行です」で落ちた)
+    for (const t of [
+      homeTitle(base, [base]), homeTitle({ ...base, days_until_start: 1 }, []), homeTitle({ ...base, days_until_start: 100 }, []),
+      homeTitle(live, [live]), homeTitle({ ...base, phase: 'past', days_until_start: null, days_since_end: 2 }, []),
+    ]) expect(t).toMatch(HOME_TITLE);
+    expect(homeTitle(null, [])).not.toMatch(HOME_TITLE);  // 読み込みの前・旅行なしの見出しでは進まない
   });
 });
