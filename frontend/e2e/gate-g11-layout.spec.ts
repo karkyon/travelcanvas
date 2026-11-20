@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { tokyoDateAfter } from './support/dates';
 import { apiClient, registerAccount } from './support/api';
 import { expectNoAxeViolations } from './support/axe';
 
@@ -17,7 +18,7 @@ async function setup(page: Page, label: string) {
   const a = await registerAccount(page, { prefix: 'g11l', label, password: PASSWORD });
   const send = apiClient(page.request, a.apiBase, a.token);
   const plan = await send('post', '/travel-plans/', { title: `配置G11-${Date.now()}` }) as { id: string };
-  const day = await send('post', `/plans/${plan.id}/days`, { local_date: '2026-11-21', timezone_id: 'Asia/Tokyo' }) as { id: string };
+  const day = await send('post', `/plans/${plan.id}/days`, { local_date: tokyoDateAfter(30), timezone_id: 'Asia/Tokyo' }) as { id: string };
   const ids: string[] = [];
   for (const [title, time] of [['清水寺', '09:00'], ['八坂神社', '11:00'], ['祇園', '13:00']] as const) {
     ids.push((await send('post', `/plans/${plan.id}/events`, { day_id: day.id, title, local_start_time: time }) as { id: string }).id);

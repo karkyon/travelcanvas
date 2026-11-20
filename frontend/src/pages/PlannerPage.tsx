@@ -1033,7 +1033,7 @@ const PlannerPage: React.FC = () => {
               </div>
             )}
             <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${currentPlan.id}/candidates`)}>
-              <UiIcon icon={Star} />近くを発見・候補
+              <UiIcon icon={Star} />場所を探す・候補
             </button>
             {/* [Gate WishPlaces] しおりは旅程の主な行き先なので、操作の列から 1 回で開く */}
             <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${currentPlan.id}/booklet`)} data-testid="plan-booklet">
@@ -1349,7 +1349,7 @@ const PlannerPage: React.FC = () => {
                   onClick={() => navigate(`/planner/${currentPlan.id}/route-options`)}
                   icon={<UiIcon icon={Route} />}
                 >
-                  経路の比較
+                  経路を比べる
                 </Button>
                 <Button
                   variant="outline"

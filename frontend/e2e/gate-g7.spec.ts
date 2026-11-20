@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page, type Request } from '@playwright/test';
+import { tokyoDateAfter } from './support/dates';
 import { apiClient, registerAccount, type Send } from './support/api';
 import { expectNoAxeViolations } from './support/axe';
 
@@ -50,7 +51,9 @@ test('MOVE-03・FR-005 既定の滞在と疲れ、ドラッグの並べ替え、
   const { send } = await member(page, 'move');
   const plan = await send('post', '/travel-plans/', { title: `滋賀G7-${Date.now()}` }) as { id: string };
   const base = `/plans/${plan.id}`;
-  const day = await send('post', `${base}/days`, { local_date: '2026-11-21', timezone_id: 'Asia/Tokyo' }) as { id: string };
+  // [Gate②] 旅行の日は試験を走らせる日から決める(固定の日付は、その日が来る・過ぎると見え方が変わりうる)
+  const tripDay = tokyoDateAfter(30);
+  const day = await send('post', `${base}/days`, { local_date: tripDay, timezone_id: 'Asia/Tokyo' }) as { id: string };
   for (const [title, time] of [['酒蔵A', '09:00'], ['酒蔵B', '10:00'], ['酒蔵C', '11:00'], ['酒蔵D', '12:00']] as const) {
     await send('post', `${base}/events`, { day_id: day.id, title, event_type: 'sightseeing', local_start_time: time });
   }
@@ -59,7 +62,7 @@ test('MOVE-03・FR-005 既定の滞在と疲れ、ドラッグの並べ替え、
   await page.goto(`/planner/${plan.id}/constraints`);
   await expect(page.getByTestId('movement-summary')).toContainText('休憩なしは180分まで');
   await page.getByRole('button', { name: '検証する' }).click();
-  await expect(page.getByTestId('day-metric')).toContainText('2026-11-21');
+  await expect(page.getByTestId('day-metric')).toContainText(tripDay);
   await expect(page.getByTestId('day-metric')).toContainText('見積もりを含む');
   await expect(page.getByText(/休憩\(15分以上の空きか食事\)がありません/).first()).toBeVisible();
   await page.getByRole('button', { name: '既定を見る・変える' }).click();
@@ -202,7 +205,7 @@ test('MEM-03・FR-039 移動の遅れの傾向から余裕を足す、14日後�
   };
   await trip(`彦根-${stamp}`, '2025-04-01', [['駅', '09:00', '09:00'], ['城', '10:00', '10:20'], ['庭', '12:00', '12:25']], [['駅', '城'], ['城', '庭']]);
   await trip(`長浜-${stamp}`, '2025-05-01', [['駅', '09:00', '09:00'], ['寺', '10:00', '10:15']], [['駅', '寺']]);
-  const next = await trip(`近江八幡-${stamp}`, '2026-11-21', [['堀', '10:00', null], ['山', '13:00', null]], [['堀', '山']]);
+  const next = await trip(`近江八幡-${stamp}`, tokyoDateAfter(30), [['堀', '10:00', null], ['山', '13:00', null]], [['堀', '山']]);
 
   // 5. 移動の遅れの傾向から、区間の前の余裕を足す
   await page.goto(`/planner/${next.plan.id}/memory-replan`);

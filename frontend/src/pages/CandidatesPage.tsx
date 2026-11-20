@@ -205,9 +205,9 @@ const CandidatesPage: React.FC = () => {
     <div className="tc-page tc-discover">
       {/* [Gate MockScreens] モックの発見: 近くを探す・SNS の投稿を2列、見つけた候補をカードで、候補箱へ */}
       <PageHead
-        eyebrow="DISCOVER · 発見・候補箱"
+        eyebrow="DISCOVER · 場所を探す・候補"
         title="近くの「行きたい」を集める"
-        sub="行きたい場所・気になる店を、まだ予定にしないで候補箱に貯めておけます。旅程に追加しても候補は残り、予定を消すと候補に戻ります。URL はページを取りに行かず、出典として残すだけです(追跡用の付け足しは外します)。"
+        sub="①場所を探す → ②この旅行の候補に保存 → ③日と時刻を選んで旅程に追加、の順で進みます。候補は旅程に追加しても残り、予定を消すと候補に戻ります。URL はページを取りに行かず、出典として残すだけです(追跡用の付け足しは外します)。"
         actions={<>
           <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${planId}`)}>← 旅程へ</button>
           {/* [Gate SpotMode] FR-060 近くにまとまった候補を、順番を決めずに歩くエリアにする */}
@@ -225,7 +225,7 @@ const CandidatesPage: React.FC = () => {
       ) : data && (
         <>
           {/* [Gate DiscoverUX] 画面の中の移動(モックアップ 2026-11-10): 探す / この旅行の候補 / 行きたい場所ライブラリ */}
-          <nav className="tc-disc-tabs" aria-label="発見の画面の中の移動">
+          <nav className="tc-disc-tabs" aria-label="場所を探す・候補の画面の中の移動">
             <button type="button" className="tc-focus-ring" onClick={() => scrollTo('disc-search')}>場所を探す <span>検索</span></button>
             <button type="button" className="tc-focus-ring" onClick={() => scrollTo('disc-saved')}>
               この旅行の候補 <span data-testid="disc-tab-count">{data.counts.open}</span></button>

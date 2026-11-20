@@ -127,7 +127,7 @@ describe('Header (Gate G9 UX-3)', () => {
     // スマホのメニューは左の帯と同じ全ての項目を出す
     const mobile = await screen.findByRole('navigation', { name: '主なメニュー(スマホ)' });
     // [Gate HomeV2] モックアップ v2 の項目(旅行を開いていない時は、旅行の中の項目を出さない)
-    for (const name of ['ホーム', '旅行', '旅の記録と思い出', '行きたい場所', '発見', '旅行相談', '設定']) {
+    for (const name of ['ホーム', '旅行', '旅の記録と思い出', '行きたい場所', '場所を探す・候補', '旅行相談', '設定']) {
       expect(within(mobile).getByRole('link', { name })).toBeInTheDocument();
     }
   });

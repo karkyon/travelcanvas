@@ -63,7 +63,7 @@ export function railItems(tripId: string | null, path: string, opts: { live?: bo
     },
     { key: 'wish', label: '行きたい場所', icon: Heart, to: '/spots', match: (p) => p.startsWith('/spots') },
     {
-      key: 'discover', label: '発見', icon: Compass, to: tripId ? `/planner/${tripId}/candidates` : '/search',
+      key: 'discover', label: '場所を探す・候補', icon: Compass, to: tripId ? `/planner/${tripId}/candidates` : '/search',
       match: (p) => p.startsWith('/search') || inTrip(['/candidates', '/places'])(p),
     },
     { key: 'intake', label: '旅行相談', icon: Sparkles, to: '/trip-consult', match: (p) => p.startsWith('/trip-consult') },
@@ -89,7 +89,7 @@ export function railItems(tripId: string | null, path: string, opts: { live?: bo
       key: 'share', label: '共有', icon: Share2, to: `/share/${tripId}`, group: 'trip',
       match: (p) => p.startsWith('/share/') || inTrip(['/discussion', '/booklet', '/exports', '/corrections'])(p),
     },
-    { key: 'optimize', label: '比較', icon: Route, to: trip('/route-options'), match: inTrip('/route-options'), group: 'trip' },
+    { key: 'optimize', label: '経路を比べる', icon: Route, to: trip('/route-options'), match: inTrip('/route-options'), group: 'trip' },
   ];
   return [...top, ...inside];
 }
