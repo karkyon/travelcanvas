@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { tokyoDateAfter } from './support/dates';
 import { apiClient, registerAccount } from './support/api';
 import { expectNoAxeViolations } from './support/axe';
 
@@ -18,13 +19,15 @@ test('FR-019 日ごとの案: 雨の日の案を作り(たたき台)、開いて
   const send = apiClient(page.request, a.apiBase, a.token);
   const plan = await send('post', '/travel-plans/', { title: `伊勢PlanB-${Date.now()}` }) as { id: string };
   const base = `/plans/${plan.id}`;
-  const day = await send('post', `${base}/days`, { local_date: '2026-11-28', timezone_id: 'Asia/Tokyo' }) as { id: string };
+  // [Gate②] 旅行の日は試験を走らせる日から決める(固定の日付は、その日が来る・過ぎると見え方が変わり CI が日付で落ちる)
+  const tripDay = tokyoDateAfter(30);
+  const day = await send('post', `${base}/days`, { local_date: tripDay, timezone_id: 'Asia/Tokyo' }) as { id: string };
   for (const [title, type, time] of [['伊勢神宮', 'sightseeing', '09:00'], ['河原でバーベキュー', 'dining', '12:00'],
     ['鳥羽水族館', 'sightseeing', '15:00']] as const) {
     await send('post', `${base}/events`, { day_id: day.id, title, event_type: type, local_start_time: time });
   }
   const made = await send('post', `${base}/variants`, {
-    local_date: '2026-11-28', source: 'copy_active', name: '雨の日', reason: 'rain', scaffold: true,
+    local_date: tripDay, source: 'copy_active', name: '雨の日', reason: 'rain', scaffold: true,
   }) as { variants: Array<{ day_id: string; label: string }> };
   expect(made.variants[0]!.label).toBe('B');
 
@@ -50,12 +53,12 @@ test('FR-019 日ごとの案: 雨の日の案を作り(たたき台)、開いて
   await expect(page.getByTestId('variant-tab-B')).toContainText('今の案');
   await expect.poll(async () => {
     const v = await send('get', `${base}/variants`) as { dates: Record<string, Array<{ label: string; status: string }>> };
-    return v.dates['2026-11-28']!.find((x) => x.status === 'active')!.label;
+    return v.dates[tripDay]!.find((x) => x.status === 'active')!.label;
   }).toBe('B');
   const rev = (await send('get', `/plans/${plan.id}`) as { revision: number }).revision;
   await send('post', `${base}/undo`, undefined, { 'If-Match': String(rev) });
   const back = await send('get', `${base}/variants`) as { dates: Record<string, Array<{ label: string; status: string }>> };
-  expect(back.dates['2026-11-28']!.find((x) => x.status === 'active')!.label).toBe('A');
+  expect(back.dates[tripDay]!.find((x) => x.status === 'active')!.label).toBe('A');
 
   // 3. もしもの案の前の URL は旅程へ
   await page.goto(`/planner/${plan.id}/branches`);

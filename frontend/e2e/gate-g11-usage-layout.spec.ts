@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { tokyoDateAfter } from './support/dates';
 import { apiClient, registerAccount } from './support/api';
 import { expectNoAxeViolations } from './support/axe';
 
@@ -54,7 +55,7 @@ for (const width of [1280, 360]) {
     const a = await registerAccount(page, { prefix: 'g11u', label: `w${width}`, password: PASSWORD });
     const send = apiClient(page.request, a.apiBase, a.token);
     const plan = await send('post', '/travel-plans/', { title: `利用枠G11-${Date.now()}` }) as { id: string };
-    const day = await send('post', `/plans/${plan.id}/days`, { local_date: '2026-11-21', timezone_id: 'Asia/Tokyo' }) as { id: string };
+    const day = await send('post', `/plans/${plan.id}/days`, { local_date: tokyoDateAfter(30), timezone_id: 'Asia/Tokyo' }) as { id: string };
     await send('post', `/plans/${plan.id}/events`, { day_id: day.id, title: '清水寺', local_start_time: '09:00' });
     await page.setViewportSize({ width, height: 900 });
     // 地図の下の移動概算は先に読み終わらせる(この試験は利用枠だけを比べる)

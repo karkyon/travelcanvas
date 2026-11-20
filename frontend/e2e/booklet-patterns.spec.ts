@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { addDays, jaDate, tokyoDateAfter } from './support/dates';
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { settleForAxe } from './support/axe';
@@ -26,8 +27,10 @@ test('しおり: 12 パターンすべてで、必須の内容を Web と印刷�
   const title = `パターン確認-${Date.now()}`;
   const { planId, apiBase, token } = await startGuestPlanViaApi(page, title);
   const send = client(context.request, apiBase, token);
-  const d1 = await send(`/plans/${planId}/days`, { local_date: '2027-04-10', timezone_id: 'Asia/Tokyo', title: '東山' });
-  const d2 = await send(`/plans/${planId}/days`, { local_date: '2027-04-11', timezone_id: 'Asia/Tokyo' });
+  // [Gate②] 旅行の日は試験を走らせる日から決める(固定の日付は、その日が来る・過ぎると見え方が変わりうる)
+  const day1 = tokyoDateAfter(30);
+  const d1 = await send(`/plans/${planId}/days`, { local_date: day1, timezone_id: 'Asia/Tokyo', title: '東山' });
+  const d2 = await send(`/plans/${planId}/days`, { local_date: addDays(day1, 1), timezone_id: 'Asia/Tokyo' });
   await send(`/plans/${planId}/events`, { day_id: d1.id, title: '清水寺', event_type: 'sightseeing', local_start_time: '09:30', latitude: 34.9949, longitude: 135.785 });
   await send(`/plans/${planId}/events`, { day_id: d1.id, title: '八坂神社', event_type: 'sightseeing', local_start_time: '12:00', latitude: 35.0037, longitude: 135.7785 });
   await send(`/plans/${planId}/events`, { day_id: d2.id, title: '金閣寺', event_type: 'sightseeing', local_start_time: '10:00', latitude: 35.0394, longitude: 135.7292 });
@@ -39,7 +42,7 @@ test('しおり: 12 パターンすべてで、必須の内容を Web と印刷�
   for (const [theme, label] of THEMES) {
     await page.getByRole('radio', { name: label }).click();
     await expect(view).toHaveAttribute('data-theme', theme);
-    for (const text of [title, '清水寺', '金閣寺', '2027年4月10日', 'OpenStreetMap']) await expect(view).toContainText(text);
+    for (const text of [title, '清水寺', '金閣寺', jaDate(day1), 'OpenStreetMap']) await expect(view).toContainText(text);
     await expect(view.getByRole('img', { name: /旅行全体の地図/ })).toBeVisible();
     await expect(view.locator('.bk-ov tbody tr')).toHaveCount(2);
     await expect(view.locator('.bk-day')).toHaveCount(2);
@@ -95,7 +98,7 @@ test('行きたい場所: 追加・編集・削除ができ、旅程の予定へ
   test.setTimeout(120_000);
   const { planId, apiBase, token } = await startGuestPlanViaApi(page, `行きたい場所確認-${Date.now()}`);
   const send = client(context.request, apiBase, token);
-  await send(`/plans/${planId}/days`, { local_date: '2027-04-10', timezone_id: 'Asia/Tokyo' });
+  await send(`/plans/${planId}/days`, { local_date: tokyoDateAfter(30), timezone_id: 'Asia/Tokyo' });
   await page.route('**/api/v1/search/spots', (r) => r.fulfill({ json: {
     query: '伊勢', total: 1, candidates: [{ id: 's1', provider: 'overpass', name: '伊勢神宮', category: 'sightseeing',
       location: { latitude: 34.455, longitude: 136.725, address: '三重県伊勢市' }, retrieved_at: '2026-10-28T09:00:00+00:00' }],

@@ -17,7 +17,7 @@ import { useCurrentTripStore } from '../../store/currentTripStore';
 
 const PLAN = '11111111-2222-3333-4444-555555555555';
 const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><AppRail /></MemoryRouter>);
-const NAMES = ['ホーム', '旅行', '旅の記録と思い出', '行きたい場所', '発見', '旅行相談', '設定'];
+const NAMES = ['ホーム', '旅行', '旅の記録と思い出', '行きたい場所', '場所を探す・候補', '旅行相談', '設定'];
 
 describe('AppRail', () => {
   beforeEach(() => useCurrentTripStore.setState({ trip: null }));
@@ -53,7 +53,7 @@ describe('AppRail', () => {
     render(<MemoryRouter><TripNav tripId={PLAN} path={`/planner/${PLAN}/reservations`} /></MemoryRouter>);
     const nav = screen.getByRole('navigation', { name: 'この旅行のメニュー' });
     // [Gate TripDayNav] 旅の当日の項目は、旅行の当日だけ出す(期間の外の旅行では出さない)
-    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['旅程', '旅行箱', '共有', '比較']);
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['旅程', '旅行箱', '共有', '経路を比べる']);
     expect(screen.getByTestId('rail-plan')).toHaveAttribute('href', `/planner/${PLAN}`);
     expect(screen.getByTestId('rail-resources')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('rail-share')).toHaveAttribute('href', `/share/${PLAN}`);

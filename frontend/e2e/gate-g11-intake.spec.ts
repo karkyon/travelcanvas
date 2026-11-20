@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { addDays, tokyoDateAfter } from './support/dates';
 import { expectNoAxeViolations } from './support/axe';
 import { apiClient, registerMember } from './support/api';
 
@@ -177,12 +178,14 @@ test('旅行相談: 希望 → 確認 → 方面の比較 → 方面の詳細 �
   await expectNoAxeViolations(page, '旅程の下書き');
 
   // 6. 日付を決めて旅程にする(本物)
-  await page.getByLabel('初日').fill('2026-11-28');
+  // [Gate②] 初日は試験を走らせる日から決める(固定の日付は、その日が過ぎると見え方が変わりうる)
+  const firstDay = tokyoDateAfter(30);
+  await page.getByLabel('初日').fill(firstDay);
   await page.getByTestId('draft-commit').click();
   await expect(page).toHaveURL(new RegExp(`/planner/${planId}$`), { timeout: 20_000 });
   const detail = await send('get', `/plans/${planId}`) as { days: Array<{ local_date: string; timezone_id: string;
     events: Array<{ title: string }> }> };
-  expect(detail.days.map((d) => d.local_date)).toEqual(['2026-11-28', '2026-11-29']);
+  expect(detail.days.map((d) => d.local_date)).toEqual([firstDay, addDays(firstDay, 1)]);
   expect(detail.days[0]!.timezone_id).toBe('Asia/Tokyo');
   expect(detail.days[0]!.events.map((e) => e.title)).toEqual(['伊勢神宮 内宮', 'おかげ横丁']);
   await expect(page.getByText('伊勢神宮 内宮').first()).toBeVisible({ timeout: 20_000 });

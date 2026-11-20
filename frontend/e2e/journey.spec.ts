@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { tokyoDateAfter } from './support/dates';
 import AxeBuilder from '@axe-core/playwright';
 import { settleForAxe } from './support/axe';
 import { guestTokenFrom, waitForGuestResponse } from './support/guestPlan';
@@ -50,7 +51,7 @@ test('振り返り: 記録から到着・出発を提案して記録し、指標
   const plan = await send('post', '/travel-plans/', { title: `P14振り返りE2E-${stamp}` });
   const next = await send('post', '/travel-plans/', { title: `P14次の旅行-${stamp}` });
   const day = await send('post', `/plans/${plan.id}/days`, { local_date: '2026-11-01', timezone_id: 'Asia/Tokyo' });
-  const nextDay = await send('post', `/plans/${next.id}/days`, { local_date: '2027-04-01', timezone_id: 'Asia/Tokyo' });
+  const nextDay = await send('post', `/plans/${next.id}/days`, { local_date: tokyoDateAfter(120), timezone_id: 'Asia/Tokyo' });
   const ev: Record<string, { id: string }> = {};
   for (const [name, time] of [['清水寺', '10:00'], ['昼食', '12:00'], ['美術館', '15:00']] as const) {
     ev[name] = await send('post', `/plans/${plan.id}/events`, { day_id: day.id, title: name, local_start_time: time });
