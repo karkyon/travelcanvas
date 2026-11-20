@@ -58,6 +58,11 @@ describe('候補を探す(入口は1つ)', () => {
       radius_km: 5, latitude: 34.4875 })));
     expect(await screen.findByTestId('consult-result-s1')).toHaveTextContent('出典: OpenStreetMap');
     expect(api.consultPlaces).not.toHaveBeenCalled();
+    // [Gate② UX P0] 確からしさの共通の印: 取った時刻があれば実データ、営業時間は未照会
+    const cert = screen.getByTestId('consult-cert-s1');
+    const kinds = Array.from(cert.querySelectorAll('[data-cert]')).map((e) => e.getAttribute('data-cert'));
+    expect(kinds).toEqual(['live', 'unqueried']);
+    expect(cert).toHaveTextContent('営業時間は未照会');
   });
 
   it('[AreaGeo] OpenStreetMap が時間切れでも Wikipedia の座標付き記事が並ぶ。出典は行ごとに Wikipedia と示す', async () => {
