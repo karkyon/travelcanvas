@@ -31,6 +31,7 @@ import 'leaflet/dist/leaflet.css'; // 地図の画像・印の位置を決める
 import type { DaySchedule, ScheduleItem } from '@/types';
 import { areaCircles } from './areaModel';
 import type { SpotResult, RoutePreview } from '@/services/api';
+import { mapLineKinds } from './mapLineKinds';
 
 interface PlanMapProps {
   day: DaySchedule | null;
@@ -316,6 +317,14 @@ const PlanMap: React.FC<PlanMapProps> = ({
     ...(homeLeg ? [{ key: 'home', color: HOME_COLOR, label: homeLeg.end.send ? '自宅との間' : '自宅との間(直線・送らない)' }] : []),
   ];
 
+  // [Gate② UX P0] 線の種類(道に沿った経路 / 直線の目安)を、引いた線があるものだけ常に凡例に出す(mapLineKinds.ts)。
+  // 以前は線の色(宿・予定・自宅)だけで、点線が「道ではない目安」だと分かるのは線にカーソルを当てた時だけだった
+  const lineKinds = mapLineKinds(
+    Boolean(askedGeo) || legs.some((l) => legColor(l)),
+    legs.map((l) => { const g = geoOf(l); return g?.kind === 'road' && g.coordinates.length > 1; }),
+    routeLine.length,
+  );
+
   const areas = useMemo(() => areaCircles(day?.events ?? []), [day]);
   const nums = useMemo(() => mapNumbers(day?.events ?? []), [day]);
 
@@ -398,9 +407,16 @@ const PlanMap: React.FC<PlanMapProps> = ({
             </Marker>
           ))}
 
-          {legend.length > 0 && (
-            <div className="tc-map-endlegend" aria-label="線の色">
+          {(legend.length > 0 || lineKinds.length > 0) && (
+            <div className="tc-map-endlegend" aria-label="線の色と種類" data-testid="plan-map-legend">
               {legend.map((l) => <span key={l.key}><i style={{ background: l.color }} aria-hidden="true" />{l.label}</span>)}
+              {lineKinds.map((k) => (
+                <span key={`kind-${k.key}`} data-testid={`plan-map-line-${k.key}`}>
+                  <i aria-hidden="true" style={k.dashed
+                    ? { background: 'none', borderTop: `3px dotted ${ROUTE_STRAIGHT}`, height: 0, borderRadius: 0 }
+                    : { background: PIN_PLANNED }} />{k.label}
+                </span>
+              ))}
             </div>
           )}
           {homeEnd && <OffMapChip target={homeEnd.at} label="自宅" all={everything} />}

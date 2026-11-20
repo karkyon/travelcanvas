@@ -175,7 +175,7 @@ const SearchPage: React.FC = () => {
     <div className="min-h-screen bg-cloud-50">
       <div className="tc-page">
         <PageHead
-          eyebrow="DISCOVER · 発見"
+          eyebrow="DISCOVER · 場所を探す"
           title="スポット検索"
           sub="キーワードで、公開の地図・百科事典のデータ(Wikipedia・OpenStreetMap)から場所の候補を探します。"
           actions={<Link to="/search/settings" className="tc-focus-ring tc-mbtn tc-mbtn--sm">検索の設定</Link>}
@@ -250,6 +250,11 @@ const SearchPage: React.FC = () => {
                 <h2 id="search-results-title" className="tc-section-title">{`見つかった候補(${status.results.length}件)`}</h2>
                 <span className="text-xs text-ink-500">提供元が返した順</span>
               </div>
+              {/* [Gate② UX P0] 押す前に保存先が分かるように(競合比較レポート 2026-11-20: 保存先の意味を保存ボタンの直前に) */}
+              <p className="text-sm text-ink-700 mb-3" data-testid="search-save-guide">
+                「プランに追加」は、次の画面で入れる旅行を選び、日と時刻を決めてその旅行の予定にします。
+                「行きたい場所に保存」は、旅行を決めずに自分の行きたい場所の一覧へ入れます(まだどの旅行の予定にもなりません)。
+              </p>
               <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {status.results.map((spot) => (
                   <li key={spot.id} className="tc-card p-5 flex flex-col gap-2">
