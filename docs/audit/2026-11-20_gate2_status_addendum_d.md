@@ -75,3 +75,27 @@ cd ~/projects/travelcanvas && bash scripts/ops/gate2_env_record.sh
 
 - 上の 3・4 のすべて(結果が貼られるまで)。
 - 実機(iPhone・Android・iPad)・実 API・実旅行の証拠は増えていない。Gate② は完了ではない。
+
+## 6. 実績(2026-11-20 15:13 JST。利用者の実行ログ。上の記入欄は消さずに残す)
+
+**main は §1 の後に `8118aa99793ee5b811132fe45970b3b4403a0e9e`(#155)へ進んだ。** CI #809 は同じ SHA で secret-scan・dependency-audit・frontend・backend・e2e の 5 件とも success(GitHub の check-runs で確認)。反映した版はこれ。
+
+### 6.1 omega-dev2(`TC_BRANCH=main bash <(git show origin/main:scripts/ops/local_dev_apply.sh)`)
+
+| 項目 | 反映前 | 反映後 | 根拠 |
+|---|---|---|---|
+| 稼働の SHA | `cd14e23`(branch main) | **`8118aa9`** | 道具の出力「1: 反映する 8118aa9」「OK: main 8118aa9 を反映」 |
+| Alembic | `d5e9f3a7b2c6` | **`d5e9f3a7b2c6`(head)** | 「4: DB revision d5e9f3a7b2c6(head)」。migrate は終了 0(道具が確かめて進む) |
+| バックアップ | — | **`tc-20261120T061310Z`**(DB 5,985,123 バイト・保存ファイル 348 件・**検証 OK**) | tcops の出力 |
+| コンテナ | — | postgres・redis は Healthy、migrate は Exited、backend・frontend は Started | compose の出力(backend・frontend の healthy は出力に無く**未確認**) |
+| /health・/ready | — | **200・200** | 「4: …/health 200」「4: …/ready 200」 |
+| /ready の checks の中身 | — | **未確認**(200 は全 checks が true の時だけ返る作り。`backend/app/main.py` の `readiness_check`) | — |
+| 画面 `/`・`/admin/ops` | — | **200・200**(画面の route の応答だけ。管理 API の認証・データの確認ではない) | 道具の出力 |
+| LAN の画面から API(CORS) | — | **可**(`http://192.168.1.11:4173`) | 道具の出力 |
+| 記録 | — | `/home/karkyon/tc-artifacts/localdev-20261120-151308.state` | 道具の出力 |
+
+**未実施(omega-dev2):** `gate2_env_record.sh` の実行(反映の前後とも)→ 判断票 T2 の重複の組・大文字小文字違いのアカウントの組・正規化前の招待の件数は**未確認**。§4 の手の確認 C-1〜C-6 も**未実施**。
+
+### 6.2 GCP VM
+**未実施。** 最後に確認された版は `cd14e23` のまま。omega-dev2 で `8118aa9` が動いたので、次は
+`bash scripts/ops/gcp_vm.sh deploy 8118aa99793ee5b811132fe45970b3b4403a0e9e`(VM の中で。main に入った commit だけを受け付け、先にバックアップ)。
