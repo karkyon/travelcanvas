@@ -9,7 +9,7 @@
 |---|---|---|
 | main(着手時) | `8118aa99793ee5b811132fe45970b3b4403a0e9e`(#155) | GitHub branches API |
 | main(更新時) | `fe5eaece7b4e5999e93fd79b26042ce75e3ca7b9`(#156 をマージ。#156 の head `39085ec` の時点でマージされた) | GitHub branches・pulls API |
-| main の CI | `8118aa9`: run #809 の 5 件とも success。`fe5eaec`: run #811 — 確認時点(09:25 UTC)で e2e 実行中・ほかの 4 件は success(e2e の結果は未確認) | check-runs |
+| main の CI | `8118aa9`: run #809 の 5 件とも success。`fe5eaec`: run #811 — run #811 の 5 件とも success(09:43 UTC に確認) | check-runs |
 | open PR | #157(この文書)・#158(FC-084 と、#156 に漏れた地図の凡例の試験)。#156 はマージ済み | pulls API |
 | main の tree | blob 1,879 件(tree の entry 2,007・truncated=false) | git/trees API |
 | 作業ツリー | 変更なし(clean)で開始 | `git status` |
@@ -85,7 +85,9 @@ frontend の単体試験のファイルは 265(main)。**全ファイルを 1 �
 | G2-12-D | 問題 | P2 | FC-084(時計ずれ)を「未実装」と判定したのは誤り。補正は既にあり、警告だけが無かった | 警告を足し、照合の文書の判定と集計を直す(実装あり 49・一部 37・未実装 11・要確認 2・判断待ち 1) | #158(未マージ) |
 | G2-12-B | 課題 | P1 | 引継ぎの文書が指示と違う場所・リポジトリにあり、繰り返し「無い」ことの確認が必要だった | `docs/design/HANDOFF_2026-11-20.md` を作る | この PR |
 | G2-12-C | 改善 | P3 | G11 の UX 仕様 §3.3 が画面を「発見の画面」と呼ぶ(帯の名前は #155 で「場所を探す・候補」) | 仕様に注記を足す(履歴は消さない) | この PR |
-| G2-ENV-G | 課題 | P0 | GCP VM の `8118aa9` への反映・記録 | 利用者が VM で `gcp_vm.sh deploy 8118aa9…` と記録の道具 | 未実施 |
+| G2-ENV-G | 課題 | P0 | GCP VM の最新の main への反映・記録 | 利用者が VM で `gcp_vm.sh deploy fe5eaece7b4e5999e93fd79b26042ce75e3ca7b9`(CI #811 成功)と記録の道具 | 未実施 |
+| G2-ENV-O2 | 課題 | P1 | omega-dev2 を `8118aa9` から最新の main `fe5eaec` へ(frontend と docs だけ・migration なし) | 利用者が `TC_BRANCH=main` で反映し、記録の道具 | 未実施 |
+| G2-12-E | 問題 | P2 | #156 の全体の検索の説明「日と時刻を決めて」は実際と違う(1 日目に時刻なしで入る) | 説明を事実に合わせ、窓にも入る場所を出す | #160(未マージ) |
 | G2-ENV-O | 課題 | P1 | omega-dev2 の記録の道具(T2 などの件数)・C-1〜C-6 | 利用者が実行 | 未実施 |
 
 ## 7. 利用者の判断待ち(変わらず。実装していない)
