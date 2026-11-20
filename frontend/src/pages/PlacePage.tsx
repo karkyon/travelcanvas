@@ -159,7 +159,7 @@ const PlacePage: React.FC = () => {
   return (
     <div className="tc-page tc-page--md">
       <Button variant="ghost" size="sm" onClick={() => navigate(`/planner/${planId}/candidates`)} className="mb-2">← 候補箱へ戻る</Button>
-      <h1 className="tc-page-title" data-eyebrow="DISCOVER · 発見">場所の詳細</h1>
+      <h1 className="tc-page-title" data-eyebrow="DISCOVER · 場所を探す">場所の詳細</h1>
       {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
       {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
       {isLoading ? (
