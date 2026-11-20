@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
+import { tokyoDateAfter } from './support/dates';
 import { expectNoAxeViolations } from './support/axe';
 import { startGuestPlanViaApi } from './support/guestPlan';
 
@@ -31,7 +32,9 @@ test('スポットモード: 候補をエリアにまとめ、地図と一覧で
   test.setTimeout(90_000);
   const { planId, apiBase, token } = await startGuestPlanViaApi(page, `スポットE2E-${Date.now()}`);
   const send = apiClient(context.request, apiBase, token);
-  await send(`/plans/${planId}/days`, { local_date: '2026-11-29', timezone_id: 'Asia/Tokyo' });
+  // [Gate②] 旅行の日は試験を走らせる日の 30 日後(以前は 2026-11-29 の固定で、その日の CI だけ「当日」になって落ちる)
+  const tripDay = tokyoDateAfter(30);
+  await send(`/plans/${planId}/days`, { local_date: tripDay, timezone_id: 'Asia/Tokyo' });
   for (const [title, latitude, longitude, category] of [
     ['赤福 本店', 34.4610, 136.7247, '甘味'], ['豚捨', 34.4622, 136.7249, null],
     ['五十鈴川のカフェ', 34.4605, 136.7262, null], ['おかげ座', 34.4617, 136.7240, null],
@@ -65,7 +68,7 @@ test('スポットモード: 候補をエリアにまとめ、地図と一覧で
   const nav = page.getByRole('navigation', { name: '表示の切り替え' });
   await expect(nav.getByRole('link', { name: /予定/ })).toHaveAttribute('href', `/planner/${planId}/today`);
   // CI の日付は旅行の日ではないので、残り時間ではなく時間枠を示す
-  await expect(page.getByText(/当日 2026-11-29 13:00〜15:30/)).toBeVisible();
+  await expect(page.getByText(`当日 ${tripDay} 13:00〜15:30`)).toBeVisible();
   const list = page.getByRole('list', { name: 'エリアの候補' });
   await expect(list.getByRole('listitem')).toHaveCount(4);
   await expectNoAxeViolations(page, 'スポットモード(一覧)');
