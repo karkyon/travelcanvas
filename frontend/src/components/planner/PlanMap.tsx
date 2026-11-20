@@ -413,7 +413,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
               {lineKinds.map((k) => (
                 <span key={`kind-${k.key}`} data-testid={`plan-map-line-${k.key}`}>
                   <i aria-hidden="true" style={k.dashed
-                    ? { background: 'none', borderTop: `3px dotted ${ROUTE_STRAIGHT}`, height: 0, borderRadius: 0 }
+                    ? { background: 'none', borderTop: '3px dotted currentColor', height: 0, borderRadius: 0 }
                     : { background: PIN_PLANNED }} />{k.label}
                 </span>
               ))}
