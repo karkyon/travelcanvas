@@ -45,7 +45,7 @@ import { loadQueue } from '@/utils/syncQueue';
 import { flushMemoQueue, loadMemoQueue } from '@/utils/memoQueue';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import {
-  computeTodayFlow, computeTodayView, formatTimeInZone, loadTodayCache, saveTodayCache,
+  clockSkewNotice, computeTodayFlow, computeTodayView, formatTimeInZone, loadTodayCache, saveTodayCache,
 } from './today/todayModel';
 import { useTodayLive } from './today/live/useTodayLive';
 import {
@@ -446,6 +446,10 @@ const TodayPage: React.FC = () => {
         <TodaySpotStrip planId={ctx.planId} todayDate={ctx.data.today_date} timeZone={ctx.timeZone} nowMs={ctx.nowMs} />
       )}
       {ctx && isStale && <OfflineAlert ctx={ctx} deviceNowMs={clock} />}
+      {/* [Gate② FC-084] 端末の時計のずれ(NOW/NEXT はサーバーの時刻で直して表示している) */}
+      {snapshot && clockSkewNotice(snapshot.offsetMs) && (
+        <p role="status" className="tl-card tl-card--warn tl-small" data-testid="today-clock-skew">{clockSkewNotice(snapshot.offsetMs)}</p>
+      )}
       {error && data && <div role="alert" className="tl-card tl-card--warn tl-small">{error}</div>}
       <LiveNotices items={shownNotices} onDismiss={dismiss} />
       {main}

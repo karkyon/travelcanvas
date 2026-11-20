@@ -216,3 +216,19 @@ export async function loadTodayCache(session: OfflineSession | null, planId: str
     return null;
   }
 }
+
+/** [Gate② FC-084] 端末の時計のずれを知らせる目安(これより小さいずれは知らせない) */
+export const CLOCK_SKEW_NOTICE_MS = 2 * 60_000;
+
+/**
+ * [Gate② FC-084] 端末の時計がサーバーの時刻とずれている時の知らせ(DOC-02 FC-084「server time との差を検知し NOW/NEXT 誤判定を警告」)。
+ * NOW/NEXT はすでに offsetMs(server_time - 端末時刻)で直しているので、知らせは「直して表示している」ことと、
+ * 端末の時計を直すと他のアプリの時刻も合うことを伝える。ずれが目安より小さい時は null。
+ */
+export function clockSkewNotice(offsetMs: number): string | null {
+  if (!Number.isFinite(offsetMs) || Math.abs(offsetMs) < CLOCK_SKEW_NOTICE_MS) return null;
+  const minutes = Math.round(Math.abs(offsetMs) / 60_000);
+  const amount = minutes >= 120 ? `約${Math.round(minutes / 60)}時間` : `約${minutes}分`;
+  const way = offsetMs > 0 ? '遅れて' : '進んで';
+  return `この端末の時計が${amount}${way}います。予定の「いま・次」はサーバーの時刻で直して表示しています。端末の時刻を直すと、ほかのアプリの時刻も合います。`;
+}

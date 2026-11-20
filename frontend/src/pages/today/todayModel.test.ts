@@ -187,3 +187,16 @@ describe('computeTodayFlow (Gate G10-UX)', () => {
     expect(flow.doneCount).toBe(4);
   });
 });
+
+describe('[Gate② FC-084] 端末の時計のずれの知らせ', () => {
+  it('2 分より小さいずれは知らせない。遅れ・進みと分・時間で書く', async () => {
+    const { clockSkewNotice } = await import('./todayModel');
+    expect(clockSkewNotice(0)).toBeNull();
+    expect(clockSkewNotice(119_000)).toBeNull();
+    expect(clockSkewNotice(-119_000)).toBeNull();
+    expect(clockSkewNotice(15 * 60_000)).toContain('約15分遅れています');
+    expect(clockSkewNotice(-5 * 60_000)).toContain('約5分進んでいます');
+    expect(clockSkewNotice(9 * 3_600_000)).toContain('約9時間遅れています');
+    expect(clockSkewNotice(Number.NaN)).toBeNull();
+  });
+});

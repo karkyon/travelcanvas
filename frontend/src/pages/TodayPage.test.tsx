@@ -93,6 +93,25 @@ describe('TodayPage (Gate L1b)', () => {
     expect(screen.queryByText(/保存した情報を表示中/)).not.toBeInTheDocument();
   });
 
+  it('[Gate② FC-084] 端末の時計がずれている時は知らせ、NOW/NEXT はサーバーの時刻で直したまま出す', async () => {
+    deviceZone('Asia/Tokyo');
+    // 端末の時計がサーバーより 15 分遅れている
+    vi.setSystemTime(new Date(Date.parse(data.server_time) - 15 * 60_000));
+    getToday.mockResolvedValue(data);
+    renderPage();
+    expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
+    expect(screen.getByTestId('today-clock-skew')).toHaveTextContent('この端末の時計が約15分遅れています');
+    expect(screen.getByTestId('today-live-band')).toHaveTextContent('あと70分で出発');  // 直した時刻での残り
+  });
+
+  it('[Gate② FC-084] ずれが小さい時は時計の知らせを出さない', async () => {
+    deviceZone('Asia/Tokyo');
+    getToday.mockResolvedValue(data);
+    renderPage();
+    expect(await screen.findByTestId('today-now')).toHaveTextContent('ホテル');
+    expect(screen.queryByTestId('today-clock-skew')).not.toBeInTheDocument();
+  });
+
   it('端末と日程のタイムゾーンが同じなら現地時間の注記は出さない', async () => {
     deviceZone('Asia/Tokyo');
     getToday.mockResolvedValue(data);
