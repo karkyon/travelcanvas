@@ -141,7 +141,8 @@ describe('TodayPage 旅帖ライブ (Gate TDay)', () => {
     expect(go).toHaveTextContent('12:18 に出発');
     // 移動時間の出どころ(概算)を出る時刻のすぐ下に。概算は概算と書く
     expect(within(go).getByTestId('today-go-source')).toHaveTextContent('距離からの概算 ・ 移動 約12分');
-    expect(within(go).getByTestId('today-go-source')).toHaveAttribute('data-kind', 'est');
+    // [Gate② UX P0] 共通の確からしさの印(概算 = estimate)
+    expect(within(go).getByTestId('today-go-source')).toHaveAttribute('data-cert', 'estimate');
     expect(go).toHaveTextContent('移動時間は直線距離からの概算です');
     // 予約がある時だけ、判断カードにチケットの操作を出す
     expect(within(go).getByRole('button', { name: '予約・チケット' })).toBeInTheDocument();
