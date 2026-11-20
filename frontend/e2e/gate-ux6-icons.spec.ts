@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { tokyoDateAfter } from './support/dates';
 import { apiClient, registerAccount } from './support/api';
 import { expectNoAxeViolations } from './support/axe';
 
@@ -23,7 +24,7 @@ test('画面に出る文字に OS のカラー絵文字が無く、確定の予�
   const a = await registerAccount(page, { prefix: 'ux6', label: 'icons', password: PASSWORD });
   const send = apiClient(page.request, a.apiBase, a.token);
   const plan = await send('post', '/travel-plans/', { title: `UX6-${Date.now()}`, destination: '京都' }) as { id: string };
-  const day = await send('post', `/plans/${plan.id}/days`, { local_date: '2026-11-21', timezone_id: 'Asia/Tokyo' }) as { id: string };
+  const day = await send('post', `/plans/${plan.id}/days`, { local_date: tokyoDateAfter(30), timezone_id: 'Asia/Tokyo' }) as { id: string };
   const ev = await send('post', `/plans/${plan.id}/events`, { day_id: day.id, title: '宿', event_type: 'accommodation', local_start_time: '18:00' }) as { id: string };
   await send('post', `/plans/${plan.id}/events`, { day_id: day.id, title: '清水寺', event_type: 'sightseeing', local_start_time: '09:00' });
   const detail = await send('get', `/plans/${plan.id}`) as { revision: number };

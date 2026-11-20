@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { tokyoDateAfter } from './support/dates';
 import { apiClient, registerAccount } from './support/api';
 import { expectNoAxeViolations } from './support/axe';
 
@@ -15,7 +16,7 @@ test('しおりの版を公開し、QR コードとメールアプリのリン�
   const send = apiClient(page.request, a.apiBase, a.token);
   const title = `共有E2E-${Date.now()}`;
   const plan = await send('post', '/travel-plans/', { title }) as { id: string };
-  const day = await send('post', `/plans/${plan.id}/days`, { local_date: '2026-12-01', timezone_id: 'Asia/Tokyo' }) as { id: string };
+  const day = await send('post', `/plans/${plan.id}/days`, { local_date: tokyoDateAfter(30), timezone_id: 'Asia/Tokyo' }) as { id: string };
   await send('post', `/plans/${plan.id}/events`, { day_id: day.id, title: '清水寺', local_start_time: '10:00' });
   await send('post', `/plans/${plan.id}/booklet-exports`, { theme: 'simple', sections: ['cover', 'schedule'] });
 
