@@ -50,3 +50,12 @@ describe('shelfModel', () => {
     expect(shelfBadge(base)).toBe('計画中');
   });
 });
+
+describe('[Gate② UX P0] 旅行の状態の名前は 1 か所(shelfModel.SHELF_TEXT)', () => {
+  it('4 つの状態の名前と、日付から決まる段階の名前(別の物)', async () => {
+    const { SHELF_TEXT } = await import('./shelfModel');
+    const { PHASE_LABEL } = await import('./dashboardModel');
+    expect(SHELF_TEXT).toEqual({ planning: '計画中', considering: '検討中', visited: '行った旅', cancelled: '見送り・中止' });
+    expect(PHASE_LABEL).toMatchObject({ upcoming: '旅行前', ongoing: '旅行中', past: '旅行後', undated: '日付未定' });
+  });
+});

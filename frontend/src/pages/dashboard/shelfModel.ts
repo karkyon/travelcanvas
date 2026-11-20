@@ -58,6 +58,8 @@ export function shelfChip(t: DashboardTrip): string {
   }
 }
 
+/** [Gate② UX P0] 旅行の状態(利用者が選ぶ)の名前の正本。ホーム・旅行の一覧はここを使う(以前は 3 か所に同じ表があり、ずれうる)。
+ *  日付から決まる段階(旅行前・旅行中・旅行後・日付未定)は dashboardModel.PHASE_LABEL で、別の物 */
 export const SHELF_TEXT: Record<TripShelf, string> = {
   planning: '計画中', considering: '検討中', visited: '行った旅', cancelled: '見送り・中止',
 };
