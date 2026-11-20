@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { apiClient, registerAccount, type Send } from '../e2e/support/api';
+import { tokyoDateAfter } from '../e2e/support/dates';
 
 /**
  * [Gate G9] UX-0 今の画面の記録と、壊れていないことの検査(e2e/ux-baseline.spec.ts)で使う同じ旅行。
@@ -34,8 +35,9 @@ export async function seedBaseline(page: Page, label: string): Promise<{ planId:
   const send = apiClient(page.request, a.apiBase, a.token);
   const plan = await send('post', '/travel-plans/', { title: '京都 紅葉の1泊2日', destination: '京都' }) as { id: string };
   const base = `/plans/${plan.id}`;
-  const d1 = await send('post', `${base}/days`, { local_date: '2026-11-21', timezone_id: 'Asia/Tokyo' }) as { id: string };
-  await send('post', `${base}/days`, { local_date: '2026-11-22', timezone_id: 'Asia/Tokyo' });
+  // [Gate②] いつ走らせても「旅行前」の旅行になるよう、30 日後から 1 泊 2 日(以前は 2026-11-21〜22 の固定で、日付で CI が落ちた)
+  const d1 = await send('post', `${base}/days`, { local_date: tokyoDateAfter(30), timezone_id: 'Asia/Tokyo' }) as { id: string };
+  await send('post', `${base}/days`, { local_date: tokyoDateAfter(31), timezone_id: 'Asia/Tokyo' });
   const ids: string[] = [];
   for (const [title, type, time, lon] of [
     ['京都駅', 'transport', '09:00', 135.7588], ['清水寺', 'sightseeing', '10:00', 135.7850],
@@ -50,6 +52,6 @@ export async function seedBaseline(page: Page, label: string): Promise<{ planId:
   return { planId: plan.id, send };
 }
 
-// [Gate②] ダッシュボードの見出し(旅行を読み込んだ後)は試験を走らせる日と上の旅行(2026-11-21〜22)の日付で変わる。
+// [Gate②] ダッシュボードの見出し(旅行を読み込んだ後)は試験を走らせる日と旅行の日付で変わりうる。
 // 形は製品の決まり(homeTitle)の隣に置き、単体試験で一致を確かめる
 export { HOME_TITLE } from '../src/pages/dashboard/dashboardModel';

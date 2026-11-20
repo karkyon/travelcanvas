@@ -29,9 +29,9 @@ def _aware(dt: Any) -> datetime:
 
 
 def _user(db: Session, email: str):
-    from app.models.models import User
+    from app.core.user_email import find_user_by_email
 
-    u = db.query(User).filter(User.email == email).first()
+    u = find_user_by_email(db, email)  # [Gate②] 大文字小文字を区別しない
     if u is None:
         raise MfaResetError("その利用者は見つかりません")
     return u
