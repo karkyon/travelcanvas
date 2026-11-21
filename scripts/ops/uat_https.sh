@@ -110,8 +110,11 @@ check() {
   say "  証明書の配布 http://$LAN_HOST:$CA_PORT/travelcanvas-uat-root.crt $code"
   [ "$code" = 200 ] || ok=1
   # backend の /metrics は通さない(画面の SPA が index.html を返すのは可。Prometheus の本文が見えたら NG)
-  if curl -s --cacert "$CRT" --connect-to "$LAN_HOST:$PORT:127.0.0.1:$PORT" --max-time 10 \
-      "https://$LAN_HOST:$PORT/metrics" | grep -qE '^# (HELP|TYPE) '; then
+  # 出力は先に受けてから照合する(pipefail の下の `curl | grep -q` は、grep が先に終わると curl が失敗して一致を見落とす)
+  local metrics
+  metrics="$(curl -s --cacert "$CRT" --connect-to "$LAN_HOST:$PORT:127.0.0.1:$PORT" --max-time 10 \
+      "https://$LAN_HOST:$PORT/metrics" || true)"
+  if grep -qE '^# (HELP|TYPE) ' <<<"$metrics"; then
     say "  NG: backend の /metrics が https の入口から見えます"; ok=1
   else
     say "  /metrics: backend へは通さない"
