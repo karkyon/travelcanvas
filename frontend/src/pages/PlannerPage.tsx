@@ -193,9 +193,6 @@ const PlannerPage: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   // [Gate② UX P0] 全体の検索から「プランに追加」した後は、追加した予定を選んだ状態で開く(旅程と地図で見つけやすく)
   const focusEventId = (location.state as { focusEventId?: string } | null)?.focusEventId ?? null;
-  useEffect(() => {
-    if (focusEventId) setSelectedEventId(focusEventId);
-  }, [focusEventId]);
   const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
   // [G11-Layout] 移動概算の読み込みの状態(地図の下の行の場所を読み込み中から確保する)
   const [routePreviewStatus, setRoutePreviewStatus] = useState<RouteSummaryStatus>('off');
@@ -210,6 +207,18 @@ const PlannerPage: React.FC = () => {
   }, [mapMax]);
   // [Gate G11] 日別 / 全日程の横断チャート、予定へ着く移動区間(移動手段の名前・時差)
   const [planView, setPlanView] = useState<'day' | 'all'>('day');
+  // 予定のある日を開き(別の日・全日程を見ていても)、選んだら印を消す(再読み込み・戻る操作で選び直さない)。
+  // 開いている旅行に無い予定(古い印・別の旅行の印)は選ばずに消すだけ。
+  useEffect(() => {
+    if (!focusEventId || !planId || !currentPlan || currentPlan.id !== planId) return;
+    const dayIdx = currentPlan.days.findIndex((d) => d.events.some((e) => e.id === focusEventId));
+    if (dayIdx >= 0) {
+      setCurrentDay(dayIdx);
+      setPlanView('day');
+      setSelectedEventId(focusEventId);
+    }
+    navigate(`/planner/${planId}`, { replace: true, state: null });
+  }, [focusEventId, currentPlan, planId, setCurrentDay, navigate]);
   // [Gate TimelineRedesign] 地図のピンから選んだ予定(旅程のカードまで送って詳細を開く。n は選ぶたびに増やす)
   const [mapFocus, setMapFocus] = useState<{ id: string; n: number } | null>(null);
   // [Gate TimelineRedesign] 地図の上の旅程チェック: 営業時間の照合と予約の状態(DayView から受け取る)
@@ -646,10 +655,15 @@ const PlannerPage: React.FC = () => {
           duration: incomingSpot.estimated_duration,
           cost: incomingSpot.estimated_cost,
         });
+      }
+      // 作成の後に store が読み直すので、増えた予定はサーバーの ID(通信できず端末に溜めた時は仮の ID)
+      const added = (usePlanStore.getState().currentPlan?.days[0]?.events ?? []).find((e) => !beforeIds.has(e.id));
+      // addScheduleItem は失敗しても例外を投げず(store が知らせて元に戻す)、増えた予定が無い。成功と言わず窓を残す
+      if (!incomingSpot.candidate_id) {
+        if (!added) return;
         addToast({ message: `${incomingSpot.name}をプランに追加しました`, type: 'success' });
       }
       setIsAddSpotModalOpen(false);
-      const added = (usePlanStore.getState().currentPlan?.days[0]?.events ?? []).find((e) => !beforeIds.has(e.id));
       navigate(`/planner/${plan.id}`, { replace: true, state: added ? { focusEventId: added.id } : null });
     } catch (error) {
       console.error('スポット追加エラー:', error);
