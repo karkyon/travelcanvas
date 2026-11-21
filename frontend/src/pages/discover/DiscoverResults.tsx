@@ -7,6 +7,7 @@
 import React, { Suspense, useState } from 'react';
 import { List, Map as MapIcon } from 'lucide-react';
 import Button from '@/components/common/Button';
+import CertaintyBadge from '@/components/common/CertaintyBadge';
 import type { NearbyResult } from '@/services/api/types/g11discover';
 import { distanceLabel, type BasePoint, type DiscoverPin } from './discoverModel';
 
@@ -42,8 +43,12 @@ const DiscoverResults: React.FC<Props> = ({ results, base, saved, busyId, canEdi
           検索結果 <span className="text-accent">{`${results.length}件`}</span>
           <span className="tc-disc-unsaved-label">未保存の検索結果</span>
         </p>
-        <span className="text-xs text-ink-700">
-          {[providers.join('・'), fetched ? `取得 ${fetched.slice(11, 16)}` : null, '距離は直線の目安'].filter(Boolean).join(' · ')}
+        {/* [Gate② UX P0] 確からしさの共通の印: 取得時刻がある時だけ実データ(無ければ不明)。距離は直線の概算 */}
+        <span className="text-xs text-ink-700 inline-flex flex-wrap items-center gap-1">
+          <CertaintyBadge kind={fetched ? 'live' : 'unknown'} at={fetched ? fetched.slice(11, 16) : null} testId="discover-cert-source">
+            {[providers.join('・'), fetched ? `取得 ${fetched.slice(11, 16)}` : null].filter(Boolean).join(' · ')}
+          </CertaintyBadge>
+          <CertaintyBadge kind="estimate" testId="discover-cert-distance">距離は直線の目安</CertaintyBadge>
         </span>
         <div className="tc-disc-toggle ml-auto" role="group" aria-label="検索結果の表示">
           <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')} data-testid="discover-results-list">

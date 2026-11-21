@@ -12,6 +12,8 @@
 import CertaintyBadge from '@/components/common/CertaintyBadge';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/authStore';
+import { rememberSearch, recallSearch } from '@/components/search/searchMemory';
 import { Search, MapPin, Globe, Camera, Mic, Info, Hash } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { searchSpots } from '../services/api';
@@ -83,8 +85,11 @@ function loadSearchPreferences(): { maxResults: number; area: { latitude: number
 const SearchPage: React.FC = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('text');
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  // [Gate② UX P0] 旅程などから戻った時は、前の検索語と結果を出し直す(外へ送り直さない。searchMemory)
+  const owner = useAuthStore((st) => st.user?.id ?? null);
+  const [initial] = useState(() => recallSearch<SearchResult>(owner));
+  const [query, setQuery] = useState(initial?.query ?? '');
+  const [status, setStatus] = useState<Status>(initial ? { kind: 'done', results: initial.results } : { kind: 'idle' });
   const [prefs] = useState(loadSearchPreferences);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(prefs.area);
   const [locationNote, setLocationNote] = useState<string>(prefs.area ? `検索の設定の座標(${prefs.area.latitude.toFixed(2)}, ${prefs.area.longitude.toFixed(2)})の近くを先に探します` : '');
@@ -134,7 +139,9 @@ const SearchPage: React.FC = () => {
       setStatus({ kind: 'error', message: '検索できませんでした。時間をおいてもう一度試してください。' });
       return;
     }
-    setStatus({ kind: 'done', results: (response.data?.spots as SearchResult[] | undefined) ?? [] });
+    const results = (response.data?.spots as SearchResult[] | undefined) ?? [];
+    setStatus({ kind: 'done', results });
+    rememberSearch(owner, q, results);
   };
 
   // [Gate WishPlaces] SC-47 場所を探して保存する
