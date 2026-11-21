@@ -54,6 +54,14 @@ export function getStoredDeviceToken(): string | null {
   }
 }
 
+function clearDeviceToken(): void {
+  try {
+    localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY);
+  } catch {
+    // 消せなくても次の作成で再び 401 になるだけ(致命的ではない)
+  }
+}
+
 function storeDeviceToken(token: string): void {
   try {
     localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, token);
@@ -96,11 +104,18 @@ export async function createQuickDraft(
   if (deviceToken) {
     headers['Authorization'] = `Bearer ${deviceToken}`;
   }
-  const response = await anonymousClient.post<QuickDraftCreateResponse>(
-    '/quick-drafts',
-    payload,
-    { headers },
-  );
+  let response;
+  try {
+    response = await anonymousClient.post<QuickDraftCreateResponse>('/quick-drafts', payload, { headers });
+  } catch (error) {
+    // 端末に残った device token をサーバーが知らない・失効した(DB を別の環境から移した・期限切れ等)と 401 になる。
+    // 古い token を捨てて、token なし(新しい端末として発行)で 1 回だけやり直す。続けて送り続けない(遮断の点数を増やさない)
+    if (!deviceToken || !axios.isAxiosError(error) || error.response?.status !== 401) throw error;
+    clearDeviceToken();
+    response = await anonymousClient.post<QuickDraftCreateResponse>('/quick-drafts', payload, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+  }
   if (response.data.device_token) {
     storeDeviceToken(response.data.device_token);
   }
