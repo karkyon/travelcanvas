@@ -26,6 +26,7 @@ import { directionArrow, HOME_COLOR, LODGING_COLOR, type MapEnd, type MapEnds } 
 import { useHomePlace } from '@/hooks/useHomePlace';
 import { getRouteGeometry, type RouteGeometry } from '@/services/api/routeGeometry';
 import { Circle, MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMap } from 'react-leaflet';
+import { markerSignature, recallMapView, rememberMapView } from './mapViewMemory';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css'; // 地図の画像・印の位置を決める CSS(無いと地図の画像がばらばらに並ぶ)
 import type { DaySchedule, ScheduleItem } from '@/types';
@@ -153,16 +154,29 @@ function candidateIcon() {
 }
 
 // 地図の表示範囲を、表示中のマーカー群に合わせて自動調整する。
-const FitBounds: React.FC<{ positions: [number, number][] }> = ({ positions }) => {
+// [Gate② UX P0] viewKey(旅行と日)があれば、印が同じ間は利用者が動かした範囲を覚えて戻す(mapViewMemory)
+const FitBounds: React.FC<{ positions: [number, number][]; viewKey?: string | null }> = ({ positions, viewKey = null }) => {
   const map = useMap();
+  const sig = markerSignature(positions);
   React.useEffect(() => {
     if (positions.length === 0) return;
-    if (positions.length === 1) {
+    const kept = viewKey ? recallMapView(viewKey, sig) : null;
+    if (kept) {
+      map.setView(kept.center, kept.zoom);
+    } else if (positions.length === 1) {
       map.setView(positions[0]!, 14);
-      return;
+    } else {
+      map.fitBounds(L.latLngBounds(positions), { padding: [40, 40] });
     }
-    map.fitBounds(L.latLngBounds(positions), { padding: [40, 40] });
-  }, [map, positions]);
+    if (!viewKey) return undefined;
+    const save = () => {
+      const c = map.getCenter();
+      rememberMapView(viewKey, sig, { center: [c.lat, c.lng], zoom: map.getZoom() });
+    };
+    save();
+    map.on('moveend', save);
+    return () => { map.off('moveend', save); };
+  }, [map, positions, viewKey, sig]);
   return null;
 };
 
@@ -347,7 +361,7 @@ const PlanMap: React.FC<PlanMapProps> = ({
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {hasAnyKnownLocation && <FitBounds positions={fitPositions} />}
+          {hasAnyKnownLocation && <FitBounds positions={fitPositions} viewKey={planId && day?.id ? `${planId}:${day.id}` : null} />}
           <PanToSelected position={selectedPos} />
 
           {askedGeo || legs.some((l) => legColor(l)) ? legs.map((leg, i) => {

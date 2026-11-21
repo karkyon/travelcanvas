@@ -14,7 +14,8 @@ vi.mock('react-leaflet', () => {
     MapContainer: Pass, TileLayer: () => null, Marker: Pass, Popup: Pass, Tooltip: Pass, Circle: Pass,
     Polyline: ({ pathOptions }: { pathOptions?: { dashArray?: string } }) =>
       <i data-testid="poly" data-dashed={pathOptions?.dashArray ? 'yes' : 'no'} />,
-    useMap: () => ({ fitBounds: () => undefined, panTo: () => undefined, getBounds: () => ({ contains: () => true }), setView: () => undefined }),
+    useMap: () => ({ fitBounds: () => undefined, panTo: () => undefined, getBounds: () => ({ contains: () => true }), setView: () => undefined,
+      on: () => undefined, off: () => undefined, getCenter: () => ({ lat: 0, lng: 0 }), getZoom: () => 13 }),
   };
 });
 vi.mock('leaflet', () => ({ default: { divIcon: () => ({}), latLngBounds: () => ({ isValid: () => true, pad: () => ({}) }) } }));

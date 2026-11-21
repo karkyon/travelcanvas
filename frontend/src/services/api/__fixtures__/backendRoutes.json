@@ -60,7 +60,8 @@
   "captured_at_head_remaining7": "dev/remaining-7 (+Gate Remaining-7 passkeys・gmail・guest/merge・constraints/undo・paid 4 種・track comparison)",
   "captured_at_head_homeplace": "Gate HomePlace: +GET/PUT/DELETE /api/v1/privacy/home-place (backend/app/api/v1/home_place.py)",
   "captured_at_head_chat_consensus": "dev/discussion-chat (+Gate ChatConsensus POST /plans/{plan_id}/polls/decision・POST /plans/{plan_id}/polls/suggest-options)",
-  "captured_at_head_spot_mode": "dev/spot-mode (+Gate SpotMode /plans/{plan_id}/spot-areas の 11 経路)"
+  "captured_at_head_spot_mode": "dev/spot-mode (+Gate SpotMode /plans/{plan_id}/spot-areas の 11 経路)",
+  "added_fc041": "Gate② FC-041: absorb・history(backend/app/api/v1/reservations.py)"
  },
  "routes": [
   "DELETE /api/v1/auth/passkeys/{passkey_id}",
@@ -267,6 +268,7 @@
   "GET /api/v1/plans/{plan_id}/reservations/search",
   "GET /api/v1/plans/{plan_id}/reservations/{reservation_id}",
   "GET /api/v1/plans/{plan_id}/reservations/{reservation_id}/events",
+  "GET /api/v1/plans/{plan_id}/reservations/{reservation_id}/history",
   "GET /api/v1/plans/{plan_id}/reservations/{reservation_id}/participants",
   "GET /api/v1/plans/{plan_id}/reservations/{reservation_id}/tickets",
   "GET /api/v1/plans/{plan_id}/reservations/{reservation_id}/tickets/{ticket_id}",
@@ -536,6 +538,7 @@
   "POST /api/v1/plans/{plan_id}/replans/{replan_id}/save-variant",
   "POST /api/v1/plans/{plan_id}/reschedule",
   "POST /api/v1/plans/{plan_id}/reservations",
+  "POST /api/v1/plans/{plan_id}/reservations/{reservation_id}/absorb",
   "POST /api/v1/plans/{plan_id}/reservations/{reservation_id}/events",
   "POST /api/v1/plans/{plan_id}/reservations/{reservation_id}/participants",
   "POST /api/v1/plans/{plan_id}/reservations/{reservation_id}/reveal",

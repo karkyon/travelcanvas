@@ -92,7 +92,7 @@ def _budget_amount(b) -> Optional[str]:
 # 旅行単位で出すテーブル(表示順)。各テーブルの行の絞り込みは plan_tables() が行う。
 PLAN_TABLES = (
     m.TravelDay, m.TravelEvent, m.EventLink, m.TravelSegment, m.RouteOption, m.RouteLeg,
-    m.Reservation, m.EventReservation, m.ReservationParticipant, m.Ticket,
+    m.Reservation, m.EventReservation, m.ReservationParticipant, m.Ticket, m.ReservationHistory,
     m.Document, m.DocumentLink, m.ImportJob, m.ExtractionCandidate,
     m.PlanConstraint, m.ValidationRun, m.ValidationIssue,
     m.PackingItem, m.PreparationTask,

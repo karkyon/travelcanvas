@@ -34,6 +34,7 @@ def _require_enabled() -> None:
 def _view(user: User) -> Dict[str, Any]:
     on = wp.enabled()
     return {"available": on, "public_key": wp.public_key() if on else None, "kinds": wp.kinds_of(user),
+            "detail": wp.detail_of(user),
             "devices": wp.summary(user),
             "notice": "通知の中身は端末の鍵で暗号化して、ブラウザの会社の窓口(無料)を通して届けます。"
                       "https で開いた画面でだけ使えます(iPhone はホーム画面に追加したアプリから)"}
@@ -95,12 +96,17 @@ class KindsIn(BaseModel):
     morning: Optional[bool] = None
     crew: Optional[bool] = None
     notice: Optional[bool] = None  # [Gate Remaining-3] 自分あて・急ぎの通知(メンション・返信・取消期限 等)
+    # [Gate② T1・FC-086] ロック画面の本文に予定の名前・時刻を出す(既定は出さない)
+    detail: Optional[bool] = None
 
 
 @router.put("/settings")
 def put_settings(body: KindsIn, db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
-    wp.set_kinds(current_user, body.model_dump(exclude_none=True))
+    changes = body.model_dump(exclude_none=True)
+    if "detail" in changes:
+        wp.set_detail(current_user, changes.pop("detail"))
+    wp.set_kinds(current_user, changes)
     db.commit()
     return _view(current_user)
 

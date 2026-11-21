@@ -19,6 +19,7 @@ import {
   Users, X, CalendarDays, Lock, Unlock, Link2, QrCode, AlertTriangle, Wallet,
 } from 'lucide-react';
 import Button from '@/components/common/Button';
+import { absorbReservation, getReservationHistory, type AbsorbKind, type ReservationHistoryEntry } from '@/services/api/reservationHistory';
 import TicketCode from '@/components/share/TicketCode';
 import Input from '@/components/common/Input';
 import Modal from '@/components/common/Modal';
@@ -73,6 +74,13 @@ const RESERVATION_TYPES: { value: string; label: string; icon: React.ReactNode }
 ];
 
 const STATUS_TONE: Record<string, 'ok' | 'warn' | 'info' | undefined> = { confirmed: 'ok', modified: 'warn', candidate: 'info' };
+
+// [Gate② FC-041] 履歴の項目の名前(画面の言葉)
+const HISTORY_FIELD_LABEL: Record<string, string> = {
+  provider_name: '予約先', start_at: '開始', end_at: '終了', timezone_id: '時刻帯', total_amount: '金額', currency: '通貨',
+  payment_status: '支払い', guest_count: '人数', cancellation_deadline: 'キャンセル期限', contact_url: '連絡先 URL',
+  holder_name: '名義', contact_phone: '電話', pin: 'PIN',
+};
 
 const STATUS_LABEL: Record<string, string> = {
   candidate: '未確定',
@@ -259,8 +267,34 @@ const ReservationsPage: React.FC = () => {
     }
   }, [planId]);
 
+  // [Gate② FC-041] この予約へまとめた変更・取消の記録(詳細を開いた時に読む)
+  const [history, setHistory] = useState<ReservationHistoryEntry[]>([]);
+  const loadHistory = async (reservation: Reservation) => {
+    if (!planId) return;
+    try {
+      setHistory(await getReservationHistory(planId, reservation.id));
+    } catch {
+      setHistory([]);  // 記録が読めなくても詳細は出す
+    }
+  };
+  // [Gate② FC-041] 新しい方(変更・取消のメール)を、元の予約(先に入った方)の履歴へまとめる。利用者が選んだ時だけ
+  const handleAbsorb = async (source: Reservation, original: Reservation, kind: AbsorbKind) => {
+    if (!planId) return;
+    const name = original.provider_name || typeLabel(original.type);
+    const what = kind === 'change' ? '変更のお知らせとして、内容を元の予約へ写します' : '取消のお知らせとして、元の予約を取消にします';
+    if (!window.confirm(`「${name}」の${what}。この行は元の予約の履歴にまとめ、一覧から消します。よろしいですか?`)) return;
+    try {
+      await absorbReservation(planId, original.id, source.id, kind, original.revision);
+      await loadReservations();
+    } catch (e) {
+      setError(errorDetailMessage(e, 'まとめられませんでした。一覧を読み直してからもう一度試してください'));
+    }
+  };
+
   const openDetail = (reservation: Reservation) => {
     setSelected(reservation);
+    setHistory([]);
+    void loadHistory(reservation);
     setRevealed(null);
     setParticipants([]);
     setEventLinks([]);
@@ -648,6 +682,20 @@ const ReservationsPage: React.FC = () => {
                     </span>
                   </p>
                 )}
+                {/* [Gate② FC-041] 予約番号が同じで、こちらが後から入った(変更・取消のメールなど)時は、元の予約の履歴へまとめられる */}
+                {(r.duplicate_candidates ?? []).filter((d) => d.reason === 'same_confirmation_number').map((d) => {
+                  const original = reservations.find((x) => x.id === d.reservation_id);
+                  if (!original || original.status === 'cancelled' || original.created_at >= r.created_at) return null;
+                  return (
+                    <div key={d.reservation_id} className="tc-kit-resrow__why" data-testid={`reservation-absorb-${r.id}`}>
+                      <span className="tc-kit-why">{`これが「${original.provider_name || typeLabel(original.type)}」の変更・取消のお知らせなら、元の予約にまとめられます`}</span>
+                      <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => void handleAbsorb(r, original, 'change')}
+                        data-testid={`reservation-absorb-change-${r.id}`}>変更としてまとめる</button>
+                      <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => void handleAbsorb(r, original, 'cancel')}
+                        data-testid={`reservation-absorb-cancel-${r.id}`}>取消としてまとめる</button>
+                    </div>
+                  );
+                })}
                 {why.length > 0 && (
                   <div className="tc-kit-resrow__why">
                     <span className="tc-kit-why">{`要確認: ${why.join('・')}`}</span>
@@ -796,6 +844,22 @@ const ReservationsPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* [Gate② FC-041] この予約へまとめた変更・取消の記録(値は出さない。何を変えたかの項目だけ) */}
+                {history.length > 0 && (
+                  <div className="border rounded-lg p-3" data-testid="reservation-history">
+                    <p className="text-sm font-medium text-ink-700 mb-1">変更・取消の記録</p>
+                    <ul className="text-xs text-ink-700 space-y-1">
+                      {history.map((h) => (
+                        <li key={h.id}>
+                          {`${h.created_at ? formatDateTime(h.created_at) : ''} ${h.kind === 'cancel' ? '取消のお知らせをまとめた' : '変更のお知らせをまとめた'}`}
+                          {h.kind === 'change' && h.fields.filter((f) => f !== 'status').length > 0
+                            ? `(${h.fields.filter((f) => f !== 'status').map((f) => HISTORY_FIELD_LABEL[f] ?? f).join('・')})` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 {/* [Gate TripKitFix] 要確認と「料金と支払い」(支払い状況をここで入れる) */}
                 <ReservationPaymentEditor reservation={selected} planId={planId ?? ''} formatDateTime={formatDateTime}

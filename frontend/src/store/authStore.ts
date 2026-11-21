@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { api as apiService, AuthApiError } from '@/services/api';
 import type { AuthResponse, SessionUser } from '@/services/api';
 import { forgetSearch } from '@/components/search/searchMemory';
+import { forgetMapViews } from '@/components/planner/mapViewMemory';
 
 // [Gate A1] 認証処理をAPIクライアント(services/api)へ一本化した(B-002)。
 // 以前はこのファイルが独自のfetch()とAPI_BASE_URL解決を持ち、login/register/guest/
@@ -315,6 +316,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         forgetSearch();  // [Gate② UX P0] 全体の検索の検索語・結果(画面のメモリ)を次の人に見せない
+        forgetMapViews();  // 旅程の地図の表示範囲(画面のメモリ)も消す
         // [Gate #28] サーバー側のセッション(refresh token)も失効させる。
         // 失敗しても(ネットワーク断など)クライアント側の状態は必ずクリアする。
         // [Gate #35] ゲストセッションはrefresh token(サーバー側セッション)を

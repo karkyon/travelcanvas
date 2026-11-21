@@ -28,6 +28,7 @@
 | `alert_target_changed` | 409 | after_reload | — | api/v1/replans.py |
 | `already_active` | 409 | no | もう今の案です | api/v1/day_variants.py |
 | `already_adopted` | — | — | この投票はもう採用しています | api/v1/decisions.py |
+| `already_cancelled` | — | — | 元の予約は取消済みです | api/v1/reservations.py |
 | `already_committed` | 409 | no | この下書きはもう旅程にしました。並びは旅程の画面で変えてください | api/v1/trip_intents.py |
 | `already_delivered` | 409 | no | 届いた送信は送り直せません | api/v1/organizations.py |
 | `already_member` | 409 | no | すでにメンバーです | api/v1/organizations.py |
@@ -195,6 +196,7 @@
 | `not_intent_draft` | 404 | no | この旅行は旅行相談から作った下書きではありません | api/v1/trip_intents.py |
 | `not_member` | 422 | no | 旅行のメンバーにだけ送れます | api/v1/booklet_share.py |
 | `not_public` | 409 | no | Web のページとして公開していない版です(公開するか、リンクを外してください) | api/v1/booklet_share.py |
+| `not_same_reservation` | — | — | 予約番号が同じ予約だけをまとめられます | api/v1/reservations.py |
 | `not_scheduled` | 409 | no | 削除の申し込みはありません | api/v1/privacy.py |
 | `not_undoable` | 409 | no | このコマンドは元に戻せません | api/v1/commands.py |
 | `nothing_extracted` | 503 | later | レシートの文字を読み取れませんでした。 | api/v1/receipts.py |
