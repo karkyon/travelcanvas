@@ -5,7 +5,7 @@
  * - 移動概算(route-preview)は表示中の日が変わった時だけ再取得する
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, waitFor, act, screen } from '@testing-library/react';
+import { render, waitFor, act, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 // 描画が重い子コンポーネント(地図・日程編集等)は本テストの対象外のため空にする
@@ -159,5 +159,38 @@ describe('PlannerPage effects (Gate M9-FE-B3)', () => {
     );
     expect(await screen.findByTestId('planner-consult-guest')).toHaveTextContent('ゲストでは、AI の方面の提案・おすすめの場所・Google の検索は使えません');
     expect(screen.getByRole('button', { name: '✦ AI なしで相談をはじめる' })).toBeEnabled();
+  });
+});
+
+describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () => {
+  it('入る場所(1 日目・時刻なし)を押す前に示し、選んだ旅行の 1 日目へ追加する', async () => {
+    const { loadPlans } = setupMocks();
+    // 旅行の一覧(この試験の対象外。通信しない)
+    const g9 = await import('@/services/api/g9');
+    vi.spyOn(g9, 'getDashboard').mockResolvedValue({ trips: [], focus: null } as unknown as Awaited<ReturnType<typeof g9.getDashboard>>);
+    const addScheduleItem = vi.fn().mockResolvedValue(undefined);
+    const plan = makePlan(['day-a', 'day-b'], '京都');
+    usePlanStore.setState({
+      plans: [plan],
+      loadPlan: vi.fn(async () => { usePlanStore.setState({ currentPlan: plan }); return true; }),
+      addScheduleItem,
+    } as Partial<ReturnType<typeof usePlanStore.getState>>);
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[{ pathname: '/planner', state: { newSpot: { name: '清水寺', category: 'sightseeing' } } }]}>
+          <Routes>
+            <Route path="/planner" element={<PlannerPage />} />
+            <Route path="/planner/:planId" element={<div>旅程</div>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+    await waitFor(() => expect(loadPlans).toHaveBeenCalled());
+    expect(await screen.findByTestId('add-spot-where')).toHaveTextContent('選んだ旅行の 1 日目に、時刻なしの予定として入ります');
+    const dialog = screen.getByTestId('add-spot-where').closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: /京都/ }));
+    await waitFor(() => expect(addScheduleItem).toHaveBeenCalledTimes(1));
+    expect(addScheduleItem.mock.calls[0]![0]).toBe(0);  // 1 日目
+    expect(addScheduleItem.mock.calls[0]![1]).not.toHaveProperty('start_time');
   });
 });
