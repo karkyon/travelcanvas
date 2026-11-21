@@ -99,3 +99,28 @@ cd ~/projects/travelcanvas && bash scripts/ops/gate2_env_record.sh
 ### 6.2 GCP VM
 **未実施。** 最後に確認された版は `cd14e23` のまま。omega-dev2 で `8118aa9` が動いたので、次は
 `bash scripts/ops/gcp_vm.sh deploy 8118aa99793ee5b811132fe45970b3b4403a0e9e`(VM の中で。main に入った commit だけを受け付け、先にバックアップ)。
+
+## 7. 実績(2026-11-21。利用者の実行ログ。§3・§6 の記録は消さずに残す)
+
+> **Claude がこの作業環境から接続して測った値ではない。** 利用者が両環境で実行し、出力を貼った記録(`gate2_env_record.sh`・`local_dev_apply.sh`・`gcp_vm.sh`)。秘密の値・個人の情報は含まない。
+
+反映した版: main `fe5eaece7b4e5999e93fd79b26042ce75e3ca7b9`(#156)。同じ SHA の CI #811 は 5 件とも success。migration の差分なし。
+
+| 項目 | omega-dev2 前 | omega-dev2 後 | GCP VM 前 | GCP VM 後 |
+|---|---|---|---|---|
+| 記録の時刻(UTC) | 2026-11-21 01:32:03 | 01:34:38 | 01:55:07 | 02:01:54 |
+| head(稼働の SHA) | `8118aa9`(branch main) | **`fe5eaec`**(branch main) | `cd14e23`(detached) | **`fe5eaec`**(detached) |
+| 作業ツリーの変更 | 0 | 0 | 0 | 0 |
+| backend・frontend・postgres・redis | すべて healthy | すべて healthy | すべて healthy | すべて healthy |
+| Alembic current = heads | `d5e9f3a7b2c6` | `d5e9f3a7b2c6` | `d5e9f3a7b2c6` | `d5e9f3a7b2c6` |
+| /health・/ready | 200・200 | 200・200 | 200・200 | 200・200 |
+| /ready の checks | database・migration・migration_current・required_routers すべて true | 同じ | 同じ | 同じ |
+| 画面 `/`・`/admin/ops` | 200・200 | 200・200 | 200・200 | 200・200(`/trip-consult` も 200) |
+| バックアップ | — | **`tc-20261121T013246Z`**(DB 5,985,123 バイト・保存ファイル 348 件・**検証 OK**) | — | **`tc-20261121T015530Z`**(DB 5,147,621 バイト・保存ファイル 341 件。道具はバックアップの後に検証して進む作り) |
+| その他 | — | LAN の画面から API(CORS `http://192.168.1.11:4173`)可 | — | CSP・CORS は同じ origin(tailnet の名前)、待ち受けは 127.0.0.1 だけ、公開は tailnet だけ、`/metrics` は backend へ通さない |
+| T2 重複の組(`t2_duplicate_groups`)・最大(`t2_max_places_per_group`) | 0・0 | 0・0 | 0・0 | 0・0 |
+| 大文字小文字違いのアカウントの組 | 0 | 0 | 0 | 0 |
+| 正規化前の招待 | 0 | 0 | 0 | 0 |
+| 記録のファイル(環境の中) | `gate2-record-20261121-103203.txt` | `gate2-record-20261121-103438.txt` | `gate2-record-20261121-015507.txt` | `gate2-record-20261121-020154.txt` |
+
+**この時点で両環境は main `fe5eaec` にそろった(利用者のログ上)。** その後の main(#158 以降)は未反映。§4 の手の確認 C-1〜C-6 は**未実施**。GCP VM には「System restart required」(OS の再起動待ち。TravelCanvas の反映とは別)。

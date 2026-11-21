@@ -25,6 +25,7 @@ describe('SearchPage (Gate Honesty)', () => {
     renderPage();
     expect(screen.getByRole('heading', { level: 1, name: 'スポット検索' })).toBeInTheDocument();
     expect(screen.getByTestId('search-honesty')).toHaveTextContent('未接続');
+    expect(screen.getByTestId('search-unconnected')).toHaveAttribute('data-cert', 'unconnected');
     expect(document.body.textContent).not.toMatch(/AI(が|で)?(インターネット|画像解析|音声認識|検索エンジン|信頼度|推奨|分析)/);
   });
 
@@ -71,7 +72,7 @@ describe('SearchPage (Gate Honesty)', () => {
     expect(document.body.textContent).not.toMatch(/¥|信頼度|★/);
     // [Gate② UX P0] 押す前に保存先の違いが分かる
     const guide = screen.getByTestId('search-save-guide');
-    expect(guide).toHaveTextContent('「プランに追加」は、次の画面で入れる旅行を選び');
+    expect(guide).toHaveTextContent('その旅行の 1 日目に時刻なしの予定として入ります');
     expect(guide).toHaveTextContent('まだどの旅行の予定にもなりません');
     expect(screen.getByRole('button', { name: '「清水寺」をプランに追加' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '「清水寺」を行きたい場所に保存' })).toBeInTheDocument();
@@ -79,10 +80,14 @@ describe('SearchPage (Gate Honesty)', () => {
     searchSpots.mockResolvedValueOnce({ success: true, data: { spots: [] } });
     await userEvent.click(screen.getByRole('button', { name: '探す' }));
     expect(await screen.findByTestId('search-empty')).toHaveTextContent('候補が見つかりませんでした');
+    expect(screen.queryByTestId('search-failed')).not.toBeInTheDocument();  // 0 件は取得失敗ではない
 
     searchSpots.mockResolvedValueOnce({ success: false, data: { spots: [] } });
     await userEvent.click(screen.getByRole('button', { name: '探す' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('検索できませんでした');
+    // [Gate② UX P0] 取得失敗の印(0 件の時は出さない)
+    expect(screen.getByTestId('search-failed')).toHaveAttribute('data-cert', 'failed');
+    expect(screen.getByTestId('search-failed')).toHaveTextContent('取得失敗');
   });
 });
 

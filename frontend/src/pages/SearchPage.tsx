@@ -9,6 +9,7 @@
  *     声で探す: 端末の音声認識で文字にして探す。SNS から探す: 投稿の文から場所の言葉を拾う(URL の中身は取りに行かない)
  *   - 評価・値段・所要時間・費用は提供元から来ないため出さない(作った値を見せない)
  */
+import CertaintyBadge from '@/components/common/CertaintyBadge';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, MapPin, Globe, Camera, Mic, Info, Hash } from 'lucide-react';
@@ -184,6 +185,7 @@ const SearchPage: React.FC = () => {
         <p className="tc-card px-4 py-3 mb-4 text-sm text-ink-700 flex gap-2" data-testid="search-honesty">
           <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
           <span>
+            <CertaintyBadge kind="unconnected" testId="search-unconnected" className="mr-1" />
             AI・有料の検索の提供元はまだつながっていません(未接続)。結果は提供元が返した順に並べ、評価や値段は付けません。
           </span>
         </p>
@@ -235,7 +237,10 @@ const SearchPage: React.FC = () => {
             </div>
           )}
           {status.kind === 'error' && (
-            <p role="alert" className="tc-card px-4 py-3 text-sm text-danger">{status.message}</p>
+            <p role="alert" className="tc-card px-4 py-3 text-sm text-danger">
+              {/* [Gate② UX P0] 取れなかったことを「0 件」と区別して示す */}
+              <CertaintyBadge kind="failed" testId="search-failed" className="mr-2" />{status.message}
+            </p>
           )}
           {status.kind === 'done' && status.results.length === 0 && (
             <div className="tc-card p-8 text-center text-ink-700" data-testid="search-empty">
@@ -252,7 +257,7 @@ const SearchPage: React.FC = () => {
               </div>
               {/* [Gate② UX P0] 押す前に保存先が分かるように(競合比較レポート 2026-11-20: 保存先の意味を保存ボタンの直前に) */}
               <p className="text-sm text-ink-700 mb-3" data-testid="search-save-guide">
-                「プランに追加」は、次の画面で入れる旅行を選び、日と時刻を決めてその旅行の予定にします。
+                「プランに追加」は、次の画面で入れる旅行を選ぶと、その旅行の 1 日目に時刻なしの予定として入ります(日と時刻は旅程で直せます)。
                 「行きたい場所に保存」は、旅行を決めずに自分の行きたい場所の一覧へ入れます(まだどの旅行の予定にもなりません)。
               </p>
               <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

@@ -1976,6 +1976,10 @@ const PlannerPage: React.FC = () => {
           <p className="text-sm text-ink-700 mb-4">
             「{incomingSpot?.name}」をどのプランに追加しますか？
           </p>
+          {/* [Gate② UX P0] 入る場所を押す前に示す(実際の動き: 1 日目に時刻なしで追加。addSpotToExistingOrNewPlan) */}
+          <p className="text-xs text-ink-700 mb-3" data-testid="add-spot-where">
+            選んだ旅行の 1 日目に、時刻なしの予定として入ります。日と時刻は、追加した後に旅程で直せます。
+          </p>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {plans.map((plan) => (
               <button
