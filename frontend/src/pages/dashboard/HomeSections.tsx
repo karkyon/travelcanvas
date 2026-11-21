@@ -24,10 +24,9 @@ import Landscape from '@/components/shell/Landscape';
 import { useCoverPhoto } from '@/hooks/useCoverPhoto';
 import { ShelfAddCard, ShelfCard } from './ShelfCard';
 import { PHASE_LABEL, ROLE_LABEL, daySpan, quickActions, statusLabel, tripDateLabel } from './dashboardModel';
+import { SHELF_TEXT } from './shelfModel';
 
-const SHELF_LABEL: Record<TripShelf, string> = {
-  planning: '計画中', considering: '検討中', visited: '行った旅', cancelled: '見送り・中止',
-};
+const SHELF_LABEL: Record<TripShelf, string> = SHELF_TEXT;  // [Gate② UX P0] 名前は shelfModel の正本
 const SHELF_ORDER: TripShelf[] = ['planning', 'considering', 'visited', 'cancelled'];
 
 

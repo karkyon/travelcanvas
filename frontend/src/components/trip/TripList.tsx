@@ -14,16 +14,18 @@ import { useCoverPhoto } from '@/hooks/useCoverPhoto';
 import { getDashboard } from '@/services/api/g9';
 import type { DashboardTrip, TripShelf } from '@/services/api/types/g9';
 import { ROLE_LABEL, spanTitle, statusLabel } from '@/pages/dashboard/dashboardModel';
+import { SHELF_TEXT } from '@/pages/dashboard/shelfModel';
 import type { TravelPlan } from '@/types';
 import { dateWithDay, partySize, stayLabel, tripSpan } from './tripListModel';
 
 type Tab = 'all' | TripShelf;
 /** [Gate TripShelfLook] 状態ごとの名前・アイコン(色は lists.css の data-shelf。色だけに頼らず、アイコンと文字でも示す) */
+// [Gate② UX P0] 名前は shelfModel.SHELF_TEXT の正本を使う(ホームと同じ言葉)
 const SHELF: Record<TripShelf, { label: string; icon: LucideIcon }> = {
-  planning: { label: '計画中', icon: CalendarClock },
-  considering: { label: '検討中', icon: Lightbulb },
-  visited: { label: '行った旅', icon: CircleCheckBig },
-  cancelled: { label: '見送り・中止', icon: Ban },
+  planning: { label: SHELF_TEXT.planning, icon: CalendarClock },
+  considering: { label: SHELF_TEXT.considering, icon: Lightbulb },
+  visited: { label: SHELF_TEXT.visited, icon: CircleCheckBig },
+  cancelled: { label: SHELF_TEXT.cancelled, icon: Ban },
 };
 const TABS: Array<[Tab, string, LucideIcon]> = [
   ['all', 'すべて', LayoutGrid],
