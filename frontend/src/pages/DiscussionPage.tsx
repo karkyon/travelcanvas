@@ -36,6 +36,7 @@ import DecisionDialog from './discussion/DecisionDialog';
 import CommentsPanel from './discussion/CommentsPanel';
 import { VETO_POLICY_OPTIONS, draftFromMessage, quoteOf } from './discussion/discussionModel';
 import { localToIso } from './preparation/preparationModel';
+import ImportantNotices from './discussion/ImportantNotices';
 
 const TARGET_LABEL: Record<CommentTargetType, string> = {
   plan: '旅行全体', event: 'この予定', reservation: 'この予約', expense: 'この費用', poll: 'この投票',
@@ -378,6 +379,9 @@ const DiscussionPage: React.FC = () => {
         </p>
         <div className="mt-2"><PlanNotificationLevel planId={planId} /></div>
       </div>
+
+      {/* [Gate② FC-064] 重大な変更・集合の変更のお知らせと確認 */}
+      {planId && <ImportantNotices planId={planId} />}
 
       {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
       {notice && <div className="mb-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{notice}</div>}

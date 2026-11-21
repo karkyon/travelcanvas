@@ -62,7 +62,8 @@
   "captured_at_head_chat_consensus": "dev/discussion-chat (+Gate ChatConsensus POST /plans/{plan_id}/polls/decision・POST /plans/{plan_id}/polls/suggest-options)",
   "captured_at_head_spot_mode": "dev/spot-mode (+Gate SpotMode /plans/{plan_id}/spot-areas の 11 経路)",
   "added_fc041": "Gate② FC-041: absorb・history(backend/app/api/v1/reservations.py)",
-  "added_fc026": "Gate② FC-026: candidates/{id}/reports"
+  "added_fc026": "Gate② FC-026: candidates/{id}/reports",
+  "added_fc064": "Gate② FC-064: notices・ack(discussion.py)"
  },
  "routes": [
   "DELETE /api/v1/auth/passkeys/{passkey_id}",
@@ -253,6 +254,7 @@
   "GET /api/v1/plans/{plan_id}/memory-reel",
   "GET /api/v1/plans/{plan_id}/memory-replan",
   "GET /api/v1/plans/{plan_id}/movement-settings",
+  "GET /api/v1/plans/{plan_id}/notices",
   "GET /api/v1/plans/{plan_id}/ownership-transfer",
   "GET /api/v1/plans/{plan_id}/packing-items",
   "GET /api/v1/plans/{plan_id}/packing-suggestions",
@@ -515,6 +517,8 @@
   "POST /api/v1/plans/{plan_id}/memories/{memory_id}/location",
   "POST /api/v1/plans/{plan_id}/memories/{memory_id}/restore",
   "POST /api/v1/plans/{plan_id}/memory-replan/apply",
+  "POST /api/v1/plans/{plan_id}/notices",
+  "POST /api/v1/plans/{plan_id}/notices/{notice_id}/ack",
   "POST /api/v1/plans/{plan_id}/ownership-transfer",
   "POST /api/v1/plans/{plan_id}/ownership-transfer/cancel",
   "POST /api/v1/plans/{plan_id}/packing-items",

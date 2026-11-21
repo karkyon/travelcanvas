@@ -3072,6 +3072,45 @@ class CandidateReport(Base):
     )
 
 
+class PlanNotice(Base):
+    """[Gate② FC-064] 重大な変更・集合の変更のお知らせ。メンバーごとの確認は PlanNoticeAck"""
+    __tablename__ = "plan_notices"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # major_change / meeting_change
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    body: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('major_change', 'meeting_change')", name="ck_plan_notices_kind"),
+        Index("ix_plan_notices_plan", "plan_id", "created_at"),
+        Index("ix_plan_notices_creator", "created_by_user_id"),
+    )
+
+
+class PlanNoticeAck(Base):
+    """[Gate② FC-064] お知らせを確認したメンバー(1 人 1 行)"""
+    __tablename__ = "plan_notice_acks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    notice_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_notices.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    acknowledged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("notice_id", "user_id", name="uq_plan_notice_acks_member"),
+        Index("ix_plan_notice_acks_user", "user_id"),
+    )
+
+
 class UserPrivateProfile(Base):
     """[Gate C1] FR-023 秘匿プロフィール。利用者ごとの非公開の条件を1つの暗号文だけで持つ(平文の列を持たない)。
 

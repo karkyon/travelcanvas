@@ -274,7 +274,7 @@
 | `thumbnail_unavailable` | 422 | no | この写真の縮小版を作れません | api/v1/memories.py |
 | `tier_feature_not_included` | 403 | no | このデザインは … クラスから使えます | api/v1/booklet.py |
 | `too_long` | 422 | no | 日程は 90 日までです | api/v1/plans.py |
-| `too_many` | 409, 429 | later, no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
+| `too_many` | 409, 429 | later, no | 1つの旅行の候補は…件までです | api/v1/candidates.py, api/v1/discussion.py |
 | `too_many_areas` | — | — | エリアは1つの旅行に30までです | api/v1/spot_areas.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |
 | `too_many_clients` | 409 | no | 使える連携は…件までです | api/v1/organizations.py |
