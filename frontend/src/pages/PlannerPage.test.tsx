@@ -173,7 +173,7 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
     vi.spyOn(g9, 'getDashboard').mockResolvedValue({ trips: [], focus: null } as unknown as Awaited<ReturnType<typeof g9.getDashboard>>);
     const plan = makePlan(['day-a', 'day-b'], '京都');
     // 追加すると 1 日目に予定が 1 つ増える(store の代わり)
-    const addScheduleItem = vi.fn(async () => {
+    const addScheduleItem = vi.fn<(dayIndex: number, item: Record<string, unknown>) => Promise<void>>(async () => {
       const cur = usePlanStore.getState().currentPlan!;
       usePlanStore.setState({ currentPlan: { ...cur, days: [{ ...cur.days[0]!, events: [{ id: 'ev-new', title: '清水寺' }] }, ...cur.days.slice(1)] } as unknown as TravelPlan });
     });
