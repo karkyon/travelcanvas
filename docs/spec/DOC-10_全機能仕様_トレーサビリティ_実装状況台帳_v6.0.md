@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v6.0(正本)
 
-> 文書ID: DOC-10 / 版: **v6.0-r61** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
+> 文書ID: DOC-10 / 版: **v6.0-r62** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -18,7 +18,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `d8bd1b7`(PR #60 Gate MockFit。2026-11-05 に版をそろえた時点の main) |
-| Alembic head | `d5e9f3a7b2c6`(単一の head。SpotMode-2 で spot_area_splits(別行動の集合の約束。位置は持たない)を追加。追加だけ。その前は `c4d8e2f6a9b1` spot_areas・spot_area_items) |
+| Alembic head | `e6a4c2b8d0f3`(単一の head。Gate② T2 で places に候補の採用の部分一意インデックスを追加。データは変えない。その前は `d5e9f3a7b2c6` spot_area_splits) |
 | 基準の試験の実測(`d8bd1b7`) | backend pytest 1603 合格・1 飛ばし / frontend vitest 1057 合格(196 ファイル) / E2E 100 合格 / 最初に読む JS 428.39 kB(上限 430 kB)。GitHub Actions の main の push run 41880257997 |
 | GitHub Actions(`d8bd1b7`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41880257997)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -285,6 +285,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | r59 | 2026-11-18 | ChatConsensus+SpotMode | **FR-060 スポットモード(自由に歩くエリア)を追加(利用者の決定 2026-11-18。モックアップを承認): 旅程に順番を決めない「自由に歩くエリア」を置き、当日は予定 ⇄ スポットを切り替え、地図・ジャンルの絞り込み・候補の詳しい所(歩く時間・方角・道順の目安・地図アプリ)・着いた/今日はやめる・行きたい印・次どこ？(気分・近さ・行きたい・営業時間・残り時間。AI なし)・回れる道順の案・周りを探す(位置を保存しない)・方角で見る・端末への暗号化保存・タブレット横の左右の配置・戻り始め。準備(SC-50)は候補箱で近くにまとまった候補からエリアの案。API /plans/{id}/spot-areas(11 経路)、表 spot_areas・spot_area_items(Alembic `c4d8e2f6a9b1`)。DOC-02 FR-060・DOC-04 SC-49/50・DOC-13 §21。FR-060 は INTEGRATED(部分)(実機・実の場所の検索・旅帖への記録は未)** |
 | r60 | 2026-11-18 | SpotMode-2 | **FR-060 の残りの未実装を実装(利用者の指示): 別行動の集合の共有(PUT/DELETE /spot-areas/{id}/split。集合の時刻・場所・ひとことだけをメンバーに知らせる。位置は共有しない。閲覧者も自分の分。当日の札にも表示)・旅帖の下書きに日ごとの「自由に歩いた」(着いた時刻の順。位置なし。公開の旅行記には入れない)。表 spot_area_splits(Alembic `d5e9f3a7b2c6`)。実機の確認表を縦断シナリオ §10 に。FR-060 の残りは実機待ち・実通信待ちだけ** |
 | **r61** | 2026-11-18 | Gate2-Docs | **製品固めゲート②(G2-09): 文書の件数・基準の食い違いを直した。DOC-10 の「全59 FR」(§0・§2・§3 の見出しと正本の表の説明)を実際の 60 件に、fr-status.json・fr-requirements.json の説明を 60 件に、FR-TRACE・縦断シナリオ・fr-requirements の基準 commit を `32c7db6`(PR #127 のマージ)に。FR の状態の遷移なし・コード・DB(Alembic head は `d5e9f3a7b2c6` のまま)の変更なし。実機・実 API の証拠は増えていない(FR-060 は INTEGRATED(部分)のまま)。`docs/audit/2026-11-18_gate2_ledger.md`** |
+| **r62** | 2026-11-21 | Gate2-T2 | **判断票 T2(利用者の指示「未実装の作業をすべて継続しろ」): places(created_by, adopted_from_candidate_id) の部分一意インデックス(Alembic `e6a4c2b8d0f3`)。重複があれば migration は止まって何も変えない。採用の FOR UPDATE は残す。FR の状態の遷移なし** |
 
 ## 10. 台帳の更新の規則
 
