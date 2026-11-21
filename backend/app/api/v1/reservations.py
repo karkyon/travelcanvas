@@ -15,6 +15,7 @@ docs/adr/ADR-reservation-minimal.mdを参照。
 - reveal(完全開示): owner/editorのみ。呼び出しをrecord_audit_event()で
   監査ログに残す(DOC-05 §18.1)。
 """
+import uuid
 from datetime import datetime, timezone as dt_timezone
 from typing import List, Optional
 
@@ -41,6 +42,7 @@ from app.models.models import (
     EventReservation,
     Reservation,
     ReservationEventRelationType,
+    ReservationHistory,
     ReservationParticipant,
     ReservationStatus,
     ReservationType,
@@ -48,6 +50,7 @@ from app.models.models import (
     TicketSharePolicy,
     TicketStatus,
     TravelEvent,
+    TravelSegment,
     User,
 )
 from app.services.audit_service import record_audit_event
@@ -672,6 +675,134 @@ def delete_reservation(
         details={"plan_id": str(plan.id)},
     )
     return None
+
+
+# ---- [Gate② FC-041] 変更・取消のメールを元の予約の履歴へまとめる ------------------------------------------------
+# DOC-02 FC-041「原予約と更新・取消メールを同一予約の履歴へ統合」。自動ではまとめない(FC-042 と同じ):
+# 同じ予約番号(blind index の一致)の 2 件を、利用者が「変更として」「取消として」選んだ時だけまとめる。
+
+# 変更のメールから元の予約へ写す項目(値が入っている物だけ。予約番号・種類・旅程との紐付けは写さない)
+_ABSORB_FIELDS = ("provider_name", "start_at", "end_at", "timezone_id", "total_amount", "currency",
+                  "payment_status", "guest_count", "cancellation_deadline", "contact_url",
+                  "holder_name_ciphertext", "contact_phone_ciphertext", "pin_ciphertext")
+_FIELD_LABEL = {"holder_name_ciphertext": "holder_name", "contact_phone_ciphertext": "contact_phone",
+                "pin_ciphertext": "pin"}
+
+
+class AbsorbRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    source_reservation_id: str
+    kind: str = Field(..., pattern="^(change|cancel)$")
+
+
+class HistoryEntry(BaseModel):
+    id: str
+    kind: str
+    source_reservation_id: Optional[str] = None
+    fields: List[str] = []
+    created_at: Optional[datetime] = None
+
+
+def _bad_absorb(code: str, message: str, status_code: int = 422) -> HTTPException:
+    return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+
+
+@router.post("/{plan_id}/reservations/{reservation_id}/absorb", response_model=ReservationResponse)
+def absorb_reservation(
+    plan_id: str,
+    reservation_id: str,
+    payload: AbsorbRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+):
+    """source(変更・取消のメールから入った予約)を、元の予約(reservation_id)の履歴へまとめる。
+    change: 入っている値を元の予約へ写し、状態を「変更あり」に。cancel: 元の予約を「取消」に。
+    source の旅程との紐付け・チケット・区間は元の予約へ移し、source は消す(画面に二重に出さない)。"""
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
+    target = _get_reservation_or_404(db, plan.id, reservation_id)
+    _require_if_match(target, if_match)
+    try:
+        source_id = uuid.UUID(payload.source_reservation_id)
+    except ValueError:
+        raise _bad_absorb("invalid_field", "まとめる予約が正しくありません")
+    if source_id == target.id:
+        raise _bad_absorb("invalid_field", "同じ予約どうしはまとめられません")
+    source = _get_reservation_or_404(db, plan.id, source_id)
+    if not target.confirmation_number_lookup_hash or \
+            target.confirmation_number_lookup_hash != source.confirmation_number_lookup_hash:
+        raise _bad_absorb("not_same_reservation", "予約番号が同じ予約だけをまとめられます")
+    if target.status == ReservationStatus.CANCELLED.value:
+        raise _bad_absorb("already_cancelled", "元の予約は取消済みです")
+
+    changed: List[str] = []
+    if payload.kind == "change":
+        for name in _ABSORB_FIELDS:
+            value = getattr(source, name)
+            if value is not None and value != getattr(target, name):
+                setattr(target, name, value)
+                changed.append(_FIELD_LABEL.get(name, name))
+        target.status = ReservationStatus.MODIFIED.value
+    else:
+        target.status = ReservationStatus.CANCELLED.value
+    changed.append("status")
+
+    # 紐付いている物を元の予約へ移す(何も失わない)
+    linked = {link.event_id for link in db.query(EventReservation).filter(EventReservation.reservation_id == target.id)}
+    for link in db.query(EventReservation).filter(EventReservation.reservation_id == source.id).all():
+        if link.event_id in linked:
+            db.delete(link)
+        else:
+            link.reservation_id = target.id
+            link.relation_type = ReservationEventRelationType.RELATED.value
+    if target.event_id is None and source.event_id is not None:
+        target.event_id = source.event_id
+    source.event_id = None
+    db.query(Ticket).filter(Ticket.reservation_id == source.id).update({Ticket.reservation_id: target.id})
+    db.query(TravelSegment).filter(TravelSegment.reservation_id == source.id).update(
+        {TravelSegment.reservation_id: target.id})
+    if not db.query(ReservationParticipant).filter(ReservationParticipant.reservation_id == target.id).count():
+        db.query(ReservationParticipant).filter(ReservationParticipant.reservation_id == source.id).update(
+            {ReservationParticipant.reservation_id: target.id})
+
+    now = datetime.now(dt_timezone.utc)
+    source.deleted_at = now
+    source.revision += 1
+    target.revision += 1
+    db.add(ReservationHistory(reservation_id=target.id, plan_id=plan.id, kind=payload.kind,
+                              source_reservation_id=source.id, fields=changed, actor_user_id=current_user.id))
+    db.commit()
+    db.refresh(target)
+
+    record_audit_event(
+        action="reservation_absorbed",
+        resource_type="reservation",
+        user_id=current_user.id,
+        resource_id=target.id,
+        ip_address=_client_ip(request),
+        user_agent=_user_agent(request),
+        details={"plan_id": str(plan.id), "source_reservation_id": str(source.id), "kind": payload.kind,
+                 "fields": changed},
+    )
+    return _to_response(target)
+
+
+@router.get("/{plan_id}/reservations/{reservation_id}/history", response_model=List[HistoryEntry])
+def reservation_history(
+    plan_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """[Gate② FC-041] この予約へまとめた変更・取消の記録(新しい順)。値は返さない(項目の名前だけ)"""
+    plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "viewer", "reservations")
+    target = _get_reservation_or_404(db, plan.id, reservation_id)
+    rows = (db.query(ReservationHistory).filter(ReservationHistory.reservation_id == target.id)
+            .order_by(ReservationHistory.created_at.desc()).all())
+    return [HistoryEntry(id=str(h.id), kind=h.kind,
+                         source_reservation_id=str(h.source_reservation_id) if h.source_reservation_id else None,
+                         fields=list(h.fields or []), created_at=h.created_at) for h in rows]
 
 
 @router.post("/{plan_id}/reservations/{reservation_id}/reveal", response_model=ReservationRevealResponse)

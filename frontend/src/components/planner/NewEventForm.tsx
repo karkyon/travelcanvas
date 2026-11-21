@@ -8,6 +8,7 @@ import { Globe, LocateFixed, Plus, X } from 'lucide-react';
 import Input from '../common/Input';
 import PlaceSourcesCredit from '@/components/places/PlaceSourcesCredit';
 import { geocodeAddress, type PlaceInfoResult } from '@/services/api/planEdit';
+import { distanceLabel, distanceM, isFar, type LatLng } from './geoCheck';
 import { applyCandidate, endFrom, lookupPlace, type NewEventData } from './newEventLookup';
 import { candidateHint } from '@/components/places/placeHelpers';
 import { usePlanStore } from '@/store/planStore';
@@ -38,6 +39,9 @@ interface Props {
 
 const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, stay, setStay, near, lookupState, setLookupState, areas = [] }) => {
   const [geo, setGeo] = useState<{ busy: boolean; note: string | null }>({ busy: false, note: null });
+  // [Gate② FC-027] 住所から探した位置(印との比べ先)と、今の印から離れた住所の位置(確かめ待ち)
+  const [anchor, setAnchor] = useState<(LatLng & { label: string }) | null>(null);
+  const [pending, setPending] = useState<(LatLng & { label: string; meters: number }) | null>(null);
   const set = (p: NewEventData) => setData((d) => ({ ...d, ...p }));
   const runLookup = async () => {
     const name = (data.title || data.location_name || '').trim();
@@ -58,7 +62,21 @@ const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, sta
     try {
       const r = await geocodeAddress(q, { ...(near ?? {}), plan_id: usePlanStore.getState().currentPlan?.id ?? null });
       const c = r.candidates[0];
-      if (c) { set({ latitude: c.latitude, longitude: c.longitude }); setGeo({ busy: false, note: `「${c.address ?? q}」の位置にしました` }); }
+      if (c) {
+        const found = { latitude: c.latitude, longitude: c.longitude, label: c.address ?? q };
+        const cur = typeof data.latitude === 'number' && typeof data.longitude === 'number'
+          ? { latitude: data.latitude, longitude: data.longitude } : null;
+        if (cur && isFar(cur, found)) {
+          // 今の印と住所の位置が離れている: 黙って動かさず、どちらにするか確かめる
+          setPending({ ...found, meters: distanceM(cur, found) });
+          setGeo({ busy: false, note: null });
+        } else {
+          set({ latitude: c.latitude, longitude: c.longitude });
+          setAnchor(found);
+          setPending(null);
+          setGeo({ busy: false, note: `「${found.label}」の位置にしました` });
+        }
+      }
       else if (r.unavailable) setGeo({ busy: false, note: '住所の検索サービスに繋がらず、位置を取れませんでした(住所が間違っているという意味ではありません)。少し待ってもう一度試してください' });
       else setGeo({ busy: false, note: 'この住所の位置が見つかりませんでした。住所の書き方を確かめてください' });
     } catch {
@@ -171,11 +189,30 @@ const NewEventForm: React.FC<Props> = ({ data, setData, urlRows, setUrlRows, sta
             data-testid="new-geocode"><LocateFixed size={14} aria-hidden="true" />住所から位置を探す</button>
         </div>
         {geo.note && <p className="mt-1 text-xs text-ink-700" role="status">{geo.note}</p>}
+        {pending && (
+          <div className="mt-1 rounded-lg border border-cloud-200 p-2 text-xs text-ink-900" role="alert" data-testid="new-geo-confirm">
+            <p className="m-0">{`住所「${pending.label}」の位置は、今の地図の印から${distanceLabel(pending.meters)}離れています。どちらにしますか?`}</p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" data-testid="new-geo-use-address"
+                onClick={() => { set({ latitude: pending.latitude, longitude: pending.longitude }); setAnchor(pending); setPending(null); }}>
+                住所の位置にする</button>
+              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" data-testid="new-geo-keep-pin"
+                onClick={() => { setAnchor(null); setPending(null); }}>今の印のままにする</button>
+            </div>
+          </div>
+        )}
+        {!pending && anchor && hasPos && isFar(anchor, { latitude: data.latitude!, longitude: data.longitude! }) && (
+          <p className="mt-1 text-xs text-ink-900" role="alert" data-testid="new-geo-drifted">
+            {`印は住所「${anchor.label}」の位置から${distanceLabel(distanceM(anchor, { latitude: data.latitude!, longitude: data.longitude! }))}離れています。この位置でよいか確かめてください。`}
+            <button type="button" className="tc-focus-ring tc-mini-link ml-1" data-testid="new-geo-back"
+              onClick={() => set({ latitude: anchor.latitude, longitude: anchor.longitude })}>住所の位置に戻す</button>
+          </p>
+        )}
         {hasPos ? (
           <React.Suspense fallback={<p className="text-xs text-ink-700">地図を読み込み中…</p>}>
             <div className="mt-2 overflow-hidden rounded-xl border border-cloud-200">
               <SpotMiniMap latitude={data.latitude!} longitude={data.longitude!} label={data.title || '予定の場所'}
-                onMove={(lat, lng) => set({ latitude: lat, longitude: lng })} height={200} />
+                onMove={(lat, lng) => { set({ latitude: lat, longitude: lng }); setPending(null); }} height={200} />
             </div>
             <p className="mt-1 text-xs text-ink-700">印を動かすと位置を直せます</p>
           </React.Suspense>

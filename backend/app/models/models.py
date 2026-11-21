@@ -1322,6 +1322,32 @@ class Reservation(Base):
 # 参照)。複数イベントへの追加リンクはevent_reservations専用エンドポイント
 # (relation_type="required"/"related")経由でのみ作成する。
 
+class ReservationHistory(Base):
+    """[Gate② FC-041] 変更・取消のメール(同じ予約番号の別の予約)を元の予約へまとめた記録。値は持たない(項目の名前だけ)"""
+    __tablename__ = "reservation_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reservation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="CASCADE"), nullable=False)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # change / cancel
+    source_reservation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reservations.id", ondelete="SET NULL"), nullable=True)
+    fields: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)  # 変えた項目の名前の一覧
+    actor_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('change', 'cancel')", name="ck_reservation_history_kind"),
+        Index("ix_reservation_history_reservation", "reservation_id", "created_at"),
+        Index("ix_reservation_history_plan", "plan_id"),
+        Index("ix_reservation_history_source", "source_reservation_id"),
+        Index("ix_reservation_history_actor", "actor_user_id"),
+    )
+
+
 class ReservationEventRelationType(str, Enum):
     """DOC-05 §6.2。"""
     PRIMARY = "primary"
