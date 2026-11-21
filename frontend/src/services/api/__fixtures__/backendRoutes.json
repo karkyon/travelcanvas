@@ -61,7 +61,8 @@
   "captured_at_head_homeplace": "Gate HomePlace: +GET/PUT/DELETE /api/v1/privacy/home-place (backend/app/api/v1/home_place.py)",
   "captured_at_head_chat_consensus": "dev/discussion-chat (+Gate ChatConsensus POST /plans/{plan_id}/polls/decision・POST /plans/{plan_id}/polls/suggest-options)",
   "captured_at_head_spot_mode": "dev/spot-mode (+Gate SpotMode /plans/{plan_id}/spot-areas の 11 経路)",
-  "added_fc041": "Gate② FC-041: absorb・history(backend/app/api/v1/reservations.py)"
+  "added_fc041": "Gate② FC-041: absorb・history(backend/app/api/v1/reservations.py)",
+  "added_fc026": "Gate② FC-026: candidates/{id}/reports"
  },
  "routes": [
   "DELETE /api/v1/auth/passkeys/{passkey_id}",
@@ -460,6 +461,7 @@
   "POST /api/v1/plans/{plan_id}/candidates/from-search",
   "POST /api/v1/plans/{plan_id}/candidates/social-preview",
   "POST /api/v1/plans/{plan_id}/candidates/{candidate_id}/merge",
+  "POST /api/v1/plans/{plan_id}/candidates/{candidate_id}/reports",
   "POST /api/v1/plans/{plan_id}/candidates/{candidate_id}/schedule",
   "POST /api/v1/plans/{plan_id}/commands/execute",
   "POST /api/v1/plans/{plan_id}/commands/preview",

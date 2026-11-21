@@ -101,7 +101,7 @@ PLAN_TABLES = (
     m.PlanCollaborator, m.PlanShareLink, m.BookletExport, m.ChangeSet, m.ChangeItem, m.PlanVersion,
     m.PlanAlert, m.Replan, m.SyncOperation, m.Memory, m.LocationTrack, m.LocationPointBatch,
     m.EventActual, m.TripLocationSetting, m.LocationAreaCell, m.PrivateProfileLink, m.VisitAssessment,
-    m.PlanCandidate, m.SupportGrant, m.DayVariantSwitch,
+    m.PlanCandidate, m.CandidateReport, m.SupportGrant, m.DayVariantSwitch,
     m.CommandRun, m.NotificationPreference, m.AbuseReport,
     m.FxRate, m.BudgetVersion,
     m.MemoryPublication, m.MemoryTrash, m.PhotoUploadLink, m.PlanExternalMap,

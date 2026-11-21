@@ -3048,6 +3048,30 @@ class PlanCandidate(Base):
     )
 
 
+class CandidateReport(Base):
+    """[Gate② FC-026] 候補箱の候補への報告(閉業・住所の誤り・危険・重複)。出典の状態へ反映する(api/v1/candidates.py)"""
+    __tablename__ = "candidate_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_candidates.id", ondelete="CASCADE"), nullable=False)
+    reason: Mapped[str] = mapped_column(String(16), nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    reporter_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("reason IN ('closed', 'wrong_address', 'dangerous', 'duplicate')",
+                        name="ck_candidate_reports_reason"),
+        Index("ix_candidate_reports_candidate", "candidate_id", "created_at"),
+        Index("ix_candidate_reports_plan", "plan_id"),
+        Index("ix_candidate_reports_reporter", "reporter_user_id"),
+    )
+
+
 class UserPrivateProfile(Base):
     """[Gate C1] FR-023 秘匿プロフィール。利用者ごとの非公開の条件を1つの暗号文だけで持つ(平文の列を持たない)。
 
