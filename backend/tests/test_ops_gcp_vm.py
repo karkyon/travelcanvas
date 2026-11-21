@@ -90,7 +90,9 @@ case "$1 $2" in
   "status --json") echo '{"Self": {"DNSName": "travelcanvas.tail-test.ts.net."}}' ;;
   "serve status")
     echo "https://travelcanvas.tail-test.ts.net (tailnet only)"
-    echo "|-- / proxy http://127.0.0.1:8080" ;;
+    echo "|-- / proxy http://127.0.0.1:8080"
+    # 実物の tailscale は最後に空の行を別に書く。照合が先に終わっても確認を誤らないこと(SIGPIPE)
+    [ -n "$STUB_LATE_TAIL" ] && { sleep 0.3; echo ""; } ;;
   "funnel status") if [ -n "$STUB_FUNNEL" ]; then echo "# Funnel on:"; else echo "(tailnet only)"; fi ;;
 esac
 exit 0
@@ -116,7 +118,13 @@ elif "-D" in a and "OPTIONS" in a:
 elif "-D" in a:
     print("content-security-policy: default-src 'self'; connect-src 'self' https://travelcanvas.tail-test.ts.net\\r")
 elif url.endswith("/metrics"):
-    print("<!doctype html>")
+    import os, time
+    if os.environ.get("STUB_METRICS"):  # Prometheus の本文が見えてしまう時(続きを遅れて書く)
+        print("# HELP tc_requests_total x", flush=True)
+        time.sleep(0.3)
+        print("tc_requests_total 1")
+    else:
+        print("<!doctype html>")
 """
 
 
@@ -180,3 +188,15 @@ def test_deploy_refuses_bad_sha_and_missing_env(vm):
     assert run("deploy", "not-a-sha").returncode != 0
     out = run("deploy", "0123456789abcdef0123456789abcdef01234567")
     assert out.returncode != 0 and ".env がありません" in out.stderr
+
+
+def test_check_does_not_misjudge_when_output_continues_after_the_match(vm):
+    """[Gate② 11-21] pipefail の下の `cmd | grep -q` は、一致の後に cmd が書くと 141 で落ちていた。
+    GCP VM の 214b179 の反映で、Serve が 127.0.0.1:8080 を出しているのに NG になった(利用者のログ)。"""
+    root, run = vm
+    assert run("env").returncode == 0
+    late = run("check", STUB_LATE_TAIL="1")
+    assert late.returncode == 0, late.stdout + late.stderr
+    assert "Tailscale Serve が 127.0.0.1:8080 を出していない" not in late.stdout
+    leak = run("check", STUB_METRICS="1")  # 見えているのに「通さない」と誤ってはいけない
+    assert leak.returncode != 0 and "NG: /metrics が見える" in leak.stdout

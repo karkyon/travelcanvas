@@ -124,3 +124,46 @@ cd ~/projects/travelcanvas && bash scripts/ops/gate2_env_record.sh
 | 記録のファイル(環境の中) | `gate2-record-20261121-103203.txt` | `gate2-record-20261121-103438.txt` | `gate2-record-20261121-015507.txt` | `gate2-record-20261121-020154.txt` |
 
 **この時点で両環境は main `fe5eaec` にそろった(利用者のログ上)。** その後の main(#158 以降)は未反映。§4 の手の確認 C-1〜C-6 は**未実施**。GCP VM には「System restart required」(OS の再起動待ち。TravelCanvas の反映とは別)。
+
+## 8. 実績(2026-11-21 14:15〜14:25 UTC。利用者の実行ログ。§3・§6・§7 の記録は消さずに残す)
+
+> **Claude がこの作業環境から接続して測った値ではない。** 利用者が両環境で実行し、出力を貼った記録(`gate2_env_record.sh`・`local_dev_apply.sh`・`gcp_vm.sh`)。秘密の値・個人の情報は含まない。
+
+反映した版: main **`214b179982e620b61b51ee56c3e4254c3edb7e6d`**(#166)。同じ SHA の CI run #836 は 5 ジョブとも success。`fe5eaec`・`f84a7db` からの差は frontend と docs だけで、migration は無い。
+反映の前の記録では、両環境とも `f84a7db` で動いていた(その反映の記録は貼られていない)。
+
+| 項目 | omega-dev2 前 | omega-dev2 後 | GCP VM 前 | GCP VM 後 |
+|---|---|---|---|---|
+| 記録の時刻(UTC) | 14:15:47 | 14:17:54 | 14:19:55 | 14:25:31 |
+| head(稼働の SHA) | `f84a7db`(branch main) | **`214b179`**(branch main) | `f84a7db`(detached) | **`214b179`**(detached) |
+| 作業ツリーの変更 | 0 | 0 | 0 | 0 |
+| backend・frontend・postgres・redis | すべて healthy | すべて healthy | すべて healthy | すべて healthy |
+| Alembic current = heads | `d5e9f3a7b2c6` | `d5e9f3a7b2c6` | `d5e9f3a7b2c6` | `d5e9f3a7b2c6` |
+| /health・/ready | 200・200 | 200・200 | 200・200 | 200・200 |
+| /ready の checks | database・migration・migration_current・required_routers すべて true | 同じ | 同じ | 同じ |
+| 画面 `/`・`/admin/ops` | 200・200 | 200・200 | 200・200 | 200・200(`/trip-consult` も 200) |
+| バックアップ | — | **`tc-20261121T141600Z`**(DB 5,985,130 バイト・保存ファイル 348 件・**検証 OK**) | — | **`tc-20261121T142019Z`**(DB 5,155,204 バイト・保存ファイル 341 件。貼られた出力に「検証OK」の行は無い) |
+| その他 | — | LAN の画面から API(CORS `http://192.168.1.11:4173`)可 | — | CSP・CORS は同じ origin(tailnet の名前)、待ち受けは 127.0.0.1 だけ、`/metrics` は backend へ通さない、Serve は `/ → http://127.0.0.1:8080`(tailnet only) |
+| T2 重複の組・最大 | 0・0 | 0・0 | 0・0 | 0・0 |
+| 大文字小文字違いのアカウントの組 | 0 | 0 | 0 | 0 |
+| 正規化前の招待 | 0 | 0 | 0 | 0 |
+
+**この時点で両環境は main `214b179` にそろった(利用者のログ上)。** 手の確認(`docs/test/gate2_manual_verification.md` の C-1〜C-9 ほか)は**未実施**。GCP VM には引き続き「System restart required」(OS の再起動待ち。TravelCanvas の反映とは別)。
+
+### 8.1 GCP VM の反映の終わりの「NG」は確認の道具の誤り
+
+`gcp_vm.sh deploy` の最後の確認が「NG: Tailscale Serve が 127.0.0.1:8080 を出していない」で終わった。ただし同じ出力の 1 行上に `serve: |-- / proxy http://127.0.0.1:8080` が出ていて、Serve は正しく出していた。反映そのもの(build・migrate・health・ready)は終わっており、反映の後の記録もすべて正常。
+
+- **原因:** 道具は `set -o pipefail` の下で `tailscale serve status | grep -q …` と照合していた。`grep -q` は一致した所で終わる。その後に `tailscale` が最後の空の行を書くと SIGPIPE(終了コード 141)で落ち、pipefail のため一致していても失敗になる。手元で同じ形を再現して、141 になることを確かめた。
+- **同じ形の別の危険:** `curl …/metrics | grep -qE '^# (HELP|TYPE) '` も同じ形だった。こちらは誤る向きが逆で、**`/metrics` が見えているのに「通さない」と言いうる**。
+- **直したもの(この PR):** `gcp_vm.sh` の Serve・Funnel・`/metrics` の照合と、`uat_https.sh` の `/metrics` の照合。どれも出力を先に変数へ受けてから照合する形にした。
+- **同じ形で直さなかった所:** 誤っても害が無い向きのものは変えていない。
+  - `local_dev_apply.sh` の backend の起動の確認: 誤ると、動いている backend をもう一度起動するだけ(何も変わらない)。
+  - `osrm_prepare.sh` の準備の待ち: 誤ると、もう一度待つだけ。
+  - GCP の作成・権限の道具(`gcp_vm_create.sh`・`bootstrap_gcp_dev_runtime.sh`・`harden_gcp_dev_iam.sh`)の `gcloud … | grep -q`: 一度だけ流す作成の道具で、出力は一度に書かれる。
+- **試験:** `test_ops_gcp_vm.py` に 1 件足した。Serve の出力が一致の後に続いても NG にしないこと、`/metrics` の本文が遅れて続いても「見える」を見落とさないこと。修正前の道具ではこの試験が落ちることを確かめた。
+- **利用者の作業(この PR のマージの後):** GCP VM を、この PR を含む main の完全な SHA へ反映する(`gcp_vm.sh deploy <SHA>`)。そのあと、直った道具で確認だけを流す。
+  ```bash
+  cd ~/projects/travelcanvas && bash scripts/ops/gcp_vm.sh check
+  ```
+  (`check` は確認だけで、反映・バックアップはしない。`bash <(git show …)` の形では流さない。道具は自分の置き場所から作業の場所を決めるため)

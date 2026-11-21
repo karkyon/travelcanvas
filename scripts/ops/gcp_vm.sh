@@ -149,15 +149,22 @@ cmd_check() {
     -H 'Access-Control-Request-Method: POST' "$GW/api/v1/auth/login" | tr -d '\r' \
     | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}')"
   if [ "$acao" = "https://$host" ]; then say "  CORS: https://$host を許可"; else say "  NG: CORS が https://$host を許可しない"; ok=1; fi
-  if curl -s --max-time 10 "$GW/metrics" | grep -qE '^# (HELP|TYPE) '; then say "  NG: /metrics が見える"; ok=1; else say "  /metrics: backend へ通さない"; fi
+  # [Gate② 11-21] 出力は先に変数へ受けてから照合する。pipefail の下で `cmd | grep -q` は、grep が先に終わると
+  # cmd が SIGPIPE(141)で落ち、一致していても失敗になる(/metrics では「見える」のに「通さない」と誤る向き)
+  local metrics
+  metrics="$(curl -s --max-time 10 "$GW/metrics" || true)"
+  if grep -qE '^# (HELP|TYPE) ' <<<"$metrics"; then say "  NG: /metrics が見える"; ok=1; else say "  /metrics: backend へ通さない"; fi
   # 外から届く口が無いこと: 0.0.0.0 で待つのは Tailscale・SSH だけ(backend・画面・振り分けは 127.0.0.1)
   local wide
   wide="$(ss -Hltn 2>/dev/null | awk '{print $4}' | grep -E '^(0\.0\.0\.0|\*|\[::\]):(8001|4173|8080|5432|6379)$' || true)"
   if [ -z "$wide" ]; then say "  待ち受け: 8001・4173・8080 は 127.0.0.1 だけ"; else say "  NG: 外向きに開いている: $wide"; ok=1; fi
   if command -v tailscale >/dev/null; then
-    sudo tailscale serve status 2>/dev/null | sed 's/^/  serve: /'
-    sudo tailscale serve status 2>/dev/null | grep -q "http://127.0.0.1:8080" || { say "  NG: Tailscale Serve が 127.0.0.1:8080 を出していない"; ok=1; }
-    sudo tailscale funnel status 2>/dev/null | grep -qi "funnel on" && { say "  NG: Funnel(インターネットへの公開)が有効"; ok=1; }
+    local serve funnel
+    serve="$(sudo tailscale serve status 2>/dev/null || true)"
+    funnel="$(sudo tailscale funnel status 2>/dev/null || true)"
+    sed 's/^/  serve: /' <<<"$serve"
+    grep -q "http://127.0.0.1:8080" <<<"$serve" || { say "  NG: Tailscale Serve が 127.0.0.1:8080 を出していない"; ok=1; }
+    grep -qi "funnel on" <<<"$funnel" && { say "  NG: Funnel(インターネットへの公開)が有効"; ok=1; }
   fi
   [ "$ok" = 0 ] || die "確認に失敗した項目があります(上の NG・200 以外)"
   say "OK: https://$host/ (tailnet の中の端末だけ)"
