@@ -107,13 +107,17 @@ def depart_messages(plan_id: str, guide: Dict[str, Any], titles: Dict[str, str],
             how = f"移動 約{travel}分" + ("(概算)" if ev.get("travel_source") == "estimate" else "")
         if 0 < minutes <= SOON_MINUTES:
             body = f"{_hm(leave, tz)} に出れば {_hm(start, tz)} の{title}にちょうど" + (f"。{how}" if how else "")
+            head = f"そろそろ出発 ・ あと{int(minutes + 0.999)}分"
             out.append((f"{plan_id}:{eid}:soon:{leave.isoformat()}",
-                        wp.message(f"そろそろ出発 ・ あと{int(minutes + 0.999)}分", body, _url(plan_id),
-                                   f"go-{eid}", "depart"), "high"))
+                        wp.message(head, body, _url(plan_id), f"go-{eid}", "depart",
+                                   brief=(head, "次の予定へ出る時刻が近づいています。開いて時刻と道順を確かめてください")),
+                        "high"))
         elif -NOW_LATE_MINUTES <= minutes <= 0:
             body = f"{title}({_hm(start, tz)} から)へ。" + (how or "外の地図で道順を確かめてください")
             out.append((f"{plan_id}:{eid}:now:{leave.isoformat()}",
-                        wp.message("いま出れば間に合います", body, _url(plan_id), f"go-{eid}", "depart"), "high"))
+                        wp.message("いま出れば間に合います", body, _url(plan_id), f"go-{eid}", "depart",
+                                   brief=("いま出れば間に合います", "次の予定へ。開いて道順を確かめてください")),
+                        "high"))
     return out
 
 
@@ -143,7 +147,8 @@ def morning_message(plan_id: str, guide: Dict[str, Any], titles: Dict[str, str],
         body += f"({_hm(first_leave, tz)} に出発)"
     return (f"{plan_id}:{guide['local_date']}:morning",
             wp.message(f"{head}{(' ・ ' + guide['day_title']) if guide.get('day_title') else ''}", body,
-                       _url(plan_id), f"morning-{guide['local_date']}", "morning"), "normal")
+                       _url(plan_id), f"morning-{guide['local_date']}", "morning",
+                       brief=(head, f"今日は{len(timed)}件の予定があります。開いて確かめてください")), "normal")
 
 
 def rain_messages(db: Session, plan_id: str, guide: Dict[str, Any], titles: Dict[str, str], now: datetime
@@ -189,7 +194,9 @@ def rain_messages(db: Session, plan_id: str, guide: Dict[str, Any], titles: Dict
         body = f"{(e.local_start_time or '')[:5]} {titles.get(eid, e.title)} の時間に雨(降水確率{hit['probability']}%)。"
         body += "プランBに切り替えられます"
         out.append((f"{plan_id}:{eid}:rain:{guide.get('local_date')}",
-                    wp.message("雨の兆し ・ 屋外の予定", body, _url(plan_id, "#today-planb"), f"rain-{eid}", "rain"),
+                    wp.message("雨の兆し ・ 屋外の予定", body, _url(plan_id, "#today-planb"), f"rain-{eid}", "rain",
+                               brief=("雨の兆し ・ 屋外の予定",
+                                      f"屋外の予定の時間に雨の兆し(降水確率{hit['probability']}%)。開いてプランBを確かめてください")),
                     "normal"))
     return out
 
@@ -346,7 +353,9 @@ def crew_targets(db: Session, plan, actor, event, arrive: datetime, planned: Opt
         if not _once(f"{uid}:{plan.id}:{event.id}:crew:{actor.id}:{delay // 10}", ttl=6 * 3600):
             continue
         body = f"{event.title}に約{delay}分遅れて {_hm(arrive, tz)} ごろ着く見込みです(位置は共有していません)"
-        out.append((uid, wp.message(f"{label}さんが遅れます", body, _url(str(plan.id)), f"crew-{actor.id}", "crew")))
+        out.append((uid, wp.message(f"{label}さんが遅れます", body, _url(str(plan.id)), f"crew-{actor.id}", "crew",
+                                    brief=(f"{label}さんが遅れます",
+                                           f"約{delay}分遅れる見込みです。開いて確かめてください(位置は共有していません)"))))
     return out
 
 

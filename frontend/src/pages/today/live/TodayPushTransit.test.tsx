@@ -61,6 +61,18 @@ describe('端末への通知', () => {
     await waitFor(() => expect(rain).not.toBeChecked());
   });
 
+  it('[Gate② T1・FC-086] ロック画面に予定の名前と時刻を出すのは既定でオフ。オンにすると保存する', async () => {
+    m.syncThisDevice.mockResolvedValue({ ...m.cfg, devices: [device] });
+    m.putPushKinds.mockResolvedValue({ ...m.cfg, devices: [device], detail: true });
+    render(<PushPanel />);
+    const detail = await screen.findByTestId('today-push-detail');
+    await waitFor(() => expect(detail).not.toBeDisabled());
+    expect(detail).not.toBeChecked();
+    fireEvent.click(detail);
+    await waitFor(() => expect(m.putPushKinds).toHaveBeenCalledWith({ detail: true }));
+    await waitFor(() => expect(detail).toBeChecked());
+  });
+
   it('http の画面・iPhone のブラウザでは使い方を案内して押せない', async () => {
     m.support = 'insecure';
     const { unmount } = render(<PushPanel />);

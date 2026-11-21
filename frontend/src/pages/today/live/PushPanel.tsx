@@ -70,6 +70,13 @@ const PushPanel: React.FC = () => {
       setErr(errorDetailMessage(e, '保存できませんでした'));
     }
   };
+  const setDetail = async (v: boolean) => {
+    try {
+      setCfg(await putPushKinds({ detail: v }));
+    } catch (e) {
+      setErr(errorDetailMessage(e, '保存できませんでした'));
+    }
+  };
   const test = async () => {
     setBusy(true);
     setErr(null);
@@ -97,6 +104,10 @@ const PushPanel: React.FC = () => {
         <LiveSwitch key={r.kind} label={r.label} sub={r.sub} checked={cfg?.kinds[r.kind] ?? true}
           disabled={!cfg || !on} onToggle={(v) => void setKind(r.kind, v)} />
       ))}
+      {/* [Gate② T1・FC-086] 既定はロック画面に予定の名前・時刻を出さない(選んだ人だけ出す) */}
+      <LiveSwitch label="ロック画面に予定の名前と時刻を出す"
+        sub={cfg?.detail ? '出します(端末を他の人に見られる時は注意)' : '出しません(開くと確かめられます)'}
+        checked={cfg?.detail ?? false} disabled={!cfg || !on} onToggle={(v) => void setDetail(v)} testId="today-push-detail" />
       <div className="tc-live-row" style={{ marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" disabled={busy || !on} onClick={() => void test()}>
           試しに送る
