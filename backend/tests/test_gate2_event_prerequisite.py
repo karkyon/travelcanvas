@@ -74,3 +74,24 @@ def test_deleting_the_prerequisite_releases_it(auth_client, db_session):
     assert client.delete(f"/api/v1/plans/{p}/events/{a}", headers={"If-Match": str(rev)}).status_code in (200, 204)
     db_session.expire_all()
     assert db_session.get(TravelEvent, uuid.UUID(b)).after_event_id is None
+
+
+def test_undo_of_deleting_the_prerequisite_puts_it_back(auth_client, db_session):
+    """先行の予定を消すと外れ、その削除を元に戻すと先行条件も戻る(記録して戻す)"""
+    from app.models.models import TravelEvent
+
+    client, _ = auth_client
+    p, d = _plan_day(client)
+    a = _event(client, p, d, "A", "2026-12-05T09:00:00+09:00")
+    b = _event(client, p, d, "B", "2026-12-05T10:00:00+09:00")
+    _set_after(client, p, b, a)
+    rev = client.get(f"/api/v1/plans/{p}").json()["revision"]
+    client.delete(f"/api/v1/plans/{p}/events/{a}", headers={"If-Match": str(rev)})
+    db_session.expire_all()
+    assert db_session.get(TravelEvent, uuid.UUID(b)).after_event_id is None
+    rev = client.get(f"/api/v1/plans/{p}").json()["revision"]
+    res = client.post(f"/api/v1/plans/{p}/undo", headers={"If-Match": str(rev)})
+    assert res.status_code in (200, 201), res.text
+    db_session.expire_all()
+    assert db_session.get(TravelEvent, uuid.UUID(a)) is not None
+    assert str(db_session.get(TravelEvent, uuid.UUID(b)).after_event_id) == a

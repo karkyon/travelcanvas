@@ -1169,11 +1169,17 @@ async def delete_event(
 
     # [Gate EventArea] エリアを消す時は中の予定を外す(元に戻すとまた入る)
     members = event_area.detach_members(db, event_uuid, _event_to_dict) if event.event_type == event_area.AREA else []
+    # [Gate② FC-017] この予定を先行条件にしている予定から外す(記録するので、元に戻すとまた付く)
+    dependents = []
+    for d in db.query(TravelEvent).filter(TravelEvent.after_event_id == event_uuid).all():
+        dependents.append((d, _event_to_dict(d)))
+        d.after_event_id = None
     db.delete(event)
     db.flush()
 
     changes = [("travel_event", event_uuid, "delete", before, None)] + detachment.changes
     changes += [("travel_event", m.id, "update", b, _event_to_dict(m)) for m, b in members]
+    changes += [("travel_event", d.id, "update", b, _event_to_dict(d)) for d, b in dependents]
     new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
     return {"message": "イベントを削除しました", "revision": new_revision, "detached": detachment.impact()}
 

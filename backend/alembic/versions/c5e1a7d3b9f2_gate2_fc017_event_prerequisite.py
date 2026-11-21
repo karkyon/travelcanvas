@@ -17,7 +17,9 @@ depends_on = None
 def upgrade() -> None:
     op.add_column("travel_events", sa.Column(
         "after_event_id", postgresql.UUID(as_uuid=True),
-        sa.ForeignKey("travel_events.id", ondelete="SET NULL", name="fk_travel_events_after_event"), nullable=True))
+        # 元に戻す時に、消した予定を作り直す前に指す側を戻すことがあるため、確かめは commit の時に(parent_event_id と同じ)
+        sa.ForeignKey("travel_events.id", ondelete="SET NULL", name="fk_travel_events_after_event",
+                      deferrable=True, initially="DEFERRED"), nullable=True))
     op.create_index("ix_travel_events_after_event", "travel_events", ["after_event_id"])
 
 
