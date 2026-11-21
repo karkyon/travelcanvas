@@ -13,6 +13,7 @@
  *   新しい検索として探し直すかは利用者が選ぶ
  * - [F04] Google にも画面の検索範囲を送る(範囲を優先するだけで、範囲外も返り得ると示す)
  */
+import CertaintyBadge from '@/components/common/CertaintyBadge';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import Button from '@/components/common/Button';
 import { searchNearby } from '@/services/api/g11discover';
@@ -38,6 +39,8 @@ type Point = { latitude: number; longitude: number };
 /** 検索元を問わない結果の1行 */
 interface Row {
   key: string; source: SearchSource; name: string; detail: string; sourceLabel: string; unverified: string;
+  /** [Gate② UX P0] 提供元から取った時刻があるか(ある時だけ「実データ」。無ければ「不明」) */
+  retrieved: boolean;
   picked: boolean; toggle: () => void;
   /** [Gate PlaceKinds] 種類・代表画像・説明・希望との一致・距離(並べ替え) */
   kind: PlaceKind; thumb: string | null; description: string | null; match: string[]; avoid: boolean;
@@ -195,7 +198,8 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
     const kind = asKind(r.kind);
     return {
       key: `${prefix}-${r.id}`, source: 'osm' as const, name: r.name, detail: [distanceLabel(r)].filter(Boolean).join(' · '),
-      sourceLabel: `出典: ${providerLabel(r.provider)} ${retrievedLabel(r.retrieved_at)}`, unverified: r.provider === 'wikipedia'
+      sourceLabel: `出典: ${providerLabel(r.provider)} ${retrievedLabel(r.retrieved_at)}`, retrieved: Boolean(retrievedLabel(r.retrieved_at)),
+      unverified: r.provider === 'wikipedia'
         ? '営業時間・料金は未照会 · 地図上の位置は Wikipedia の記事の座標' : '営業時間は未照会',
       picked: Boolean(picked[r.id]), toggle: () => onPick(r, !picked[r.id]),
       kind, thumb: r.thumbnail_url ?? null, description: r.description ?? null,
@@ -207,7 +211,7 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
   const allRows: Row[] = shown === 'google'
     ? (gResults?.rows ?? []).map((g) => ({
       key: `g-${g.place_id}`, source: 'google' as const, name: g.name, detail: g.address ?? '',
-      sourceLabel: `出典: Google ${retrievedLabel(g.retrieved_at)}`,
+      sourceLabel: `出典: Google ${retrievedLabel(g.retrieved_at)}`, retrieved: Boolean(retrievedLabel(g.retrieved_at)),
       unverified: '営業時間・料金は未確認 · 下書きには場所の ID と Google マップの URL だけを残します',
       picked: Boolean(pickedGoogle[g.place_id]), toggle: () => onPickGoogle(g, !pickedGoogle[g.place_id]),
       kind: 'other' as PlaceKind, thumb: null, description: null, match: [], avoid: false, distance: null,
@@ -249,7 +253,11 @@ const PlaceSearchPanel: React.FC<PlaceSearchProps> = ({
                             {r.aiNote && <p className="text-xs text-ink-900 break-words"><b>特色</b>{` ${r.aiNote}`}</p>}
                             {r.aiWhy && <p className="text-xs text-success break-words"><b>おすすめの理由</b>{` ${r.aiWhy}`}</p>}
                             {r.detail && <p className="text-xs text-ink-700 break-words">{r.detail}</p>}
-                            <p className="text-[11px] text-ink-700">{`${r.sourceLabel} · ${r.unverified}`}</p>
+                            {/* [Gate② UX P0] 確からしさの共通の印: 取った時刻がある時だけ実データ。営業時間などは未照会 */}
+                            <p className="text-[11px] text-ink-700 flex flex-wrap gap-1 items-center" data-testid={`consult-cert-${r.key.slice(2)}`}>
+                              <CertaintyBadge kind={r.retrieved ? 'live' : 'unknown'}>{r.sourceLabel}</CertaintyBadge>
+                              <CertaintyBadge kind="unqueried">{r.unverified}</CertaintyBadge>
+                            </p>
                             <Button type="button" size="sm" variant={r.picked ? 'primary' : 'outline'} className="mt-2"
                               aria-pressed={r.picked} onClick={r.toggle} data-testid={`consult-pick-${r.key.slice(2)}`}>
                               {r.picked ? '✓ 旅程案に入れる' : '旅程案に入れる'}

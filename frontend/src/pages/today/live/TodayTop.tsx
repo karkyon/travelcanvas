@@ -11,6 +11,7 @@
  *    (右に固定のスポット欄は置かない)。空模様は地図の下に同じ時刻の線で
  * 状態は色だけで伝えない(必ず文字)。
  */
+import CertaintyBadge from '@/components/common/CertaintyBadge';
 import React from 'react';
 import {
   AlertTriangle, BookOpen, Camera, CalendarDays, CheckCircle2, CloudRain, Coffee, Eye, LifeBuoy, ListOrdered,
@@ -24,7 +25,7 @@ import { Seal } from './LivePieces';
 import type { TodayCtx, TodayScreen } from './todayCtx';
 import { bookingPill } from './todayHelpers';
 import {
-  SOURCE_LETTER, SOURCE_WORD, changeItems, hasBookingFor, sourceKind, travelSource, type SourceKind,
+  SOURCE_CERTAINTY, SOURCE_WORD, changeItems, hasBookingFor, sourceKind, travelSource, type SourceKind,
 } from './todaySource';
 
 const hm = (iso: string | null | undefined, tz: string | null) => formatTimeInZone(iso ?? null, tz);
@@ -56,11 +57,9 @@ export const GoRing: React.FC<{ view: GoNowView; size: number; top?: string | nu
 
 // ---- 移動時間の出どころ ------------------------------------------------------------------------------------------
 
+// [Gate② UX P0] 共通の確からしさの印(CertaintyBadge)で出す。当日の言い方(実時刻・登録した移動など)は SOURCE_WORD のまま
 export const SourceTag: React.FC<{ kind: SourceKind; children?: React.ReactNode; testId?: string }> = ({ kind, children, testId }) => (
-  <span className="tl-src" data-kind={kind} data-testid={testId}>
-    <i aria-hidden="true">{SOURCE_LETTER[kind]}</i>
-    {children ?? SOURCE_WORD[kind]}
-  </span>
+  <CertaintyBadge kind={SOURCE_CERTAINTY[kind]} word={SOURCE_WORD[kind]} testId={testId}>{children}</CertaintyBadge>
 );
 
 function deviceZone(): string | null {

@@ -1,0 +1,17 @@
+/* [Gate② UX P0] 確からしさの印(components/common/CertaintyBadge)。当日の .tl-src の配色を共通にした。
+   語と 1 文字の印と枠の形(概算は点線・取得失敗は二重線)で示し、色だけに頼らない。 */
+.tc-cert { display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; padding: 3px 8px 3px 5px; font-size: 11px; font-weight: 700;
+  border: 1px solid; white-space: nowrap; max-width: 100%; }
+.tc-cert small { font-weight: 600; opacity: .85; }
+.tc-cert i { font-style: normal; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; font-size: 10px; font-weight: 900; color: #ffffff; flex: none; }
+.tc-cert[data-cert='live'] { border-color: #bfe3d2; background: #f0fbf6; color: #14532d; } .tc-cert[data-cert='live'] i { background: #166534; }
+.tc-cert[data-cert='manual'] { border-color: #ecd3a4; background: #fffaf0; color: #6b4508; } .tc-cert[data-cert='manual'] i { background: #92400e; }
+.tc-cert[data-cert='registered'] { border-color: #c9d7f5; background: #f5f8ff; color: #1e3a8a; } .tc-cert[data-cert='registered'] i { background: #1d4ed8; }
+.tc-cert[data-cert='estimate'] { border-color: #94a3b8; border-style: dashed; background: #f8fafc; color: #334155; } .tc-cert[data-cert='estimate'] i { background: #5b6b80; }
+.tc-cert[data-cert='unknown'], .tc-cert[data-cert='unqueried'] { border-color: #cbd5e1; border-style: dotted; background: #f8fafc; color: #334155; }
+.tc-cert[data-cert='unknown'] i, .tc-cert[data-cert='unqueried'] i { background: #64748b; }
+.tc-cert[data-cert='unconnected'] { border-color: #d8b4fe; background: #faf5ff; color: #581c87; } .tc-cert[data-cert='unconnected'] i { background: #7e22ce; }
+.tc-cert[data-cert='failed'] { border-color: #f5c2bb; border-style: double; border-width: 3px; padding: 1px 6px 1px 3px; background: #fff6f5; color: #9f1c12; }
+.tc-cert[data-cert='failed'] i { background: #b42318; }
+/* 暗い表示: 背景と文字は画面の色に合わせ、枠の形と印の色で種類を残す */
+[data-theme='dark'] .tc-cert { background: var(--tc-cloud-50, #1f2937); color: var(--tc-ink-900, #f1f5f9); }

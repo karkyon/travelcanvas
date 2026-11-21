@@ -2,6 +2,7 @@
  * [Gate TDay-Live2] 旅の当日の「出どころ」と「変化の知らせ」の計算(部品から切り離した関数)。
  */
 import type { TodayEvent } from '@/services/api';
+import type { CertaintyKind } from '@/components/common/certainty';
 import { formatTimeInZone } from '../todayModel';
 import { hoursLabel, modeWord, rainWindow } from './todayLive';
 import type { TodayCtx, TodayScreen } from './todayCtx';
@@ -15,6 +16,10 @@ export const SOURCE_WORD: Record<SourceKind, string> = {
   api: '実時刻', manual: '手入力', seg: '登録した移動', est: '概算', none: '不明',
 };
 export const SOURCE_LETTER: Record<SourceKind, string> = { api: '実', manual: '手', seg: '登', est: '概', none: '!' };
+/** [Gate② UX P0] 共通の確からしさの語彙(components/common/certainty.ts)への対応。当日の言い方(SOURCE_WORD)はそのまま使う */
+export const SOURCE_CERTAINTY: Record<SourceKind, CertaintyKind> = {
+  api: 'live', manual: 'manual', seg: 'registered', est: 'estimate', none: 'unknown',
+};
 
 /** guide の travel_source を出どころの種類へ(実時刻は交通の情報サービスから取った時だけ。今は登録・手入力・概算) */
 export function sourceKind(src: string | null | undefined, minutes: number | null | undefined): SourceKind {
