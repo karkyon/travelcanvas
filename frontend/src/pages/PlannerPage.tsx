@@ -20,6 +20,7 @@ import EventTimeImpact, { type EndValue } from '@/components/planner/EventTimeIm
 import EventPhotoPanel from '@/components/planner/EventPhotoPanel';
 import EventRelatedSummary from '@/components/planner/EventRelatedSummary';
 import { geocodeAddress, getPlaceInfo, type PlaceInfoResult } from '@/services/api/planEdit';
+import { distanceLabel, distanceM, isFar } from '@/components/planner/geoCheck';
 import { appendNotes, candidateHint, mergeUrlRows, nearPoint } from '@/components/places/placeHelpers';
 import PlaceSourcesCredit from '@/components/places/PlaceSourcesCredit';
 import { Globe, LocateFixed } from 'lucide-react';
@@ -1705,6 +1706,13 @@ const PlannerPage: React.FC = () => {
                               {c.website && <span className="block truncate text-xs text-ink-700">{c.website}</span>}
                               {c.notes?.map((n) => <span key={n} className="block text-xs text-ink-700">{n}</span>)}
                               {c.links?.map((l) => <span key={l.url} className="block truncate text-xs text-ink-700">{`${l.label ?? 'リンク'}: ${l.url}`}</span>)}
+                              {/* [Gate② FC-027] 今の地図の印から離れた位置は、選ぶ前に距離を示す */}
+                              {placeInfo.mode === 'geo' && typeof c.latitude === 'number' && typeof c.longitude === 'number'
+                                && typeof editingItem?.latitude === 'number' && typeof editingItem?.longitude === 'number'
+                                && isFar({ latitude: editingItem.latitude, longitude: editingItem.longitude }, { latitude: c.latitude, longitude: c.longitude }) && (
+                                <span className="block text-xs text-ink-900" data-testid={`place-info-far-${i}`}>
+                                  {`今の地図の印から${distanceLabel(distanceM({ latitude: editingItem.latitude, longitude: editingItem.longitude }, { latitude: c.latitude, longitude: c.longitude }))}離れています。同じ場所か確かめてから選んでください`}
+                                </span>)}
                               {candidateHint(c, placeInfo.result?.area) && (
                                 <span className="block text-[11px] text-ink-600" data-testid={`place-info-hint-${i}`}>{candidateHint(c, placeInfo.result?.area)}</span>)}
                             </span>
