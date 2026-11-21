@@ -356,3 +356,27 @@ def test_adopt_candidate_concurrent_requests_converge_to_one_place():
         check.query(User).filter(User.id == user_id).delete(synchronize_session=False)
         check.commit()
         check.close()
+
+
+def test_db_refuses_a_second_place_from_the_same_candidate_for_the_same_owner(db_session, make_user):
+    """[Gate② T2] DB の部分一意インデックス(migration e6a4c2b8d0f3): 採用の FOR UPDATE を通らない経路で
+    同じ人・同じ候補の Place を 2 つ目に作ろうとしても、DB が断る。候補から作っていない Place・別の人は対象外。"""
+    from sqlalchemy.exc import IntegrityError
+    from app.models.models import Place
+
+    owner, _ = make_user()
+    other, _ = make_user()
+    now = datetime(2026, 11, 21, tzinfo=timezone.utc)
+    cand = SearchCandidate(query="神宮", provider="nominatim", external_id=f"t2-{uuid.uuid4().hex[:8]}", name="伊勢神宮",
+                           searched_by_user_id=owner.id, retrieved_at=now)
+    db_session.add(cand)
+    db_session.flush()
+    db_session.add(Place(name="伊勢神宮", adopted_from_candidate_id=cand.id, created_by=owner.id))
+    db_session.add(Place(name="伊勢神宮", adopted_from_candidate_id=cand.id, created_by=other.id))  # 別の人は可
+    db_session.add(Place(name="手で入れた場所", created_by=owner.id))
+    db_session.add(Place(name="手で入れた場所", created_by=owner.id))  # 候補から作っていない Place は対象外
+    db_session.flush()
+    with pytest.raises(IntegrityError):
+        with db_session.begin_nested():
+            db_session.add(Place(name="伊勢神宮(2つ目)", adopted_from_candidate_id=cand.id, created_by=owner.id))
+            db_session.flush()

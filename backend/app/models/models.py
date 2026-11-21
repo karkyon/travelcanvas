@@ -796,6 +796,11 @@ class SearchCandidate(Base):
 class Place(Base):
     """候補(Candidate)をユーザーが採用(adopt)して確定した正規の場所。"""
     __tablename__ = "places"
+    # [Gate② T2] 同じ人が同じ候補から作る場所は 1 つだけ(migration e6a4c2b8d0f3。採用の FOR UPDATE と二重の守り)
+    __table_args__ = (
+        Index("uq_places_adopted_candidate_owner", "created_by", "adopted_from_candidate_id", unique=True,
+              postgresql_where=text("adopted_from_candidate_id IS NOT NULL")),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
