@@ -7,7 +7,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 const { searchSpots, searchNearby } = vi.hoisted(() => ({ searchSpots: vi.fn(), searchNearby: vi.fn() }));
-vi.mock('../services/api', () => ({ searchSpots }));
+// SearchPage が読む authStore(持ち主の判定)のために api も置く(この試験では通信しない)
+vi.mock('../services/api', () => ({ searchSpots, api: new Proxy({}, { get: () => vi.fn() }), AuthApiError: class extends Error {} }));
 vi.mock('../services/api/g11discover', () => ({ searchNearby }));
 
 import SearchPage from './SearchPage';
@@ -101,5 +102,44 @@ describe('[Gate2 G2-08] 位置の許可は押した時だけ', () => {
     await userEvent.click(screen.getByTestId('search-use-location'));
     expect(getCurrentPosition).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/座標を検索サービスへ送ります/)).toBeInTheDocument();
+  });
+});
+
+describe('[Gate② UX P0] 旅程などから戻った時の検索の文脈', () => {
+  beforeEach(async () => {
+    searchSpots.mockReset();
+    localStorage.removeItem('search_preferences');
+    (await import('@/components/search/searchMemory')).forgetSearch();
+    (await import('@/store/authStore')).useAuthStore.setState({ user: { id: 'u-1' } as never });
+  });
+
+  const searchOnce = async () => {
+    searchSpots.mockResolvedValueOnce({ success: true, data: { spots: [{ id: 's1', name: '伊勢神宮', description: '', category: 'sightseeing' }] } });
+    const view = renderPage();
+    await userEvent.type(screen.getByLabelText('探す言葉'), '伊勢');
+    await userEvent.click(screen.getByRole('button', { name: '探す' }));
+    expect(await screen.findByText('伊勢神宮')).toBeInTheDocument();
+    view.unmount();
+  };
+
+  it('画面を離れて戻ると、検索語と結果をそのまま出す(同じ検索を外へ送り直さない)', async () => {
+    await searchOnce();
+    renderPage();
+    expect(screen.getByDisplayValue('伊勢')).toBeInTheDocument();
+    expect(screen.getByText('伊勢神宮')).toBeInTheDocument();
+    expect(searchSpots).toHaveBeenCalledTimes(1);
+  });
+
+  it('別の人がログインした・ログアウトした後は、前の人の検索を出さない', async () => {
+    const { useAuthStore } = await import('@/store/authStore');
+    await searchOnce();
+    useAuthStore.setState({ user: { id: 'u-2' } as never });
+    const v = renderPage();
+    expect(screen.queryByText('伊勢神宮')).toBeNull();
+    v.unmount();
+    useAuthStore.setState({ user: { id: 'u-1' } as never });
+    (await import('@/components/search/searchMemory')).forgetSearch();  // logout が呼ぶ
+    renderPage();
+    expect(screen.queryByText('伊勢神宮')).toBeNull();
   });
 });
