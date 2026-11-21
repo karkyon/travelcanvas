@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { render, waitFor, act, screen, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 
 // 描画が重い子コンポーネント(地図・日程編集等)は本テストの対象外のため空にする
 // [Gate Remaining-2] 祝日は取りに行かない(外の通信を差し替える)
@@ -21,7 +21,10 @@ vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null
 vi.mock('@/components/DayView', () => ({ default: () => null }));
 vi.mock('@/components/planner/DateNavigation', () => ({ default: () => null }));
 vi.mock('@/components/planner/OptimizationPanel', () => ({ default: () => null }));
-vi.mock('@/components/planner/PlanMap', () => ({ default: () => null }));
+// [Gate② UX P0] 地図に渡す「選んだ予定」だけを見られるようにする(地図そのものは描かない)
+vi.mock('@/components/planner/PlanMap', () => ({
+  default: ({ selectedEventId }: { selectedEventId?: string | null }) => <i data-testid="map-selected" data-id={selectedEventId ?? ''} />,
+}));
 
 import PlannerPage from './PlannerPage';
 import { ToastProvider } from '@/components/common/Toast';
@@ -168,8 +171,12 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
     // 旅行の一覧(この試験の対象外。通信しない)
     const g9 = await import('@/services/api/g9');
     vi.spyOn(g9, 'getDashboard').mockResolvedValue({ trips: [], focus: null } as unknown as Awaited<ReturnType<typeof g9.getDashboard>>);
-    const addScheduleItem = vi.fn().mockResolvedValue(undefined);
     const plan = makePlan(['day-a', 'day-b'], '京都');
+    // 追加すると 1 日目に予定が 1 つ増える(store の代わり)
+    const addScheduleItem = vi.fn<(dayIndex: number, item: Record<string, unknown>) => Promise<void>>(async () => {
+      const cur = usePlanStore.getState().currentPlan!;
+      usePlanStore.setState({ currentPlan: { ...cur, days: [{ ...cur.days[0]!, events: [{ id: 'ev-new', title: '清水寺' }] }, ...cur.days.slice(1)] } as unknown as TravelPlan });
+    });
     usePlanStore.setState({
       plans: [plan],
       loadPlan: vi.fn(async () => { usePlanStore.setState({ currentPlan: plan }); return true; }),
@@ -180,7 +187,7 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
         <MemoryRouter initialEntries={[{ pathname: '/planner', state: { newSpot: { name: '清水寺', category: 'sightseeing' } } }]}>
           <Routes>
             <Route path="/planner" element={<PlannerPage />} />
-            <Route path="/planner/:planId" element={<div>旅程</div>} />
+            <Route path="/planner/:planId" element={<FocusProbe />} />
           </Routes>
         </MemoryRouter>
       </ToastProvider>
@@ -192,5 +199,116 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
     await waitFor(() => expect(addScheduleItem).toHaveBeenCalledTimes(1));
     expect(addScheduleItem.mock.calls[0]![0]).toBe(0);  // 1 日目
     expect(addScheduleItem.mock.calls[0]![1]).not.toHaveProperty('start_time');
+    // 追加した予定を選んだ状態で旅程を開く
+    expect(await screen.findByTestId('focus-probe')).toHaveTextContent('ev-new');
+  });
+
+  it('旅程を focusEventId つきで開くと、その予定を選んだ状態にする(地図・旅程で見つけやすく)', async () => {
+    const { loadPlan } = setupMocks();
+    const plan = { ...makePlan(['day-a']), days: [{ id: 'day-a', events: [{ id: 'ev-new', title: '清水寺' }] }] } as unknown as TravelPlan;
+    loadPlan.mockImplementation(async () => { usePlanStore.setState({ currentPlan: plan }); return true; });
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[{ pathname: '/planner/plan-1', state: { focusEventId: 'ev-new' } }]}>
+          <Routes><Route path="/planner/:planId" element={<PlannerPage />} /></Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+    await waitFor(() => expect(screen.getAllByTestId('map-selected').some((m) => m.getAttribute('data-id') === 'ev-new')).toBe(true));
+  });
+
+  // 検索から追加する窓を開いた状態を作る(旅行 1 件。追加の関数は試験ごとに渡す)
+  const openAddModal = async (overrides: Partial<ReturnType<typeof usePlanStore.getState>>, newSpot: Record<string, unknown>) => {
+    const { loadPlans } = setupMocks();
+    const g9 = await import('@/services/api/g9');
+    vi.spyOn(g9, 'getDashboard').mockResolvedValue({ trips: [], focus: null } as unknown as Awaited<ReturnType<typeof g9.getDashboard>>);
+    const plan = makePlan(['day-a', 'day-b'], '京都');
+    usePlanStore.setState({
+      plans: [plan],
+      loadPlan: vi.fn(async () => { usePlanStore.setState({ currentPlan: plan }); return true; }),
+      ...overrides,
+    } as Partial<ReturnType<typeof usePlanStore.getState>>);
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[{ pathname: '/planner', state: { newSpot } }]}>
+          <Routes>
+            <Route path="/planner" element={<PlannerPage />} />
+            <Route path="/planner/:planId" element={<FocusProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+    await waitFor(() => expect(loadPlans).toHaveBeenCalled());
+    const dialog = (await screen.findByTestId('add-spot-where')).closest('[role="dialog"]') as HTMLElement;
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /京都/ })); });
+  };
+  const addToDay0 = (id: string) => {
+    const cur = usePlanStore.getState().currentPlan!;
+    usePlanStore.setState({ currentPlan: { ...cur, days: [{ ...cur.days[0]!, events: [{ id, title: '清水寺' }] }, ...cur.days.slice(1)] } as unknown as TravelPlan });
+  };
+
+  it('追加に失敗した時(予定が増えない)は「追加しました」と言わず、窓を残して旅程へ移らない', async () => {
+    // store の addScheduleItem は失敗しても例外を投げず、元に戻して知らせる
+    const addScheduleItem = vi.fn<(dayIndex: number, item: Record<string, unknown>) => Promise<void>>(async () => {});
+    await openAddModal({ addScheduleItem }, { name: '清水寺', category: 'sightseeing' });
+    await waitFor(() => expect(addScheduleItem).toHaveBeenCalledTimes(1));
+    await sleep(0);
+    expect(screen.queryByTestId('focus-probe')).toBeNull();
+    expect(screen.getByTestId('add-spot-where')).toBeInTheDocument();
+    expect(screen.queryByText('清水寺をプランに追加しました')).toBeNull();
+  });
+
+  it('検索の候補(candidate_id)から追加した時も、増えた予定(場所の ID でなく予定の ID)を選んで開く', async () => {
+    const addScheduleItemFromCandidate = vi.fn<(dayIndex: number, candidateId: string, title?: string) => Promise<boolean>>(
+      async () => { addToDay0('ev-from-cand'); return true; });
+    await openAddModal({ addScheduleItemFromCandidate }, { name: '清水寺', candidate_id: 'cand-1' });
+    expect(await screen.findByTestId('focus-probe')).toHaveTextContent('ev-from-cand');
+    expect(addScheduleItemFromCandidate.mock.calls[0]).toEqual([0, 'cand-1', '清水寺']);
+  });
+
+  it('候補からの追加が失敗した時は旅程へ移らない(窓を残し、もう一度押せる)', async () => {
+    const addScheduleItemFromCandidate = vi.fn<(dayIndex: number, candidateId: string, title?: string) => Promise<boolean>>(
+      async () => false);
+    await openAddModal({ addScheduleItemFromCandidate }, { name: '清水寺', candidate_id: 'cand-1' });
+    await waitFor(() => expect(addScheduleItemFromCandidate).toHaveBeenCalledTimes(1));
+    await sleep(0);
+    expect(screen.queryByTestId('focus-probe')).toBeNull();
+    const dialog = screen.getByTestId('add-spot-where').closest('[role="dialog"]') as HTMLElement;
+    expect(within(dialog).getByRole('button', { name: /京都/ })).not.toBeDisabled();
+  });
+
+  const openWithFocus = (plan: TravelPlan, focusEventId: string, loadPlan: ReturnType<typeof setupMocks>['loadPlan']) => {
+    loadPlan.mockImplementation(async () => { usePlanStore.setState({ currentPlan: plan }); return true; });
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[{ pathname: '/planner/plan-1', state: { focusEventId } }]}>
+          <Routes><Route path="/planner/:planId" element={<><PlannerPage /><FocusProbe /></>} /></Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+  };
+
+  it('別の日を見ていても、追加した予定のある日(1 日目)を開いて選び、選んだ後は印を消す', async () => {
+    const { loadPlan } = setupMocks();
+    usePlanStore.setState({ currentDayIndex: 1 });  // 2 日目を見ていた
+    const plan = { ...makePlan([]), days: [{ id: 'day-a', events: [{ id: 'ev-new', title: '清水寺' }] }, { id: 'day-b', events: [] }] } as unknown as TravelPlan;
+    openWithFocus(plan, 'ev-new', loadPlan);
+    await waitFor(() => expect(usePlanStore.getState().currentDayIndex).toBe(0));
+    await waitFor(() => expect(screen.getAllByTestId('map-selected').some((m) => m.getAttribute('data-id') === 'ev-new')).toBe(true));
+    // 再読み込み・戻る操作で選び直さないよう、履歴の印は消す
+    await waitFor(() => expect(screen.getByTestId('focus-probe')).toHaveTextContent(''));
+  });
+
+  it('開いた旅行に無い予定の印(古い・別の旅行)は何も選ばず、印だけ消す', async () => {
+    const { loadPlan } = setupMocks();
+    const plan = { ...makePlan([]), days: [{ id: 'day-a', events: [{ id: 'ev-1', title: '清水寺' }] }] } as unknown as TravelPlan;
+    openWithFocus(plan, 'ev-gone', loadPlan);
+    await waitFor(() => expect(screen.getByTestId('focus-probe')).toHaveTextContent(''));
+    expect(screen.getAllByTestId('map-selected').every((m) => m.getAttribute('data-id') === '')).toBe(true);
   });
 });
+
+function FocusProbe() {
+  const loc = useLocation();
+  return <p data-testid="focus-probe">{(loc.state as { focusEventId?: string } | null)?.focusEventId ?? ''}</p>;
+}
