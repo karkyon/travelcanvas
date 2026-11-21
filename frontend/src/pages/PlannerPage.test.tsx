@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { render, waitFor, act, screen, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 
 // 描画が重い子コンポーネント(地図・日程編集等)は本テストの対象外のため空にする
 // [Gate Remaining-2] 祝日は取りに行かない(外の通信を差し替える)
@@ -21,7 +21,10 @@ vi.mock('@/components/planning/PlanningUsageMeter', () => ({ default: () => null
 vi.mock('@/components/DayView', () => ({ default: () => null }));
 vi.mock('@/components/planner/DateNavigation', () => ({ default: () => null }));
 vi.mock('@/components/planner/OptimizationPanel', () => ({ default: () => null }));
-vi.mock('@/components/planner/PlanMap', () => ({ default: () => null }));
+// [Gate② UX P0] 地図に渡す「選んだ予定」だけを見られるようにする(地図そのものは描かない)
+vi.mock('@/components/planner/PlanMap', () => ({
+  default: ({ selectedEventId }: { selectedEventId?: string | null }) => <i data-testid="map-selected" data-id={selectedEventId ?? ''} />,
+}));
 
 import PlannerPage from './PlannerPage';
 import { ToastProvider } from '@/components/common/Toast';
@@ -168,8 +171,12 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
     // 旅行の一覧(この試験の対象外。通信しない)
     const g9 = await import('@/services/api/g9');
     vi.spyOn(g9, 'getDashboard').mockResolvedValue({ trips: [], focus: null } as unknown as Awaited<ReturnType<typeof g9.getDashboard>>);
-    const addScheduleItem = vi.fn().mockResolvedValue(undefined);
     const plan = makePlan(['day-a', 'day-b'], '京都');
+    // 追加すると 1 日目に予定が 1 つ増える(store の代わり)
+    const addScheduleItem = vi.fn(async () => {
+      const cur = usePlanStore.getState().currentPlan!;
+      usePlanStore.setState({ currentPlan: { ...cur, days: [{ ...cur.days[0]!, events: [{ id: 'ev-new', title: '清水寺' }] }, ...cur.days.slice(1)] } as unknown as TravelPlan });
+    });
     usePlanStore.setState({
       plans: [plan],
       loadPlan: vi.fn(async () => { usePlanStore.setState({ currentPlan: plan }); return true; }),
@@ -180,7 +187,7 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
         <MemoryRouter initialEntries={[{ pathname: '/planner', state: { newSpot: { name: '清水寺', category: 'sightseeing' } } }]}>
           <Routes>
             <Route path="/planner" element={<PlannerPage />} />
-            <Route path="/planner/:planId" element={<div>旅程</div>} />
+            <Route path="/planner/:planId" element={<FocusProbe />} />
           </Routes>
         </MemoryRouter>
       </ToastProvider>
@@ -192,5 +199,26 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
     await waitFor(() => expect(addScheduleItem).toHaveBeenCalledTimes(1));
     expect(addScheduleItem.mock.calls[0]![0]).toBe(0);  // 1 日目
     expect(addScheduleItem.mock.calls[0]![1]).not.toHaveProperty('start_time');
+    // 追加した予定を選んだ状態で旅程を開く
+    expect(await screen.findByTestId('focus-probe')).toHaveTextContent('ev-new');
+  });
+
+  it('旅程を focusEventId つきで開くと、その予定を選んだ状態にする(地図・旅程で見つけやすく)', async () => {
+    const { loadPlan } = setupMocks();
+    const plan = { ...makePlan(['day-a']), days: [{ id: 'day-a', events: [{ id: 'ev-new', title: '清水寺' }] }] } as unknown as TravelPlan;
+    loadPlan.mockImplementation(async () => { usePlanStore.setState({ currentPlan: plan }); return true; });
+    render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={[{ pathname: '/planner/plan-1', state: { focusEventId: 'ev-new' } }]}>
+          <Routes><Route path="/planner/:planId" element={<PlannerPage />} /></Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    );
+    await waitFor(() => expect(screen.getAllByTestId('map-selected').some((m) => m.getAttribute('data-id') === 'ev-new')).toBe(true));
   });
 });
+
+function FocusProbe() {
+  const loc = useLocation();
+  return <p data-testid="focus-probe">{(loc.state as { focusEventId?: string } | null)?.focusEventId ?? ''}</p>;
+}

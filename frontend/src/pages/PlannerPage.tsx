@@ -191,6 +191,11 @@ const PlannerPage: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   // [Gate #32] PLAN MAP: timelineとMAPの双方向選択同期用
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  // [Gate② UX P0] 全体の検索から「プランに追加」した後は、追加した予定を選んだ状態で開く(旅程と地図で見つけやすく)
+  const focusEventId = (location.state as { focusEventId?: string } | null)?.focusEventId ?? null;
+  useEffect(() => {
+    if (focusEventId) setSelectedEventId(focusEventId);
+  }, [focusEventId]);
   const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
   // [G11-Layout] 移動概算の読み込みの状態(地図の下の行の場所を読み込み中から確保する)
   const [routePreviewStatus, setRoutePreviewStatus] = useState<RouteSummaryStatus>('off');
@@ -561,7 +566,7 @@ const PlannerPage: React.FC = () => {
   // [Gate #17] SpotListPage.tsxの「詳細」ボタンも同様にlocation.state.spotId
   // (登録済みスポットのID)を渡していたが、こちらも一切受け取られていなかった。
   // spotIdのみの場合はAPIから詳細を取得してから同じ追加フローに合流させる。
-  const routeState = location.state as { newSpot?: IncomingSpot; spotId?: string } | null;
+  const routeState = location.state as { newSpot?: IncomingSpot; spotId?: string; focusEventId?: string } | null;
   const [incomingSpot, setIncomingSpot] = useState<IncomingSpot | undefined>(routeState?.newSpot);
   const [isAddSpotModalOpen, setIsAddSpotModalOpen] = useState(false);
   const [isAddingSpot, setIsAddingSpot] = useState(false);
@@ -618,6 +623,8 @@ const PlannerPage: React.FC = () => {
       if (loadedPlan.days.length === 0) {
         await addDay();
       }
+      // [Gate② UX P0] 追加した予定を旅程で見つけやすくする: 追加の前の 1 日目の予定を覚え、増えた予定を選んだ状態で開く
+      const beforeIds = new Set((usePlanStore.getState().currentPlan?.days[0]?.events ?? []).map((e) => e.id));
 
       if (incomingSpot.candidate_id) {
         // /search/spots の候補は、Placeへ採用してから place_id 付きで予定にする。
@@ -642,7 +649,8 @@ const PlannerPage: React.FC = () => {
         addToast({ message: `${incomingSpot.name}をプランに追加しました`, type: 'success' });
       }
       setIsAddSpotModalOpen(false);
-      navigate(`/planner/${plan.id}`, { replace: true, state: null });
+      const added = (usePlanStore.getState().currentPlan?.days[0]?.events ?? []).find((e) => !beforeIds.has(e.id));
+      navigate(`/planner/${plan.id}`, { replace: true, state: added ? { focusEventId: added.id } : null });
     } catch (error) {
       console.error('スポット追加エラー:', error);
       addToast({
