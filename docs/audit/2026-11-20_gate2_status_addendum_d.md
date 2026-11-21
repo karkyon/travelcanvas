@@ -157,6 +157,10 @@ cd ~/projects/travelcanvas && bash scripts/ops/gate2_env_record.sh
 - **原因:** 道具は `set -o pipefail` の下で `tailscale serve status | grep -q …` と照合していた。`grep -q` は一致した所で終わる。その後に `tailscale` が最後の空の行を書くと SIGPIPE(終了コード 141)で落ち、pipefail のため一致していても失敗になる。手元で同じ形を再現して、141 になることを確かめた。
 - **同じ形の別の危険:** `curl …/metrics | grep -qE '^# (HELP|TYPE) '` も同じ形だった。こちらは誤る向きが逆で、**`/metrics` が見えているのに「通さない」と言いうる**。
 - **直したもの(この PR):** `gcp_vm.sh` の Serve・Funnel・`/metrics` の照合と、`uat_https.sh` の `/metrics` の照合。どれも出力を先に変数へ受けてから照合する形にした。
+- **同じ形で直さなかった所:** 誤っても害が無い向きのものは変えていない。
+  - `local_dev_apply.sh` の backend の起動の確認: 誤ると、動いている backend をもう一度起動するだけ(何も変わらない)。
+  - `osrm_prepare.sh` の準備の待ち: 誤ると、もう一度待つだけ。
+  - GCP の作成・権限の道具(`gcp_vm_create.sh`・`bootstrap_gcp_dev_runtime.sh`・`harden_gcp_dev_iam.sh`)の `gcloud … | grep -q`: 一度だけ流す作成の道具で、出力は一度に書かれる。
 - **試験:** `test_ops_gcp_vm.py` に 1 件足した。Serve の出力が一致の後に続いても NG にしないこと、`/metrics` の本文が遅れて続いても「見える」を見落とさないこと。修正前の道具ではこの試験が落ちることを確かめた。
 - **利用者の作業(この PR のマージの後):** GCP VM を、この PR を含む main の完全な SHA へ反映する(`gcp_vm.sh deploy <SHA>`)。そのあと、直った道具で確認だけを流す。
   ```bash
