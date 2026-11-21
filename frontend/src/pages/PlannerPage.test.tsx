@@ -166,7 +166,7 @@ describe('PlannerPage effects (Gate M9-FE-B3)', () => {
 });
 
 describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () => {
-  it('入る場所(1 日目・時刻なし)を押す前に示し、選んだ旅行の 1 日目へ追加する', async () => {
+  it('入る場所(日を選べる・時刻なし)を押す前に示し、日が 2 日ある旅行は日を選んでから、その日へ追加する', async () => {
     const { loadPlans } = setupMocks();
     // 旅行の一覧(この試験の対象外。通信しない)
     const g9 = await import('@/services/api/g9');
@@ -193,9 +193,11 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
       </ToastProvider>
     );
     await waitFor(() => expect(loadPlans).toHaveBeenCalled());
-    expect(await screen.findByTestId('add-spot-where')).toHaveTextContent('選んだ旅行の 1 日目に、時刻なしの予定として入ります');
+    expect(await screen.findByTestId('add-spot-where')).toHaveTextContent('旅行を選ぶと、入れる日を選べます');
     const dialog = screen.getByTestId('add-spot-where').closest('[role="dialog"]') as HTMLElement;
     fireEvent.click(within(dialog).getByRole('button', { name: /京都/ }));
+    // 日が 2 日あるので、まだ追加せずに日を選ぶ段へ
+    fireEvent.click(await screen.findByTestId('add-spot-day-0'));
     await waitFor(() => expect(addScheduleItem).toHaveBeenCalledTimes(1));
     expect(addScheduleItem.mock.calls[0]![0]).toBe(0);  // 1 日目
     expect(addScheduleItem.mock.calls[0]![1]).not.toHaveProperty('start_time');
@@ -218,11 +220,12 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
   });
 
   // 検索から追加する窓を開いた状態を作る(旅行 1 件。追加の関数は試験ごとに渡す)
-  const openAddModal = async (overrides: Partial<ReturnType<typeof usePlanStore.getState>>, newSpot: Record<string, unknown>) => {
+  const openAddModal = async (overrides: Partial<ReturnType<typeof usePlanStore.getState>>, newSpot: Record<string, unknown>,
+    dayIds: string[] = ['day-a']) => {
     const { loadPlans } = setupMocks();
     const g9 = await import('@/services/api/g9');
     vi.spyOn(g9, 'getDashboard').mockResolvedValue({ trips: [], focus: null } as unknown as Awaited<ReturnType<typeof g9.getDashboard>>);
-    const plan = makePlan(['day-a', 'day-b'], '京都');
+    const plan = makePlan(dayIds, '京都');
     usePlanStore.setState({
       plans: [plan],
       loadPlan: vi.fn(async () => { usePlanStore.setState({ currentPlan: plan }); return true; }),
@@ -242,10 +245,32 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
     const dialog = (await screen.findByTestId('add-spot-where')).closest('[role="dialog"]') as HTMLElement;
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /京都/ })); });
   };
-  const addToDay0 = (id: string) => {
+  const addToDay0 = (id: string) => addToDay(0, id);
+  const addToDay = (dayIndex: number, id: string) => {
     const cur = usePlanStore.getState().currentPlan!;
-    usePlanStore.setState({ currentPlan: { ...cur, days: [{ ...cur.days[0]!, events: [{ id, title: '清水寺' }] }, ...cur.days.slice(1)] } as unknown as TravelPlan });
+    usePlanStore.setState({ currentPlan: { ...cur, days: cur.days.map((d, i) => (i === dayIndex ? { ...d, events: [...d.events, { id, title: '清水寺' }] } : d)) } as unknown as TravelPlan });
   };
+
+  it('日が 2 日以上ある旅行では、選んだ日(2 日目)へ追加し、その予定を選んで開く', async () => {
+    const addScheduleItem = vi.fn<(dayIndex: number, item: Record<string, unknown>) => Promise<void>>(async (i) => { addToDay(i, 'ev-d2'); });
+    await openAddModal({ addScheduleItem }, { name: '清水寺', category: 'sightseeing' }, ['day-a', 'day-b']);
+    expect(addScheduleItem).not.toHaveBeenCalled();  // 旅行を選んだだけでは入れない
+    const days = await screen.findByTestId('add-spot-days');
+    expect(within(days).getByTestId('add-spot-day-1')).toHaveTextContent('2 日目');
+    await act(async () => { fireEvent.click(within(days).getByTestId('add-spot-day-1')); });
+    expect(addScheduleItem.mock.calls[0]![0]).toBe(1);
+    expect(await screen.findByTestId('focus-probe')).toHaveTextContent('ev-d2');
+  });
+
+  it('日を選ぶ段から「旅行を選び直す」で旅行の一覧へ戻れる(何も追加しない)', async () => {
+    const addScheduleItem = vi.fn<(dayIndex: number, item: Record<string, unknown>) => Promise<void>>(async () => {});
+    await openAddModal({ addScheduleItem }, { name: '清水寺', category: 'sightseeing' }, ['day-a', 'day-b']);
+    fireEvent.click(await screen.findByTestId('add-spot-day-back'));
+    expect(screen.queryByTestId('add-spot-days')).toBeNull();
+    const dialog = screen.getByTestId('add-spot-where').closest('[role="dialog"]') as HTMLElement;
+    expect(within(dialog).getByRole('button', { name: /京都/ })).toBeInTheDocument();
+    expect(addScheduleItem).not.toHaveBeenCalled();
+  });
 
   it('追加に失敗した時(予定が増えない)は「追加しました」と言わず、窓を残して旅程へ移らない', async () => {
     // store の addScheduleItem は失敗しても例外を投げず、元に戻して知らせる

@@ -72,7 +72,7 @@ describe('SearchPage (Gate Honesty)', () => {
     expect(document.body.textContent).not.toMatch(/¥|信頼度|★/);
     // [Gate② UX P0] 押す前に保存先の違いが分かる
     const guide = screen.getByTestId('search-save-guide');
-    expect(guide).toHaveTextContent('その旅行の 1 日目に時刻なしの予定として入ります');
+    expect(guide).toHaveTextContent('入れる旅行と日を選ぶと、その日に時刻なしの予定として入ります');
     expect(guide).toHaveTextContent('まだどの旅行の予定にもなりません');
     expect(screen.getByRole('button', { name: '「清水寺」をプランに追加' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '「清水寺」を行きたい場所に保存' })).toBeInTheDocument();
