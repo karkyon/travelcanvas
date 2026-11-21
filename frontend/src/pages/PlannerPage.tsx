@@ -581,6 +581,8 @@ const PlannerPage: React.FC = () => {
   const [isAddingSpot, setIsAddingSpot] = useState(false);
   // [Gate② UX P0] 日が 2 日以上ある旅行を選んだ時は、入れる日を選んでもらう(以前は必ず 1 日目)
   const [dayChoice, setDayChoice] = useState<{ planId: string; days: { index: number; label: string }[] } | null>(null);
+  // [Gate② UX P0] 日を選ぶ段で、入れる時刻も選べる(任意。空なら時刻なし)
+  const [addSpotTime, setAddSpotTime] = useState('');
   // [Gate M9-FE-B3] effectが参照する値をローカル変数へ取り出し、依存を正確に宣言する
   // (以前はeslint-disableで抑制していた。発火条件はnewSpot/spotIdの変化時のみで不変)。
   const routeNewSpot = routeState?.newSpot;
@@ -651,12 +653,14 @@ const PlannerPage: React.FC = () => {
       }
       // [Gate② UX P0] 追加した予定を旅程で見つけやすくする: 追加の前のその日の予定を覚え、増えた予定を選んだ状態で開く
       const beforeIds = new Set((days[dayIndex]?.events ?? []).map((e) => e.id));
+      // 時刻は日を選ぶ段でだけ選べる(日を選ばずに入る 1 日だけの旅行・新しい旅行は時刻なし)
+      const startTime = chosenDay !== undefined && /^\d{2}:\d{2}$/.test(addSpotTime) ? addSpotTime : undefined;
 
       if (incomingSpot.candidate_id) {
         // /search/spots の候補は、Placeへ採用してから place_id 付きで予定にする。
         // 汎用の addScheduleItem へ流すと候補との紐付けが失われ、営業時間確認等へ連携できない。
         const added = await usePlanStore.getState().addScheduleItemFromCandidate(
-          dayIndex, incomingSpot.candidate_id, incomingSpot.name
+          dayIndex, incomingSpot.candidate_id, incomingSpot.name, startTime
         );
         if (!added) return; // storeが失敗を通知する。モーダルを残し再試行可能にする。
       } else {
@@ -671,6 +675,7 @@ const PlannerPage: React.FC = () => {
           longitude: incomingSpot.location?.longitude,
           duration: incomingSpot.estimated_duration,
           cost: incomingSpot.estimated_cost,
+          ...(startTime ? { start_time: startTime } : {}),
         });
       }
       // 作成の後に store が読み直すので、増えた予定はサーバーの ID(通信できず端末に溜めた時は仮の ID)
@@ -682,6 +687,7 @@ const PlannerPage: React.FC = () => {
       }
       setIsAddSpotModalOpen(false);
       setDayChoice(null);
+      setAddSpotTime('');
       navigate(`/planner/${plan.id}`, { replace: true, state: added ? { focusEventId: added.id } : null });
     } catch (error) {
       console.error('スポット追加エラー:', error);
@@ -2009,6 +2015,7 @@ const PlannerPage: React.FC = () => {
         onClose={() => {
           setIsAddSpotModalOpen(false);
           setDayChoice(null);
+          setAddSpotTime('');
           navigate('/planner', { replace: true, state: null });
         }}
         title="プランに追加"
@@ -2020,11 +2027,16 @@ const PlannerPage: React.FC = () => {
           {/* [Gate② UX P0] 入る場所を押す前に示す(addSpotToExistingOrNewPlan: 日が 2 日以上なら日を選ぶ。1 日だけ・新しい旅行は 1 日目) */}
           <p className="text-xs text-ink-700 mb-3" data-testid="add-spot-where">
             {dayChoice
-              ? '入れる日を選んでください。時刻なしの予定として入ります。時刻は、追加した後に旅程で直せます。'
+              ? '入れる日を選んでください。時刻は任意です(空なら時刻なし)。日と時刻は、追加した後にも旅程で直せます。'
               : '旅行を選ぶと、入れる日を選べます(日が 1 日だけの旅行・新しい旅行は 1 日目)。時刻なしの予定として入り、時刻は追加した後に旅程で直せます。'}
           </p>
           {dayChoice ? (
             <div className="space-y-2 max-h-64 overflow-y-auto" role="group" aria-label="入れる日" data-testid="add-spot-days">
+              <label className="flex items-center gap-2 text-sm text-ink-900">
+                時刻(任意)
+                <input type="time" value={addSpotTime} onChange={(e) => setAddSpotTime(e.target.value)}
+                  className="tc-focus-ring min-h-11 rounded-lg border border-cloud-200 bg-cloud-0 px-2" data-testid="add-spot-time" />
+              </label>
               {dayChoice.days.map((d) => (
                 <button key={d.index} type="button" onClick={() => addSpotToExistingOrNewPlan(dayChoice.planId, d.index)}
                   disabled={isAddingSpot} data-testid={`add-spot-day-${d.index}`}

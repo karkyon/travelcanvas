@@ -107,7 +107,9 @@ interface PlanState {
   addScheduleItemFromCandidate: (
     dayIndex: number,
     candidateId: string,
-    fallbackTitle?: string
+    fallbackTitle?: string,
+    /** [Gate② UX P0] 入れる時刻(HH:MM。任意。無ければ時刻なし) */
+    startTime?: string
   ) => Promise<boolean>;
   /** [Gate C1] 保存の結果(conflict = 他の変更と競合し、最新を読み直した。入力は呼出側に残す) */
   updateScheduleItem: (itemId: string, item: Partial<ScheduleItem>) => Promise<ItemSaveResult>;
@@ -721,7 +723,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   // (adopt)し、そのplace_idでイベントを作成する。「候補に追加」
   // (検索結果に残しておくだけの操作、既にGate #31の検索時点でDBへ
   // 保存済み)とは明確に分離された、確定的な操作。
-  addScheduleItemFromCandidate: async (dayIndex: number, candidateId: string, fallbackTitle?: string) => {
+  addScheduleItemFromCandidate: async (dayIndex: number, candidateId: string, fallbackTitle?: string, startTime?: string) => {
     const state = get();
     if (!state.currentPlan || !state.currentPlan.days[dayIndex]) return false;
     if (state.currentPlan.revision === undefined) {
@@ -744,6 +746,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           latitude: place.location?.latitude,
           longitude: place.location?.longitude,
           place_id: place.id,
+          ...(startTime ? { local_start_time: startTime } : {}),
         },
         generateIdempotencyKey()
       );

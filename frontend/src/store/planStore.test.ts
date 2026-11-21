@@ -745,6 +745,20 @@ describe('addScheduleItemFromCandidate (Gate2 G2-01)', () => {
     }), expect.any(String));
   });
 
+  it('[Gate② UX P0] 時刻を渡した時だけ local_start_time を送る(渡さなければ時刻なし)', async () => {
+    await seedLoadedPlan(2);
+    mockedApi.adoptCandidate.mockResolvedValue({ id: 'place-1', name: '伊勢神宮', category: 'sightseeing', location: {} });
+    mockedApi.createEvent.mockResolvedValue({});
+    mockedApi.getPlan.mockResolvedValue({ success: true, data: { id: PLAN_ID, title: 'テストプラン', days: [] } });
+    mockedApi.getPlanDetail.mockResolvedValue({ success: true, data: { id: PLAN_ID, title: 'テストプラン', revision: 3,
+      days: [{ id: DAY_ID, local_date: '2026-10-01', timezone_id: 'Asia/Tokyo', sort_order: 0, events: [] }] } });
+    await usePlanStore.getState().addScheduleItemFromCandidate(0, 'candidate-1', '伊勢神宮', '10:30');
+    expect(mockedApi.createEvent.mock.calls[0]![1]).toMatchObject({ local_start_time: '10:30' });
+    await seedLoadedPlan(2);
+    await usePlanStore.getState().addScheduleItemFromCandidate(0, 'candidate-1', '伊勢神宮');
+    expect(mockedApi.createEvent.mock.calls[mockedApi.createEvent.mock.calls.length - 1]![1]).not.toHaveProperty('local_start_time');
+  });
+
   it('候補の採用に失敗した時は false を返し、place_idなしのイベントを作らない', async () => {
     await seedLoadedPlan(2);
     mockedApi.adoptCandidate.mockRejectedValue(new Error('candidate unavailable'));
