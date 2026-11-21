@@ -934,6 +934,20 @@ const PlannerPage: React.FC = () => {
     }
   };
 
+  // [Gate② FC-007] テンプレートとして保存(構造だけを写した新しい旅行を作る)
+  const handleTemplatePlan = async (id: string, title: string) => {
+    if (!confirm(`「${title}」をテンプレートとして保存しますか?\n日・予定の名前・種類・時刻・場所だけを写します。説明・メモ・電話・予算・予約・費用・コメント・位置の記録は写しません。`)) return;
+    setCloningPlanId(id);
+    try {
+      await apiService.clonePlan(id, { as_template: true });
+      await loadPlans();
+    } catch {
+      alert('テンプレートを作れませんでした。しばらくしてから再試行してください。');
+    } finally {
+      setCloningPlanId(null);
+    }
+  };
+
   // [Gate C1] FR-020 同じ旅行を開いている人・編集中・他の人の変更(オフラインのデータを表示している間は止める)
   const presencePlanId = planId && currentPlan?.id === planId && !isOfflineData ? planId : null;
   const presence = usePlanPresence(presencePlanId, currentPlan?.revision, editingItem?.id ?? null);
@@ -1989,7 +2003,8 @@ const PlannerPage: React.FC = () => {
         ) : (
           // [Gate TripsWish] 旅行のカード(表紙・状態・出発日と最終日・泊数・人数・メンバー・予定と写真の数・備考)と状態のタブ
           <TripList plans={plans} cloningId={cloningPlanId} onOpen={(id) => navigate(`/planner/${id}`)}
-            onClone={(id, title) => handleClonePlan(id, title)} onDelete={(id) => handleDeletePlan(id)} />
+            onClone={(id, title) => handleClonePlan(id, title)} onTemplate={(id, title) => handleTemplatePlan(id, title)}
+            onDelete={(id) => handleDeletePlan(id)} />
         )}
 
         <DeletedPlansSection refreshKey={trashRefreshKey} onRestored={() => loadPlans()} />

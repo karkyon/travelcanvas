@@ -76,7 +76,7 @@ export class PlansApi extends SpotsApi {
   // [Gate R3-12] FR-047 旅程複製。backend(Gate #39)はDB/API実装済みだったが
   // frontendから一切到達不能だった(Gate #25等と同じ「実装済みだが未到達」
   // パターン)。
-  async clonePlan(planId: string, data?: { title?: string; start_date?: string }): Promise<ApiResponse<TravelPlan>> {
+  async clonePlan(planId: string, data?: { title?: string; start_date?: string; as_template?: boolean }): Promise<ApiResponse<TravelPlan>> {
     const response = await this.client.post<unknown>(`/travel-plans/${planId}/clone`, data ?? {});
     return apiOk<TravelPlan>(this.planFromApi(decodeResponse(response.data, legacyTravelPlan, 'POST /travel-plans/{plan_id}/clone')));
   }
