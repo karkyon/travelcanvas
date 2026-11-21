@@ -174,6 +174,8 @@ export class PlansApi extends SpotsApi {
       dining: DiningInfo | null;
       /** [Gate EventArea] 入れる先のエリア(null で外す) */
       parent_event_id: string | null;
+      /** [Gate② FC-017] 先行条件の予定(空で外す) */
+      after_event_id: string;
     }>,
     ifMatch: number
   ): Promise<NormalizedEvent> {

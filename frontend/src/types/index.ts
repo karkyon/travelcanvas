@@ -176,6 +176,8 @@ export interface ScheduleItem {
   dining?: DiningInfo | null;
   /** [Gate EventArea] 入っているエリア(category が area の予定)の ID */
   parent_event_id?: string | null;
+  /** [Gate② FC-017] 先行条件: この予定の前に終えておく予定の ID */
+  after_event_id?: string | null;
 }
 
 /** [Gate SpotLinks] 予定の場所の URL 1 件 */

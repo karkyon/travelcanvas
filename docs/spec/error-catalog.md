@@ -139,6 +139,7 @@
 | `invalid_plan` | — | — | 配布する旅行を選んでください | api/v1/organizations.py |
 | `invalid_planning_units` | — | — | 操作の量はオブジェクトで指定してください | api/v1/planning_usage.py |
 | `invalid_position` | — | — | 位置(緯度・経度)が正しくありません | api/v1/home_place.py |
+| `invalid_prerequisite` | 422 | no | 自分自身を先行の予定にはできません | api/v1/plans.py |
 | `invalid_reason` | 422 | no | 止める理由を200文字までで入力してください | api/v1/admin_support.py, api/v1/day_variants.py |
 | `invalid_request` | — | — | 本文の形が正しくありません | api/v1/organizations.py |
 | `invalid_role` | — | — | 役割は member か admin です(owner へは役割の変更で) | api/v1/organizations.py |

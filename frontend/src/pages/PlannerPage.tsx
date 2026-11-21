@@ -302,6 +302,8 @@ const PlannerPage: React.FC = () => {
   const [editCategory, setEditCategory] = useState<{ value: string; original: string }>({ value: 'other', original: 'other' });
   // [Gate EventArea] 入れる先のエリア('' は入れない)
   const [editArea, setEditArea] = useState<{ value: string; original: string }>({ value: '', original: '' });
+  // [Gate② FC-017] 先行条件(この予定の前に終えておく予定)
+  const [editAfter, setEditAfter] = useState<{ value: string; original: string }>({ value: '', original: '' });
   // [Gate PlanSpotEdit] 電話番号(変えた時だけ送る)・場所の情報の取得(OpenStreetMap)・写真を変えた時の旅程の読み直し
   const [editPhone, setEditPhone] = useState<{ value: string; original: string }>({ value: '', original: '' });
   const [placeInfo, setPlaceInfo] = useState<{ busy: boolean; result: PlaceInfoResult | null; error: string | null; mode?: 'info' | 'geo' }>(
@@ -404,6 +406,7 @@ const PlannerPage: React.FC = () => {
     setPlaceInfo({ busy: false, result: null, error: null });
     setEditCategory({ value: item.category || 'other', original: item.category || 'other' });
     setEditArea({ value: item.parent_event_id ?? '', original: item.parent_event_id ?? '' });
+    setEditAfter({ value: item.after_event_id ?? '', original: item.after_event_id ?? '' });
     setEditForm(fieldsOf(item));
     setEditOriginal(fieldsOf(item));
     const end = { time: item.end_time || '', offset: item.end_day_offset ?? 0 };
@@ -488,6 +491,7 @@ const PlannerPage: React.FC = () => {
         // [Gate EventArea] エリアに入れる・外す(エリアにした予定はエリアに入らない)
         ...(editCategory.value !== 'area' && editArea.value !== editArea.original
           ? { parent_event_id: editArea.value || null } : {}),
+        ...(editAfter.value !== editAfter.original ? { after_event_id: editAfter.value || null } : {}),
         ...(editPhone.value.trim() !== editPhone.original ? { phone: editPhone.value.trim() } : {}),
         ...(urlsChanged ? { urls: links.urls } : {}),
         ...(diningChanged ? { dining } : {}),
@@ -500,6 +504,7 @@ const PlannerPage: React.FC = () => {
       if (result === 'saved') setEditCoords((c) => ({ ...c, changed: false }));
       if (result === 'saved') setEditEndOriginal(editEnd);
       if (result === 'saved') setEditArea((a) => ({ ...a, original: a.value }));
+      if (result === 'saved') setEditAfter((a) => ({ ...a, original: a.value }));
       if (result === 'conflict') {
         // 最新を読み直した後の内容と比べ、入力は残したまま違いを示す(黙って上書きしない)
         const latestItem = usePlanStore.getState().currentPlan?.days.flatMap((d) => d.events).find((e) => e.id === itemId);
@@ -1653,6 +1658,20 @@ const PlannerPage: React.FC = () => {
                     <option value="">入れない</option>
                     {editAreas.map((a) => <option key={a.id} value={a.id}>{a.start_time ? `${a.start_time} ${a.title}` : a.title}</option>)}
                   </select>
+                </label>
+              )}
+              {/* [Gate② FC-017] 先行条件: この予定の前に終えておく予定(チェックインの後・集合の後 など)。順が逆なら検証で知らせる */}
+              {editingItem && (currentPlan?.days.flatMap((d) => d.events).filter((e) => e.id !== editingItem.id).length ?? 0) > 0 && (
+                <label className="block text-sm font-medium text-ink-700">
+                  この予定の前に終えておく予定(任意)
+                  <select value={editAfter.value} onChange={(e) => setEditAfter((a) => ({ ...a, value: e.target.value }))}
+                    className="mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-3 py-2 text-sm text-ink-900"
+                    data-testid="edit-after">
+                    <option value="">なし</option>
+                    {(currentPlan?.days ?? []).flatMap((d, di) => d.events.filter((e) => e.id !== editingItem.id)
+                      .map((e) => <option key={e.id} value={e.id}>{`${di + 1}日目 ${e.start_time ? `${e.start_time} ` : ''}${e.title}`}</option>))}
+                  </select>
+                  <span className="mt-1 block text-xs font-normal text-ink-700">選んだ予定より前に始まると、旅程の確認(検証)で知らせます</span>
                 </label>
               )}
               {/* [Gate SpotInfo] 食事の情報(種類が「食事」か、もう入っている時) */}

@@ -561,6 +561,10 @@ class TravelEvent(Base):
         UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="SET NULL", deferrable=True, initially="DEFERRED",
                                        name="fk_travel_events_parent_event_id"),
         nullable=True, index=True)
+    # [Gate② FC-017] 先行条件: この予定の前に終えておく予定(同じ旅行。チェックインの後・集合の後 など)
+    after_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="SET NULL", name="fk_travel_events_after_event"),
+        nullable=True)
     # [Gate G11] 予定のカードの写真(同じ旅行の kind=photo の記録。記録が消えたら NULL)
     image_memory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("memories.id", ondelete="SET NULL", use_alter=True,
@@ -573,6 +577,7 @@ class TravelEvent(Base):
 
     __table_args__ = (
         Index("ix_travel_events_variant_standby", "plan_id", "variant_standby"),
+        Index("ix_travel_events_after_event", "after_event_id"),
     )
 
 
