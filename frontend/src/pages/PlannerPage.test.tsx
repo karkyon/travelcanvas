@@ -262,6 +262,30 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
     expect(await screen.findByTestId('focus-probe')).toHaveTextContent('ev-d2');
   });
 
+  it('日を選ぶ段で時刻を入れると、その時刻で入れる(手入力の経路・候補の経路)', async () => {
+    const addScheduleItem = vi.fn<(dayIndex: number, item: Record<string, unknown>) => Promise<void>>(async (i) => { addToDay(i, 'ev-t'); });
+    await openAddModal({ addScheduleItem }, { name: '清水寺', category: 'sightseeing' }, ['day-a', 'day-b']);
+    fireEvent.change(await screen.findByTestId('add-spot-time'), { target: { value: '10:30' } });
+    await act(async () => { fireEvent.click(screen.getByTestId('add-spot-day-1')); });
+    expect(addScheduleItem.mock.calls[0]![1]).toMatchObject({ start_time: '10:30' });
+  });
+
+  it('候補から入れる時も、選んだ時刻を渡す', async () => {
+    const addScheduleItemFromCandidate = vi.fn<(dayIndex: number, candidateId: string, title?: string, time?: string) => Promise<boolean>>(
+      async (i) => { addToDay(i, 'ev-c'); return true; });
+    await openAddModal({ addScheduleItemFromCandidate }, { name: '清水寺', candidate_id: 'cand-1' }, ['day-a', 'day-b']);
+    fireEvent.change(await screen.findByTestId('add-spot-time'), { target: { value: '09:00' } });
+    await act(async () => { fireEvent.click(screen.getByTestId('add-spot-day-0')); });
+    expect(addScheduleItemFromCandidate.mock.calls[0]).toEqual([0, 'cand-1', '清水寺', '09:00']);
+  });
+
+  it('時刻を空のままにすると、時刻なしで入れる', async () => {
+    const addScheduleItem = vi.fn<(dayIndex: number, item: Record<string, unknown>) => Promise<void>>(async (i) => { addToDay(i, 'ev-n'); });
+    await openAddModal({ addScheduleItem }, { name: '清水寺', category: 'sightseeing' }, ['day-a', 'day-b']);
+    await act(async () => { fireEvent.click(await screen.findByTestId('add-spot-day-0')); });
+    expect(addScheduleItem.mock.calls[0]![1]).not.toHaveProperty('start_time');
+  });
+
   it('日を選ぶ段から「旅行を選び直す」で旅行の一覧へ戻れる(何も追加しない)', async () => {
     const addScheduleItem = vi.fn<(dayIndex: number, item: Record<string, unknown>) => Promise<void>>(async () => {});
     await openAddModal({ addScheduleItem }, { name: '清水寺', category: 'sightseeing' }, ['day-a', 'day-b']);
@@ -288,7 +312,7 @@ describe('[Gate② UX P0] 全体の検索からの「プランに追加」', () 
       async () => { addToDay0('ev-from-cand'); return true; });
     await openAddModal({ addScheduleItemFromCandidate }, { name: '清水寺', candidate_id: 'cand-1' });
     expect(await screen.findByTestId('focus-probe')).toHaveTextContent('ev-from-cand');
-    expect(addScheduleItemFromCandidate.mock.calls[0]).toEqual([0, 'cand-1', '清水寺']);
+    expect(addScheduleItemFromCandidate.mock.calls[0]).toEqual([0, 'cand-1', '清水寺', undefined]);
   });
 
   it('候補からの追加が失敗した時は旅程へ移らない(窓を残し、もう一度押せる)', async () => {
