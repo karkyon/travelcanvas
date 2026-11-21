@@ -8,6 +8,7 @@
 - 乗換を調べて入れた区間の所要時間(manual)を出発の合図に使う
 """
 import json
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -223,7 +224,8 @@ def test_sweep_sends_depart_soon_once(auth_client, db_session, freeze_now, outbo
     client, user = auth_client
     plan_id, _d1, _a, b = _two_stops(client, freeze_now)
     _r, key, auth = _subscribe(client)
-    client.put("/api/v1/push/settings", json={"morning": False, "rain": False})
+    # [Gate② T1] 予定の名前・時刻をロック画面に出すのは、利用者が選んだ時だけ(この試験は選んだ人)
+    client.put("/api/v1/push/settings", json={"morning": False, "rain": False, "detail": True})
     leave = _parse(_guide(client, plan_id)["events"][b]["leave_by"])
     freeze_now(leave - timedelta(minutes=10))
     counts = today_push.sweep(db_session)
@@ -298,7 +300,9 @@ def test_crew_delay_notifies_other_members(auth_client, make_user, db_session, f
     assert len(outbox.items) == 1 and outbox.items[0][0] == FCM  # 本人の端末へは送らない
     msg = _decrypt(outbox.items[0][2], key, auth)
     arrive_hm = (start + timedelta(minutes=25)).astimezone(today_mode.zone_for("Asia/Tokyo")).strftime("%H:%M")
-    assert msg["title"] == f"{owner.username}さんが遅れます" and "約25分" in msg["body"] and arrive_hm in msg["body"]
+    assert msg["title"] == f"{owner.username}さんが遅れます" and "約25分" in msg["body"]
+    # [Gate② T1・FC-086] 詳細を選んでいない人には、予定の名前・着く時刻を出さない
+    assert arrive_hm not in msg["body"] and "テラス" not in msg["body"]
     client.put(f"/api/v1/plans/{plan_id}/today/eta",
                json={**body, "arrive_at": (start + timedelta(minutes=26)).isoformat()})
     assert len(outbox.items) == 1  # 同じくらいの遅れは二度送らない
@@ -318,3 +322,35 @@ def test_guide_uses_manual_segment_duration(auth_client, freeze_now):
     assert after["travel_source"] == "manual" and after["travel_minutes"] == 25 and after["travel_mode"] == "train"
     assert after["segment_id"] == r.json()["id"] and after["segment_revision"] == r.json()["revision"]
     assert _parse(after["leave_by"]) == _parse(after["start_at"]) - timedelta(minutes=25)
+
+
+# ---- [Gate② T1・FC-086] ロック画面の本文(既定は予定の名前・時刻を出さない) --------------------------------------
+
+def test_lock_screen_text_hides_event_names_and_times_by_default(auth_client, db_session, freeze_now, outbox):
+    client, user = auth_client
+    plan_id, _d1, _a, b = _two_stops(client, freeze_now)
+    _r, key, auth = _subscribe(client)
+    view = client.put("/api/v1/push/settings", json={"morning": False, "rain": False}).json()
+    assert view["detail"] is False  # 既定
+    leave = _parse(_guide(client, plan_id)["events"][b]["leave_by"])
+    freeze_now(leave - timedelta(minutes=10))
+    assert today_push.sweep(db_session)["sent"] == 1
+    msg = _decrypt(outbox.items[0][2], key, auth)
+    assert msg["title"] == "そろそろ出発 ・ あと10分" and msg["kind"] == "depart"
+    assert "テラス" not in msg["body"] and not re.search(r"\d{2}:\d{2}", msg["body"])
+    assert "_brief" not in msg  # 送る中身に別の言い方を混ぜない
+
+
+def test_builders_keep_details_only_for_users_who_chose_them():
+    guide = {"timezone_id": "Asia/Tokyo", "local_date": "2026-11-13", "day_index": 2, "day_title": "湖の日",
+             "events": {"e1": {"start_at": "2026-11-13T00:30:00+00:00", "leave_by": "2026-11-13T00:10:00+00:00"}}}
+    _key, msg, _u = today_push.morning_message("p1", guide, {"e1": "朝市"}, datetime(2026, 11, 12, 23, 50,
+                                                                                   tzinfo=timezone.utc))
+
+    class U:
+        def __init__(self, detail):
+            self.preferences = {"web_push": {"detail": detail}}
+    brief = wp.for_user(U(False), msg)
+    full = wp.for_user(U(True), msg)
+    assert "朝市" not in brief["body"] and "湖の日" not in brief["title"] and "09:30" not in brief["body"]
+    assert "朝市" in full["body"] and full["title"] == "旅の2日目 ・ 湖の日"

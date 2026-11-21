@@ -7,7 +7,7 @@
  */
 import type { AxiosRequestConfig } from 'axios';
 import { api } from './index';
-import { arrayOf, bool, decodeResponse, nullable, object, str, type Decoder } from './decode';
+import { arrayOf, bool, decodeResponse, nullable, object, optional, str, type Decoder } from './decode';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 export const PUSH_SW_URL = '/tc-push-sw.js';
@@ -17,19 +17,21 @@ export type PushKinds = Record<PushKind, boolean>;
 export interface PushDevice { id: string | null; label: string | null; at: string | null; current_key: boolean }
 export interface PushConfig {
   available: boolean; public_key: string | null; kinds: PushKinds; devices: PushDevice[]; notice: string;
+  /** [Gate② T1・FC-086] ロック画面の本文に予定の名前・時刻を出すか(既定 false) */
+  detail?: boolean;
 }
 export interface PushTestResult extends PushConfig { sent: number; removed: number; failed: number }
 
 const kinds: Decoder<PushKinds> = object<PushKinds>({ depart: bool, rain: bool, morning: bool, crew: bool, notice: bool });
 const config: Decoder<PushConfig> = object<PushConfig>({
-  available: bool, public_key: nullable(str), kinds, notice: str,
+  available: bool, public_key: nullable(str), kinds, notice: str, detail: optional(bool),
   devices: arrayOf(object<PushDevice>({ id: nullable(str), label: nullable(str), at: nullable(str), current_key: bool })),
 });
 
 export async function getPushConfig(): Promise<PushConfig> {
   return decodeResponse((await api.get('/push/config', SILENT)).data, config, 'GET /push/config');
 }
-export async function putPushKinds(changes: Partial<PushKinds>): Promise<PushConfig> {
+export async function putPushKinds(changes: Partial<PushKinds> & { detail?: boolean }): Promise<PushConfig> {
   return decodeResponse((await api.put('/push/settings', changes, SILENT)).data, config, 'PUT /push/settings');
 }
 export async function sendTestPush(): Promise<PushTestResult> {

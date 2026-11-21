@@ -20,7 +20,7 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
 
 import httpx
@@ -186,6 +186,18 @@ def kinds_of(user) -> Dict[str, bool]:
     return {k: bool(stored.get(k, DEFAULT_KINDS[k])) for k in KINDS}
 
 
+def detail_of(user) -> bool:
+    """[Gate② T1・FC-086] ロック画面の本文に予定の名前・時刻を出すか。既定は出さない(利用者が選んだ時だけ)"""
+    return bool(_state(user).get("detail", False))
+
+
+def set_detail(user, on: bool) -> bool:
+    state = dict(_state(user))
+    state["detail"] = bool(on)
+    _save(user, state)
+    return bool(on)
+
+
 def set_kinds(user, changes: Dict[str, bool]) -> Dict[str, bool]:
     state = dict(_state(user))
     kinds = kinds_of(user)
@@ -283,8 +295,22 @@ def _http_send(url: str, headers: Dict[str, str], body: bytes) -> int:
         return client.post(url, headers=headers, content=body).status_code
 
 
-def message(title: str, body: str, url: str, tag: str, kind: str) -> Dict[str, Any]:
-    return {"title": title[:80], "body": body[:240], "url": url, "tag": tag[:64], "kind": kind}
+def message(title: str, body: str, url: str, tag: str, kind: str,
+            brief: Optional[Tuple[str, str]] = None) -> Dict[str, Any]:
+    """brief = (題, 本文): 予定の名前・時刻を含まない言い方。[Gate② T1・FC-086] 既定はこちらを送る(for_user)"""
+    msg: Dict[str, Any] = {"title": title[:80], "body": body[:240], "url": url, "tag": tag[:64], "kind": kind}
+    if brief is not None:
+        msg["_brief"] = {"title": brief[0][:80], "body": brief[1][:240]}
+    return msg
+
+
+def for_user(user, msg: Dict[str, Any]) -> Dict[str, Any]:
+    """この人へ送る中身。詳細を選んでいない人には、予定の名前・時刻を含まない言い方にする"""
+    out = {k: v for k, v in msg.items() if k != "_brief"}
+    brief = msg.get("_brief")
+    if isinstance(brief, dict) and not detail_of(user):
+        out.update(brief)
+    return out
 
 
 def send_to_user(user, msg: Dict[str, Any], *, urgency: str = "normal", ttl: int = 1800,
@@ -294,7 +320,7 @@ def send_to_user(user, msg: Dict[str, Any], *, urgency: str = "normal", ttl: int
     if not enabled():
         return result
     sender = send or _http_send
-    payload = json.dumps(msg, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    payload = json.dumps(for_user(user, msg), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     gone: List[str] = []
     tag = key_tag()
     for sub in subscriptions(user):
