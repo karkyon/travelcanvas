@@ -231,8 +231,11 @@ class TravelPlan(Base):
     journey_start_minutes: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
     journey_end_mode: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     journey_end_minutes: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    # [FR-061] 日帰り(day_trip)。null は今までの旅行(泊まり)
+    trip_style: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     __table_args__ = (
+        CheckConstraint("trip_style IS NULL OR trip_style IN ('day_trip')", name="ck_travel_plans_trip_style"),
         CheckConstraint(
             "(deleted_at IS NULL AND purge_after IS NULL) OR (deleted_at IS NOT NULL AND purge_after IS NOT NULL)",
             name="ck_travel_plans_deleted_consistency",
@@ -4455,4 +4458,46 @@ class SpotAreaSplit(Base):
         UniqueConstraint("area_id", "user_id", name="uq_spot_area_splits_member"),
         Index("ix_spot_area_splits_area", "area_id"),
         Index("ix_spot_area_splits_user", "user_id"),
+    )
+
+
+class DayTripRoute(Base):
+    """[FR-061] 日帰りの行き・帰りのルート(詳細設計 DD-2026-11-22-01 §2.2)。旅行ごとに out / back の 1 行ずつ。
+
+    出発地は利用者の今いる場所になりうるので、小数 2 桁(約 1km)に丸めた値と地名(「〇〇のあたり」)だけを持つ。
+    線(polyline)は Google の encoded polyline(最大 200KB)。provider は google / osrm / straight。
+    """
+    __tablename__ = "day_trip_routes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    leg: Mapped[str] = mapped_column(String(4), nullable=False)
+    origin_label: Mapped[str] = mapped_column(String(120), nullable=False)
+    origin_lat: Mapped[float] = mapped_column(Float, nullable=False)
+    origin_lng: Mapped[float] = mapped_column(Float, nullable=False)
+    dest_label: Mapped[str] = mapped_column(String(200), nullable=False)
+    dest_lat: Mapped[float] = mapped_column(Float, nullable=False)
+    dest_lng: Mapped[float] = mapped_column(Float, nullable=False)
+    dest_spot_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("spots.id", ondelete="SET NULL"), nullable=True)
+    road: Mapped[str] = mapped_column(String(12), nullable=False, default="auto", server_default="auto")
+    depart_at: Mapped[str] = mapped_column(String(5), nullable=False)
+    home_by: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    polyline: Mapped[str] = mapped_column(Text, nullable=False)
+    distance_m: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    duration_s: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    toll_jpy: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    provider: Mapped[str] = mapped_column(String(16), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
+    __table_args__ = (
+        UniqueConstraint("plan_id", "leg", name="uq_day_trip_routes_plan_leg"),
+        CheckConstraint("leg IN ('out', 'back')", name="ck_day_trip_routes_leg"),
+        CheckConstraint("road IN ('highway', 'local', 'avoid_tolls', 'auto')", name="ck_day_trip_routes_road"),
+        CheckConstraint("provider IN ('google', 'osrm', 'straight')", name="ck_day_trip_routes_provider"),
+        CheckConstraint("octet_length(polyline) <= 200000", name="ck_day_trip_routes_polyline_size"),
+        Index("ix_day_trip_routes_plan", "plan_id"),
+        Index("ix_day_trip_routes_dest_spot", "dest_spot_id"),
     )

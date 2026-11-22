@@ -16,7 +16,7 @@ import json
 import secrets
 from datetime import date as date_cls
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Literal, List, Optional
 
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.encoders import jsonable_encoder
@@ -129,6 +129,8 @@ class PromoteRequest(BaseModel):
     device_token: str
     # [Gate2 G2-04] 新しい日に付ける時刻帯(IANA)。送らない時は既存の日の時刻帯、無ければ UTC(従来どおり)
     timezone_id: Optional[str] = None
+    # [FR-061] 新しい旅行を日帰りにする(既存の旅行へ足す時は使わない)
+    trip_style: Optional[Literal["day_trip"]] = None
 
     @field_validator("timezone_id")
     @classmethod
@@ -471,6 +473,7 @@ async def promote_quick_draft(
                     start_date=start_dt,
                     end_date=end_dt,
                     status="draft",
+                    trip_style=body.trip_style,
                 )
                 db.add(plan)
                 db.flush()
