@@ -253,8 +253,8 @@ const SocialPage: React.FC = () => {
                 {chosen.map((id, i) => (
                   <li key={id} className="flex items-center gap-2 text-sm">
                     <span>{`${i + 1}. ${photosById.get(id)?.place_name ?? '写真'}${i === 0 ? '(表紙)' : ''}`}</span>
-                    <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm min-h-11" aria-label="上へ" onClick={() => setChosen((c) => move(c, i, -1))}><ArrowUp size={14} /></button>
-                    <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm min-h-11" aria-label="下へ" onClick={() => setChosen((c) => move(c, i, 1))}><ArrowDown size={14} /></button>
+                    <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm min-h-11" aria-label={`${i + 1}. ${photosById.get(id)?.place_name ?? '写真'}を上へ`} disabled={i === 0} onClick={() => setChosen((c) => move(c, i, -1))}><ArrowUp size={14} aria-hidden="true" /></button>
+                    <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm min-h-11" aria-label={`${i + 1}. ${photosById.get(id)?.place_name ?? '写真'}を下へ`} disabled={i === chosen.length - 1} onClick={() => setChosen((c) => move(c, i, 1))}><ArrowDown size={14} aria-hidden="true" /></button>
                   </li>
                 ))}
               </ol>
