@@ -14,6 +14,7 @@ import email
 import email.policy
 import html
 import io
+import os
 import json
 import re
 import shutil
@@ -603,8 +604,11 @@ def ocr_image(content: bytes, lang: str = "jpn") -> str:
     png = io.BytesIO()
     gray.save(png, format="PNG")
     try:
+        # [Gate② 11-21] OpenMP の複数のスレッドは、CPU が混んでいる時に奪い合って遅くなる(試験で 1 回 58 秒。60 秒の上限に近い)。
+        # 1 つのスレッドで読む(結果は同じで、小さな VM でも時間が安定する)
+        env = {**os.environ, "OMP_THREAD_LIMIT": "1"}
         done = subprocess.run(["tesseract", "stdin", "stdout", "-l", lang, "--psm", "6"], input=png.getvalue(),
-                              capture_output=True, timeout=60, check=False)
+                              capture_output=True, timeout=60, check=False, env=env)
     except (OSError, subprocess.SubprocessError):
         return ""
     return compact_ocr(done.stdout.decode("utf-8", "replace")) if done.returncode == 0 else ""

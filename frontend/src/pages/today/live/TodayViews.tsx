@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { CalendarDays, CloudRain, Pause, Play, Sunrise } from 'lucide-react';
 import { getPackingItems } from '@/services/api';
 import { getWeather, type Forecast } from '@/services/api/dayVariants';
-import { keepForNextTrip, type GuideUpcoming, type TodayGuide } from '@/services/api/travelDay';
+import { type GuideUpcoming, type TodayGuide } from '@/services/api/travelDay';
+import { keepMissed, type KeepTarget } from './keepMissed';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { formatTimeInZone } from '../todayModel';
 import { dateLabel, rainWindow, recapTitle, sealGlyph, walkedKm } from './todayLive';
@@ -265,22 +266,33 @@ async function shareText(text: string): Promise<string | null> {
   }
 }
 
+const KeepChoice: React.FC<{ onPick: (t: KeepTarget) => void; className?: string }> = ({ onPick, className }) => (
+  <span className={className ?? 'inline-flex flex-wrap gap-2'} role="group" aria-label="残す先">
+    <button type="button" className="tc-focus-ring tl-btn tl-btn--sm" onClick={() => onPick('wish')}>今度行きたい(行きたい場所)</button>
+    <button type="button" className="tc-focus-ring tl-btn tl-btn--sm tl-btn--ghost" onClick={() => onPick('box')}>この旅行の候補箱</button>
+  </span>
+);
+
+const keptLabel = (t: KeepTarget | undefined) => (t === 'box' ? 'この旅行の候補箱' : '今度行きたい');
+
 export const NightView: React.FC<{ ctx: TodayCtx; onToday: () => void }> = ({ ctx, onToday }) => {
   const g = ctx.guide as TodayGuide;
   const [hide, setHide] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [kept, setKept] = useState<string[]>([]);
+  const [kept, setKept] = useState<Record<string, KeepTarget>>({});
+  const [choosing, setChoosing] = useState<string | null>(null);
   const m = g.metrics;
   const km = walkedKm(ctx.events, ctx.visitedIds);
   const next = g.next_day;
   const missed = ctx.events.filter((e) => !ctx.visitedIds.has(e.id) && ctx.stamps[e.id]?.status !== 'visited'
     && !/accommodation|lodging|transport/.test(e.event_type) && !/出発|自宅/.test(e.title)).slice(0, 2);
-  const keep = async (id: string) => {
+  const keep = async (id: string, target: KeepTarget) => {
     const e = ctx.events.find((x) => x.id === id);
     if (!e) return;
+    setChoosing(null);
     try {
-      await keepForNextTrip(ctx.planId, { title: e.title, address: e.address, latitude: e.latitude, longitude: e.longitude });
-      setKept((k) => [...k, id]);
+      await keepMissed(ctx.planId, { title: e.title, address: e.address, latitude: e.latitude, longitude: e.longitude }, target);
+      setKept((k) => ({ ...k, [id]: target }));
     } catch (err) {
       setMsg(errorDetailMessage(err, '候補に残せませんでした'));
     }
@@ -304,9 +316,10 @@ export const NightView: React.FC<{ ctx: TodayCtx; onToday: () => void }> = ({ ct
           <p>{[next.first_event_time ? `${next.first_event_time.slice(0, 5)} 出発` : null, `${next.event_count}か所`, next.day_title].filter(Boolean).join(' ・ ')}</p>
           {missed.map((e) => (
             <p key={e.id} className="tl-small">
-              {kept.includes(e.id) ? `今日行けなかった${e.title}を、行きたい場所リストに残しました` : <>
+              {kept[e.id] ? `今日行けなかった${e.title}を、${keptLabel(kept[e.id])}に残しました` : <>
                 {`今日行けなかった${e.title}を `}
-                <button type="button" className="tc-focus-ring tl-link tl-link--mint" onClick={() => void keep(e.id)}>行きたい場所リストに残す</button></>}
+                {choosing === e.id ? <KeepChoice onPick={(t) => void keep(e.id, t)} />
+                  : <button type="button" className="tc-focus-ring tl-link tl-link--mint" onClick={() => setChoosing(e.id)}>次の旅の候補に残す</button>}</>}
             </p>
           ))}
         </section>
@@ -327,15 +340,20 @@ export const FinishView: React.FC<{ ctx: TodayCtx; onToday: () => void }> = ({ c
   const g = ctx.guide as TodayGuide;
   const trip = g.trip;
   const [kept, setKept] = useState<string[]>([]);
+  const [keptTo, setKeptTo] = useState<KeepTarget>('wish');
+  const [choosing, setChoosing] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const stamps = trip?.stamps ?? ctx.events.filter((e) => ctx.visitedIds.has(e.id)).map((e) => ({ event_id: e.id, title: e.title, event_type: e.event_type }));
   const missed = trip?.missed ?? [];
-  const keepAll = async () => {
+  const keepAll = async (target: KeepTarget) => {
+    setChoosing(false);
+    setKeptTo(target);
     try {
       for (const x of missed) {
         if (kept.includes(x.event_id)) continue;
         const e = ctx.events.find((y) => y.id === x.event_id);
-        await keepForNextTrip(ctx.planId, { title: x.title, address: e?.address ?? null, latitude: e?.latitude ?? null, longitude: e?.longitude ?? null });
+        await keepMissed(ctx.planId, { title: x.title, address: e?.address ?? null, latitude: e?.latitude ?? null,
+          longitude: e?.longitude ?? null }, target);
         setKept((k) => [...k, x.event_id]);
       }
     } catch (err) {
@@ -357,10 +375,11 @@ export const FinishView: React.FC<{ ctx: TodayCtx; onToday: () => void }> = ({ c
       </section>
       {missed.length > 0 && (
         <section className="tl-card tl-card--flat" aria-label="行けなかった場所">
-          {allKept ? <p>{`行けなかった ${missed.map((x) => x.title).join('・')} を「次の旅の候補」に残しました`}</p> : (
+          {allKept ? <p>{`行けなかった ${missed.map((x) => x.title).join('・')} を「${keptLabel(keptTo)}」に残しました`}</p> : (
             <>
               <p>{`行けなかった ${missed.map((x) => x.title).join('・')} を「次の旅の候補」に残せます`}</p>
-              <button type="button" className="tc-focus-ring tl-btn tl-btn--sm" onClick={() => void keepAll()}>次の旅の候補に残す</button>
+              {choosing ? <KeepChoice onPick={(t) => void keepAll(t)} />
+                : <button type="button" className="tc-focus-ring tl-btn tl-btn--sm" onClick={() => setChoosing(true)}>次の旅の候補に残す</button>}
             </>
           )}
         </section>

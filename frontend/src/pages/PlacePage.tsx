@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
+import WishSaveButton from '@/components/wishes/WishSaveButton';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import { getPlaceInfo, putOpeningHours, updatePlace } from '@/services/api';
@@ -168,7 +169,12 @@ const PlacePage: React.FC = () => {
         <>
           <Card className="mt-4 p-4">
             <section aria-label="場所の情報">
-              <h2 className="text-lg font-semibold text-ink-900">{place.name}</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold text-ink-900">{place.name}</h2>
+                {/* [FR-062] ♡ 今度行きたい(確認なしで保存) */}
+                <WishSaveButton name={place.name} latitude={place.latitude} longitude={place.longitude} address={place.address}
+                  genre={place.category} sourceKind="manual" />
+              </div>
               {place.aliases.length > 0 && <p className="text-sm text-ink-700">別名: {place.aliases.join('、')}</p>}
               {place.phone && (
                 <Button size="sm" variant="outline" className="mt-2" onClick={call}>電話をかける({place.phone})</Button>

@@ -30,6 +30,7 @@ import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl, safeInternalPath } from '@/utils/safeNavigation';
 import DocumentLinkDialog from './documents/DocumentLinkDialog';
 import { relationCount } from './documents/documentLinkModel';
+import { replaceDocument } from '@/services/api/documentVersions';
 
 /** [Gate TripKitFix] 文書の札の補足(「予約確認書 2 · チケット 1」) */
 function typeBreakdown(docs: TravelDocument[]): string {
@@ -171,6 +172,21 @@ const DocumentsPage: React.FC = () => {
     }
   };
 
+  // [Gate② FC-045] 差し替え: 新しいファイルを新しい版にする(前の版は消さず、読み取った値はその版を指したまま)
+  const replaceInput = useRef<HTMLInputElement | null>(null);
+  const [replaceTarget, setReplaceTarget] = useState<TravelDocument | null>(null);
+  const handleReplacePicked = async (file: File | undefined) => {
+    const doc = replaceTarget;
+    setReplaceTarget(null);
+    if (!planId || !doc || !file) return;
+    try {
+      await replaceDocument(planId, doc.id, file);
+      await loadDocuments();
+    } catch (e) {
+      setError(errorDetailMessage(e, '文書を差し替えられませんでした'));
+    }
+  };
+
   const handleDelete = async (doc: TravelDocument) => {
     if (!planId) return;
     if (!window.confirm(`「${doc.original_filename ?? doc.document_type ?? '文書'}」を削除しますか?`)) return;
@@ -233,6 +249,8 @@ const DocumentsPage: React.FC = () => {
 
   return (
     <div className="tc-page tc-kit-page">
+      <input ref={replaceInput} type="file" className="hidden" accept="application/pdf,image/*" data-testid="doc-replace-input"
+        aria-label="差し替えるファイル" onChange={(e) => { void handleReplacePicked(e.target.files?.[0]); e.target.value = ''; }} />
       <KitHead
         icon={<FileText size={14} />}
         title="文書"
@@ -358,6 +376,9 @@ const DocumentsPage: React.FC = () => {
                         </>
                       )}
                     </div>
+                    {(d.version ?? 1) > 1 && (
+                      <p className="text-xs text-ink-700" data-testid={`doc-version-${d.id}`}>{`第 ${d.version} 版(前の版も残っています。読み取った値は読み取った版のまま)`}</p>
+                    )}
                     {planId && <DocLinks planId={planId} doc={d} />}
                   </div>
                 </div>
@@ -371,6 +392,9 @@ const DocumentsPage: React.FC = () => {
                   >
                     <Download size={16} />
                   </button>
+                  <button type="button" className="tc-focus-ring tc-mini-link" data-testid={`doc-replace-${d.id}`}
+                    aria-label={`${d.original_filename ?? '文書'}を新しい版に差し替える`}
+                    onClick={() => { setReplaceTarget(d); replaceInput.current?.click(); }}>差し替え</button>
                   <button
                     type="button"
                     onClick={() => handleDelete(d)}

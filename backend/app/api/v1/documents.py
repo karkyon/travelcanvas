@@ -158,6 +158,10 @@ class DocumentResponse(BaseModel):
     # 支出の名前・金額は返さない(件数だけ)。単体の取得では None。
     link_count: Optional[int] = None
     receipt_count: Optional[int] = None
+    # [Gate② FC-045] 版(差し替え)
+    version: int = 1
+    replaces_document_id: Optional[str] = None
+    superseded_at: Optional[datetime] = None
 
 
 class DocumentLinkCreateRequest(BaseModel):
@@ -218,6 +222,9 @@ def _to_response(d: Document) -> DocumentResponse:
         revision=d.revision,
         created_at=d.created_at,
         updated_at=d.updated_at,
+        version=d.version or 1,
+        replaces_document_id=str(d.replaces_document_id) if d.replaces_document_id else None,
+        superseded_at=d.superseded_at,
     )
 
 
@@ -516,6 +523,70 @@ async def upload_document(
     return _to_response(d)
 
 
+# ---- [Gate② FC-045] 文書の差し替え(版) ------------------------------------------------------------------------
+# DOC-02 FC-045「文書差替: 版と抽出値の由来」。新しいファイルを新しい版として保存し、前の版は消さずに残す。
+# 旅程・予約との紐付けは新しい版へ移す。費用のレシート・読み取り(抽出)の記録は、読み取った版を指したまま(由来が変わらない)。
+
+@router.post("/{plan_id}/documents/{document_id}/replace", response_model=DocumentResponse,
+             status_code=status.HTTP_201_CREATED)
+async def replace_document(
+    plan_id: str,
+    document_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    old = _get_document_or_404(db, plan.id, document_id, current_user)
+    if old.superseded_at is not None:
+        raise HTTPException(status_code=409, detail={"code": "already_replaced",
+                                                     "message": "この版はもう差し替えられています。最新の版を差し替えてください"})
+    # 保存・形・大きさ・ウイルスの確かめ・暗号化・使った量の数え方は、新しく入れる時と同じ
+    created = await upload_document(plan_id, request, file, old.classification, old.document_type, db, current_user)
+    new = db.get(Document, uuid_module.UUID(created.id))
+    if new is None:  # 作った直後なので起きないが、型の上で確かめる
+        raise HTTPException(status_code=500, detail="差し替えに失敗しました。もう一度入れてください")
+    new.version = (old.version or 1) + 1
+    new.replaces_document_id = old.id
+    new.owner_user_id = old.owner_user_id
+    old.superseded_at = datetime.now(dt_timezone.utc)
+    old.revision += 1
+    db.query(DocumentLink).filter(DocumentLink.document_id == old.id).update({DocumentLink.document_id: new.id})
+    db.commit()
+    db.refresh(new)
+    record_audit_event(
+        action="document_replaced", resource_type="document", user_id=current_user.id, resource_id=new.id,
+        ip_address=_client_ip(request), user_agent=_user_agent(request),
+        details={"plan_id": str(plan.id), "replaces_document_id": str(old.id), "version": new.version},
+    )
+    return _to_response(new)
+
+
+@router.get("/{plan_id}/documents/{document_id}/versions", response_model=List[DocumentResponse])
+def document_versions(
+    plan_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_or_guest),
+):
+    """この文書の版(新しい順)。前の版も中身を開ける(読み取りの由来の確認)"""
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    d = _get_document_or_404(db, plan.id, document_id, current_user)
+    out = [d]
+    seen = {d.id}
+    cur = d
+    while cur.replaces_document_id and len(out) < 50:
+        prev = db.query(Document).filter(Document.id == cur.replaces_document_id, Document.plan_id == plan.id,
+                                         Document.deleted_at.is_(None)).first()
+        if prev is None or prev.id in seen:
+            break
+        out.append(prev)
+        seen.add(prev.id)
+        cur = prev
+    return [_to_response(x) for x in out]
+
+
 @router.get("/{plan_id}/documents/{document_id}/download-url", response_model=dict)
 def get_document_download_url(
     plan_id: str,
@@ -655,7 +726,8 @@ def list_documents(
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
     rows = (
         db.query(Document)
-        .filter(Document.plan_id == plan.id, Document.deleted_at.is_(None))
+        # [Gate② FC-045] 差し替えられた前の版は一覧に出さない(版の履歴で見る)
+        .filter(Document.plan_id == plan.id, Document.deleted_at.is_(None), Document.superseded_at.is_(None))
         .order_by(Document.created_at.desc())
         .all()
     )

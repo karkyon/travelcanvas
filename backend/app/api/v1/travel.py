@@ -312,6 +312,9 @@ class PlanCloneRequest(BaseModel):
     """[Gate #39] 旅程複製リクエスト。全項目任意。"""
     title: Optional[str] = None
     start_date: Optional[date] = None
+    # [Gate② FC-007] テンプレートとして保存: 構造(日・予定の名前・種類・時刻・場所)だけを写し、
+    # 自由に書いた文(説明・メモ)・電話・予算・旅行の説明を写さない。予約・実費・コメント・位置の記録は複製でも写さない
+    as_template: bool = False
 
 
 @router.post("/{plan_id}/clone", response_model=TravelPlanResponse, status_code=status.HTTP_201_CREATED)
@@ -371,17 +374,19 @@ async def clone_travel_plan(
             return value
         return value + date_delta
 
-    new_title = clone_data.title if clone_data.title and clone_data.title.strip() else f"{original_plan.title}のコピー"
+    tpl = bool(clone_data.as_template)
+    suffix = "(テンプレート)" if tpl else "のコピー"
+    new_title = clone_data.title if clone_data.title and clone_data.title.strip() else f"{original_plan.title}{suffix}"
 
     new_plan = TravelPlan(
         user_id=current_user.id,
         title=new_title,
-        description=original_plan.description,
+        description=None if tpl else original_plan.description,
         destination=original_plan.destination,
         start_date=_shift_datetime(original_plan.start_date),
         end_date=_shift_datetime(original_plan.end_date),
-        budget=original_plan.budget,
-        preferences=original_plan.preferences,
+        budget=None if tpl else original_plan.budget,
+        preferences={**dict(original_plan.preferences or {}), "template": True} if tpl else original_plan.preferences,
         status="draft",
     )
 
@@ -396,7 +401,7 @@ async def clone_travel_plan(
                 local_date=new_local_date,
                 timezone_id=day.timezone_id,
                 title=day.title,
-                notes=day.notes,
+                notes=None if tpl else day.notes,
                 sort_order=day.sort_order,
                 variant_status=day.variant_status,
                 variant_label=day.variant_label,
@@ -415,7 +420,7 @@ async def clone_travel_plan(
                     spot_id=event.spot_id,
                     place_id=event.place_id,
                     title=event.title,
-                    description=event.description,
+                    description=None if tpl else event.description,
                     event_type=event.event_type,
                     start_at=_shift_datetime(event.start_at),
                     end_at=_shift_datetime(event.end_at),
@@ -424,7 +429,7 @@ async def clone_travel_plan(
                     address=event.address,
                     latitude=event.latitude,
                     longitude=event.longitude,
-                    phone=event.phone,
+                    phone=None if tpl else event.phone,
                     urls=event.urls,
                     dining=event.dining,
                     locked=False,

@@ -407,8 +407,34 @@ class Spot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
+    # [FR-062] 今度行きたい・また行きたい(DD-2026-11-22-01 §2.1。migration e9a1c3f5b7d2)
+    wish_kind: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)  # next / again(null = 今度に数える)
+    wish_scope: Mapped[str] = mapped_column(String(8), nullable=False, default="place", server_default="place")
+    radius_m: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    source_kind: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    source_plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL", name="fk_spots_source_plan"),
+        nullable=True)
+    source_label: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    wish_note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    wish_when: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    remind_nearby: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    again_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    client_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    last_visited_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # リレーションシップ
     creator = relationship("User", back_populates="created_spots")
+
+    __table_args__ = (
+        CheckConstraint("wish_kind IS NULL OR wish_kind IN ('next', 'again')", name="ck_spots_wish_kind"),
+        CheckConstraint("wish_scope IN ('place', 'area')", name="ck_spots_wish_scope"),
+        CheckConstraint("radius_m IS NULL OR (radius_m >= 100 AND radius_m <= 5000)", name="ck_spots_radius"),
+        CheckConstraint("wish_when IS NULL OR wish_when IN ('next_trip', 'someday')", name="ck_spots_wish_when"),
+        Index("ix_spots_source_plan", "source_plan_id"),
+        Index("uq_spots_owner_client_id", "created_by", "client_id", unique=True,
+              postgresql_where=text("client_id IS NOT NULL")),
+    )
 
 
 class UserSpotFavorite(Base):
@@ -561,6 +587,11 @@ class TravelEvent(Base):
         UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="SET NULL", deferrable=True, initially="DEFERRED",
                                        name="fk_travel_events_parent_event_id"),
         nullable=True, index=True)
+    # [Gate② FC-017] 先行条件: この予定の前に終えておく予定(同じ旅行。チェックインの後・集合の後 など)
+    after_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="SET NULL", deferrable=True, initially="DEFERRED",
+                                       name="fk_travel_events_after_event"),
+        nullable=True)
     # [Gate G11] 予定のカードの写真(同じ旅行の kind=photo の記録。記録が消えたら NULL)
     image_memory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("memories.id", ondelete="SET NULL", use_alter=True,
@@ -573,6 +604,7 @@ class TravelEvent(Base):
 
     __table_args__ = (
         Index("ix_travel_events_variant_standby", "plan_id", "variant_standby"),
+        Index("ix_travel_events_after_event", "after_event_id"),
     )
 
 
@@ -1611,9 +1643,19 @@ class Document(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # [Gate② FC-045] 版(差し替え)。前の版は残し、一覧には出さない(superseded_at)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    replaces_document_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL", name="fk_documents_replaces_document"),
+        nullable=True)
+    superseded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     plan = relationship("TravelPlan")
     owner = relationship("User")
+
+    __table_args__ = (
+        Index("ix_documents_replaces_document", "replaces_document_id"),
+    )
 
 
 class DocumentLink(Base):
@@ -3045,6 +3087,69 @@ class PlanCandidate(Base):
         CheckConstraint("(status = 'scheduled') = (scheduled_event_id IS NOT NULL)",
                         name="ck_plan_candidates_scheduled"),
         Index("ix_plan_candidates_plan", "plan_id", "status"),
+    )
+
+
+class CandidateReport(Base):
+    """[Gate② FC-026] 候補箱の候補への報告(閉業・住所の誤り・危険・重複)。出典の状態へ反映する(api/v1/candidates.py)"""
+    __tablename__ = "candidate_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_candidates.id", ondelete="CASCADE"), nullable=False)
+    reason: Mapped[str] = mapped_column(String(16), nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    reporter_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("reason IN ('closed', 'wrong_address', 'dangerous', 'duplicate')",
+                        name="ck_candidate_reports_reason"),
+        Index("ix_candidate_reports_candidate", "candidate_id", "created_at"),
+        Index("ix_candidate_reports_plan", "plan_id"),
+        Index("ix_candidate_reports_reporter", "reporter_user_id"),
+    )
+
+
+class PlanNotice(Base):
+    """[Gate② FC-064] 重大な変更・集合の変更のお知らせ。メンバーごとの確認は PlanNoticeAck"""
+    __tablename__ = "plan_notices"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # major_change / meeting_change
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    body: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('major_change', 'meeting_change')", name="ck_plan_notices_kind"),
+        Index("ix_plan_notices_plan", "plan_id", "created_at"),
+        Index("ix_plan_notices_creator", "created_by_user_id"),
+    )
+
+
+class PlanNoticeAck(Base):
+    """[Gate② FC-064] お知らせを確認したメンバー(1 人 1 行)"""
+    __tablename__ = "plan_notice_acks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    notice_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_notices.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    acknowledged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("notice_id", "user_id", name="uq_plan_notice_acks_member"),
+        Index("ix_plan_notice_acks_user", "user_id"),
     )
 
 

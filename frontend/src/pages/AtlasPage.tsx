@@ -7,6 +7,7 @@
  * - 年で絞り込み、旅行ごとにAtlasへ含めるかを選べる。Atlasはあなただけが見られる
  * - [Gate Remaining-2] 国・都道府県・市区町村は「地名でまとめる」で調べる(AtlasPlacesPanel。押した時だけ外へ送る)
  */
+import WishSaveButton from '@/components/wishes/WishSaveButton';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '@/components/common/Card';
@@ -154,7 +155,14 @@ const AtlasPage: React.FC = () => {
                   {data.cells.map((c) => (
                     <tr key={c.key} className="border-t border-gray-200">
                       <td className="py-1 text-ink-900">{`${STATE_INFO[c.state].mark} ${STATE_INFO[c.state].label}`}</td>
-                      <td className="py-1 text-ink-900">{cellLabel(c)}</td>
+                      <td className="py-1 text-ink-900">{cellLabel(c)}
+                        {/* [FR-062] ♡ また行きたい(このマスをエリアとしてではなく、真ん中の場所として残す) */}
+                        {c.state !== 'PLANNED' && c.state !== 'PASS_THROUGH' && (
+                          <WishSaveButton compact name={`${c.trips[0]?.title ?? '旅'}で行ったあたり`} kind="again" sourceKind="visit"
+                            latitude={(c.lat_min + c.lat_max) / 2} longitude={(c.lng_min + c.lng_max) / 2}
+                            className="tc-focus-ring tc-mbtn tc-mbtn--sm ml-2 min-h-11" />
+                        )}
+                      </td>
                       <td className="py-1 text-ink-900">
                         {c.trips.map((t, i) => (
                           <React.Fragment key={t.plan_id}>

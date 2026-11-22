@@ -32,7 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -173,6 +173,8 @@ class EventUpdate(BaseModel):
     dining: Optional[dining_info.DiningInfo] = None
     # [Gate EventArea] 入れる先のエリア(null・空で外す)
     parent_event_id: Optional[str] = None
+    # [Gate② FC-017] 先行条件: この予定の前に終えておく予定(null・空で外す)
+    after_event_id: Optional[str] = None
 
 
 class EventMove(BaseModel):
@@ -204,8 +206,10 @@ class EventResponse(BaseModel):
     dining: Optional[Dict[str, Any]] = None
     # [Gate EventArea] この予定が入っているエリアの予定の ID
     parent_event_id: Optional[str] = None
+    # [Gate② FC-017] 先行条件の予定の ID
+    after_event_id: Optional[str] = None
 
-    @field_validator("id", "day_id", "place_id", "parent_event_id", mode="before")
+    @field_validator("id", "day_id", "place_id", "parent_event_id", "after_event_id", mode="before")
     @classmethod
     def _stringify_ids(cls, v):
         return str(v) if v is not None else v
@@ -449,7 +453,39 @@ def _event_to_dict(event: TravelEvent) -> dict:
         "urls": event.urls,
         "dining": event.dining,
         "parent_event_id": str(event.parent_event_id) if event.parent_event_id else None,
+        "after_event_id": str(event.after_event_id) if event.after_event_id else None,
     }
+
+
+def _check_prerequisite(db: Session, plan_id, event_id, raw: Optional[str]):
+    """[Gate② FC-017] 先行条件の予定を確かめる。空なら外す。同じ旅行の別の予定だけ。たどって自分に戻る(循環)は断る"""
+    if not (raw or "").strip():
+        return None
+    try:
+        target = uuid.UUID(str(raw))
+    except ValueError:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "先行の予定が正しくありません"})
+    if target == event_id:
+        raise HTTPException(status_code=422, detail={"code": "invalid_prerequisite",
+                                                     "message": "自分自身を先行の予定にはできません"})
+    seen = {event_id}
+    cur = target
+    for _ in range(100):
+        row = db.query(TravelEvent.id, TravelEvent.after_event_id).filter(
+            TravelEvent.id == cur, TravelEvent.plan_id == plan_id).first()
+        if row is None:
+            if cur == target:
+                raise HTTPException(status_code=422, detail={"code": "invalid_prerequisite",
+                                                             "message": "先行の予定はこの旅行の予定から選んでください"})
+            break
+        if row[1] is None:
+            break
+        if row[1] in seen:
+            raise HTTPException(status_code=422, detail={"code": "invalid_prerequisite",
+                                                         "message": "先行の予定が互いに相手を指しています(循環)"})
+        seen.add(row[1])
+        cur = row[1]
+    return target
 
 
 def _area_error(e: "event_area.AreaError") -> HTTPException:
@@ -1044,6 +1080,9 @@ async def update_event(
     # [Gate EventArea] エリアの指定(列はそのまま当てず、決まりを確かめてから)
     parent_given = "parent_event_id" in update_data
     parent_raw = update_data.pop("parent_event_id", None)
+    # [Gate② FC-017] 先行条件(同じ旅行の別の予定。自分・循環は断る)
+    after_given = "after_event_id" in update_data
+    after_raw = update_data.pop("after_event_id", None)
     # [Gate G7] FR-005 終了時刻の入力(列ではない)を取り出してから項目を当てる
     end_given = "local_end_time" in update_data or "end_day_offset" in update_data
     local_end_time = update_data.pop("local_end_time", None)
@@ -1077,6 +1116,8 @@ async def update_event(
         event.parent_event_id = pid
     elif event.event_type == event_area.AREA and event.parent_event_id is not None:
         event.parent_event_id = None
+    if after_given:
+        event.after_event_id = _check_prerequisite(db, plan.id, event.id, after_raw)
     if before["event_type"] == event_area.AREA and event.event_type != event_area.AREA:
         extra += event_area.detach_members(db, event.id, _event_to_dict)
     db.flush()
@@ -1128,11 +1169,17 @@ async def delete_event(
 
     # [Gate EventArea] エリアを消す時は中の予定を外す(元に戻すとまた入る)
     members = event_area.detach_members(db, event_uuid, _event_to_dict) if event.event_type == event_area.AREA else []
+    # [Gate② FC-017] この予定を先行条件にしている予定から外す(記録するので、元に戻すとまた付く)
+    dependents = []
+    for d in db.query(TravelEvent).filter(TravelEvent.after_event_id == event_uuid).all():
+        dependents.append((d, _event_to_dict(d)))
+        d.after_event_id = None
     db.delete(event)
     db.flush()
 
     changes = [("travel_event", event_uuid, "delete", before, None)] + detachment.changes
     changes += [("travel_event", m.id, "update", b, _event_to_dict(m)) for m, b in members]
+    changes += [("travel_event", d.id, "update", b, _event_to_dict(d)) for d, b in dependents]
     new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
     return {"message": "イベントを削除しました", "revision": new_revision, "detached": detachment.impact()}
 
@@ -1203,6 +1250,77 @@ async def move_event(
     response = _event_out(event, hidden)
     _store_idempotency(db, current_user, "POST /plans/events/move", idempotency_key, 200, response)
     return response
+
+
+class EventBulkUpdate(BaseModel):
+    """[Gate② FC-012] 複数の予定をまとめて変える(種類・日)。1 つの変更の組(元に戻すで一度に戻る)。"""
+    model_config = ConfigDict(extra="forbid")
+    event_ids: List[str] = Field(..., min_length=1, max_length=50)
+    event_type: Optional[str] = Field(None, min_length=1, max_length=40)
+    day_id: Optional[str] = None
+
+
+@router.post("/{plan_id}/events/bulk")
+async def bulk_update_events(
+    plan_id: str,
+    body: EventBulkUpdate,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """選んだ予定の種類を変える・別の日へ移す(移した予定はその日の最後へ、選んだ順に並べる)。
+    鍵をかけた予定・エリア(とエリアの中の予定の日の移動)は断る。全部か、何もしないか。"""
+    plan, _hidden = _plan_hidden(db, plan_id, current_user, "editor")
+    _require_if_match(plan, if_match)
+    if body.event_type is None and body.day_id is None:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "変える項目を選んでください"})
+    if body.event_type == event_area.AREA:
+        raise HTTPException(status_code=422, detail={"code": "bulk_area_unsupported",
+                                                     "message": "まとめてエリアにはできません。1 つずつ変えてください"})
+    try:
+        ids = list(dict.fromkeys(uuid.UUID(str(i)) for i in body.event_ids))
+    except ValueError:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "予定の ID が正しくありません"})
+    rows = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id, TravelEvent.id.in_(ids)).all()
+    events = {e.id: e for e in rows}
+    if len(events) != len(ids):
+        raise HTTPException(status_code=404, detail="見つからない予定があります")
+    ordered = [events[i] for i in ids]
+    if any(e.locked for e in ordered):
+        raise HTTPException(status_code=409, detail="鍵をかけた予定が含まれています(鍵を外してください)")
+    target_day = None
+    if body.day_id:
+        target_day = db.query(TravelDay).filter(TravelDay.id == body.day_id, TravelDay.plan_id == plan.id).first()
+        if not target_day:
+            raise HTTPException(status_code=404, detail="移動先の日程が見つかりません")
+        if any(e.event_type == event_area.AREA or (e.parent_event_id and e.day_id != target_day.id) for e in ordered):
+            raise HTTPException(status_code=422, detail={"code": "bulk_area_unsupported",
+                                                         "message": "エリアとエリアの中の予定は、まとめて別の日へ移せません"})
+    befores = {e.id: _event_to_dict(e) for e in ordered}
+    touched_days = {e.day_id for e in ordered}
+    if body.event_type is not None:
+        for e in ordered:
+            e.event_type = body.event_type
+    if target_day is not None:
+        last = db.query(func.max(TravelEvent.sort_order)).filter(TravelEvent.day_id == target_day.id).scalar()
+        nxt = (last if last is not None else -1) + 1
+        for e in ordered:
+            if e.day_id == target_day.id:
+                continue
+            et.shift_dates(e, e.day.local_date, target_day.local_date)
+            e.day_id = target_day.id
+            e.sort_order = nxt
+            nxt += 1
+        touched_days.add(target_day.id)
+    db.flush()
+    extra: List[tuple] = []
+    for d in touched_days:
+        extra += event_area.normalize_day(db, d, _event_to_dict)
+    db.flush()
+    changes = [("travel_event", e.id, "update", befores[e.id], _event_to_dict(e)) for e in ordered]
+    changes += [c for c in _area_changes(None, extra) if c[1] not in events]  # 選んだ予定は上で記録済み
+    new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
+    return {"updated": len(ordered), "revision": new_revision}
 
 
 class DayReorder(BaseModel):
@@ -1839,6 +1957,7 @@ def _restore_event(plan: TravelPlan, event_id, before: dict) -> TravelEvent:
         locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
         phone=before.get("phone"), urls=before.get("urls"), dining=before.get("dining"),
         parent_event_id=before.get("parent_event_id"),
+        after_event_id=before.get("after_event_id"),
     )
 
 

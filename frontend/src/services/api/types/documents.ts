@@ -33,6 +33,10 @@ export interface TravelDocument {
   link_count?: number | null;
   /** [Gate TripKitFix] この文書を領収書にしている支出の件数(支出の名前・金額は返らない) */
   receipt_count?: number | null;
+  /** [Gate② FC-045] 版(差し替えで 1 つ増える)と、差し替えた前の版 */
+  version?: number;
+  replaces_document_id?: string | null;
+  superseded_at?: string | null;
 }
 
 export interface DocumentLink {

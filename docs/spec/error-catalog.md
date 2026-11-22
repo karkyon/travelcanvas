@@ -32,6 +32,7 @@
 | `already_committed` | 409 | no | この下書きはもう旅程にしました。並びは旅程の画面で変えてください | api/v1/trip_intents.py |
 | `already_delivered` | 409 | no | 届いた送信は送り直せません | api/v1/organizations.py |
 | `already_member` | 409 | no | すでにメンバーです | api/v1/organizations.py |
+| `already_replaced` | 409 | no | この版はもう差し替えられています。最新の版を差し替えてください | api/v1/documents.py |
 | `already_resolved` | 409 | no | 既に対応を記録しています | api/v1/corrections.py |
 | `already_restored` | 409 | no | この記録はすでに戻っています | api/v1/memory_publish.py |
 | `already_reverted` | 409 | no | 既に取り消しています | api/v1/corrections.py |
@@ -46,6 +47,7 @@
 | `blocked_host` | — | — | 内部のアドレス・localhost へは送れません | api/v1/organizations.py |
 | `budget_empty` | 422 | no | 予算(旅行全体かカテゴリ別)を入れてから版を残してください | api/v1/finance_ledger.py |
 | `budget_initial_exists` | 409 | no | 当初の予算の版は1つだけです(変えた後は「更新」で残してください) | api/v1/finance_ledger.py |
+| `bulk_area_unsupported` | 422 | no | まとめてエリアにはできません。1 つずつ変えてください | api/v1/plans.py |
 | `candidate_missing` | — | — | 決定した候補が候補箱から消えています | api/v1/decisions.py |
 | `candidate_not_found` | 409 | after_reload | 捨てる候補はありません | api/v1/admin_ops.py, api/v1/optimization.py, api/v1/spot_areas.py |
 | `candidate_unavailable` | 409 | no | この案は使えません | api/v1/day_variants.py, api/v1/replans.py, api/v1/spot_areas.py |
@@ -139,6 +141,7 @@
 | `invalid_plan` | — | — | 配布する旅行を選んでください | api/v1/organizations.py |
 | `invalid_planning_units` | — | — | 操作の量はオブジェクトで指定してください | api/v1/planning_usage.py |
 | `invalid_position` | — | — | 位置(緯度・経度)が正しくありません | api/v1/home_place.py |
+| `invalid_prerequisite` | 422 | no | 自分自身を先行の予定にはできません | api/v1/plans.py |
 | `invalid_reason` | 422 | no | 止める理由を200文字までで入力してください | api/v1/admin_support.py, api/v1/day_variants.py |
 | `invalid_request` | — | — | 本文の形が正しくありません | api/v1/organizations.py |
 | `invalid_role` | — | — | 役割は member か admin です(owner へは役割の変更で) | api/v1/organizations.py |
@@ -236,7 +239,7 @@
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |
 | `quota_exceeded` | 429 | later | …の…の上限に達しました。 | services/usage.py |
 | `quota_override_requires_pro` | — | — | 上限の例外は Pro/B2B の契約(クラス pro の付与)がある利用者だけに付けられます | api/v1/planning_usage.py |
-| `rate_limited` | 429 | later | 回数が多すぎます。しばらくしてから試してください | api/v1/account_recovery.py, api/v1/admin_support.py, api/v1/booklet_share.py, api/v1/corrections.py, api/v1/organization |
+| `rate_limited` | 429 | later | 回数が多すぎます。しばらくしてから試してください | api/v1/account_recovery.py, api/v1/admin_support.py, api/v1/again.py, api/v1/booklet_share.py, api/v1/corrections.py, ap |
 | `reauth_failed` | 403 | no | パスワードが正しくありません | api/v1/corrections.py, api/v1/ownership.py, api/v1/privacy.py |
 | `registered_only` | 403 | no | 訂正の記録は会員登録したアカウントだけが使えます | api/v1/corrections.py, api/v1/ownership.py |
 | `replan_closed` | 409 | no | 適用・却下した再計画案は適用できません | api/v1/replans.py |
@@ -274,7 +277,7 @@
 | `thumbnail_unavailable` | 422 | no | この写真の縮小版を作れません | api/v1/memories.py |
 | `tier_feature_not_included` | 403 | no | このデザインは … クラスから使えます | api/v1/booklet.py |
 | `too_long` | 422 | no | 日程は 90 日までです | api/v1/plans.py |
-| `too_many` | 409 | no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
+| `too_many` | 409, 429 | later, no | 1つの旅行の候補は…件までです | api/v1/candidates.py, api/v1/discussion.py |
 | `too_many_areas` | — | — | エリアは1つの旅行に30までです | api/v1/spot_areas.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |
 | `too_many_clients` | 409 | no | 使える連携は…件までです | api/v1/organizations.py |
@@ -307,6 +310,7 @@
 | `undo_not_latest` | 409 | no | この後に別の変更があるため、元に戻せません(変更の履歴から戻してください) | api/v1/commands.py, api/v1/constraints.py |
 | `unknown_entity` | 409 | no | — | api/v1/sync.py |
 | `unknown_event` | — | — | この旅行の位置のある予定ではありません | api/v1/visits.py |
+| `unknown_key` | 422 | no | 選んだ場所が見つかりません。画面を開き直してください | api/v1/again.py |
 | `unknown_plan` | 422 | no | 参加していない旅行は指定できません | api/v1/atlas.py |
 | `unknown_planning_operation` | — | — | 知らない操作です | api/v1/planning_usage.py |
 | `unknown_provider` | 404 | no | 知らない提供元です | api/v1/admin_ops.py |

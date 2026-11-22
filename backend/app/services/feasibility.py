@@ -100,6 +100,8 @@ class EventInfo:
     start: Optional[datetime]  # UTC
     end: Optional[datetime]  # UTC(end_atが明示された場合のみ)
     sort_order: int
+    # [Gate② FC-017] 先行条件(この予定の前に終えておく予定)
+    after_event_id: Optional[uuid.UUID] = None
 
 
 @dataclass(frozen=True)
@@ -224,6 +226,7 @@ def load_snapshot(db: Session, plan: TravelPlan) -> Snapshot:
             id=ev.id, day=day, title=ev.title or "", description=ev.description or "", address=ev.address or "",
             event_type=ev.event_type or "", place_id=ev.place_id, is_all_day=bool(ev.is_all_day),
             start=start, end=_aware(ev.end_at), sort_order=ev.sort_order or 0,
+            after_event_id=getattr(ev, "after_event_id", None),
         ))
 
     segments = [
@@ -387,6 +390,31 @@ def _check_overlaps(timed: List[EventInfo], res: EvaluationResult) -> None:
                     evidence={"other_event_id": str(a.id), "start": _iso(b.start)},
                     suggestion={"action": "move_event"},
                 ))
+
+
+def _check_prerequisites(snap: Snapshot, res: EvaluationResult) -> None:
+    """[Gate② FC-017] 先行の予定より前に始まる予定を「順序の注意」として出す。時刻の無い予定は確かめられない(数える)"""
+    by_id = {e.id: e for e in snap.events}
+    for e in snap.events:
+        if e.after_event_id is None:
+            continue
+        pre = by_id.get(e.after_event_id)
+        if pre is None:
+            continue
+        if e.start is None or pre.start is None:
+            res.count("prerequisite_time_unknown")
+            continue
+        pre_done = pre.end or pre.start
+        if _start(e) < pre_done:
+            res.findings.append(Finding(
+                code="PREREQUISITE_ORDER", kind="violation", severity="WARNING",
+                message=f"「{e.title}」は「{pre.title}」の後の予定ですが、"
+                        f"「{pre.title}」({_fmt(pre_done, pre.day)}まで)より前に始まります",
+                entity_type="event", entity_id=e.id, entity_label=_event_label(e), day_id=e.day.id,
+                evidence={"prerequisite_event_id": str(pre.id), "prerequisite_done": _iso(pre_done),
+                          "start": _iso(e.start)},
+                suggestion={"action": "move_event", "earliest_start": _iso(pre_done)},
+            ))
 
 
 def _estimated_end(e: EventInfo, rules: Any) -> Optional[datetime]:
@@ -1192,6 +1220,7 @@ def evaluate(snap: Snapshot, constraints: ConstraintSet, titles: Optional[Dict[u
     res = EvaluationResult()
     timed = _check_event_times(snap, res)
     _check_overlaps(timed, res)
+    _check_prerequisites(snap, res)
     _check_segments(snap, res, movement)
     _check_reservations(snap, res)
     _check_opening_hours(timed, snap, res, movement)

@@ -32,7 +32,8 @@ from app.models.models import EmailOutbox, Notification, NotificationPreference,
 LEVELS = ("all", "mentions", "none")
 DIGESTS = ("off", "daily", "instant")
 # [Gate Remaining-3] instant の人へすぐメールで送る種類(自分あてでなくても送る)。それ以外は自分あての時だけ
-URGENT_TYPES = frozenset({"cancel_deadline", "poll_reminder", "replan_applied", "alert_created", "booking_mail"})
+URGENT_TYPES = frozenset({"cancel_deadline", "poll_reminder", "replan_applied", "alert_created", "booking_mail",
+                          "important_notice"})  # [Gate② FC-064] 確認を求めるお知らせ
 MAX_ATTEMPTS = 6
 DIGEST_INTERVAL = timedelta(hours=20)  # 1日1回(cron の時刻のずれを見込む)
 

@@ -32,6 +32,8 @@
  * 開く画面(出発の合図・移動モード・次の場所・印・この場所に残す・旅帖・旅程・地図・寄り道・雨の兆し・遅れの知らせ・
  * チケット・出発前のチェック・写真を集める・宿・宿へ帰る・同行者・お助け・設定)は URL の ?v= で開き、戻るで閉じる。
  */
+import WishHeartButton from '@/components/wishes/WishHeartButton';
+import WishNearbyBanner from '@/components/wishes/WishNearbyBanner';
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Camera, Luggage, PartyPopper } from 'lucide-react';
@@ -445,6 +447,8 @@ const TodayPage: React.FC = () => {
       {ctx && !screen && (
         <TodaySpotStrip planId={ctx.planId} todayDate={ctx.data.today_date} timeZone={ctx.timeZone} nowMs={ctx.nowMs} />
       )}
+      {/* [FR-062] 近くに来たら知らせる(当日の画面を開いている間だけ・端末の中で比べる) */}
+      {ctx && view?.isCurrentDay && <WishNearbyBanner active />}
       {ctx && isStale && <OfflineAlert ctx={ctx} deviceNowMs={clock} />}
       {/* [Gate② FC-084] 端末の時計のずれ(NOW/NEXT はサーバーの時刻で直して表示している) */}
       {snapshot && clockSkewNotice(snapshot.offsetMs) && (
@@ -454,6 +458,13 @@ const TodayPage: React.FC = () => {
       <LiveNotices items={shownNotices} onDismiss={dismiss} />
       {main}
       {live && !simple && ctx && <TodayDock ctx={ctx} current={tabCurrent} />}
+      {/* [FR-062] ♡ 今度行きたいに残す(親指の届く所。今の予定の場所からも残せる) */}
+      {ctx && !screen && (
+        <WishHeartButton isGuest={false} className="tc-focus-ring tc-wish-fab" label="今度行きたい"
+          options={{ sourceKind: 'today', planId: ctx.planId, currentPlace: ctx.nowEv ? { name: ctx.nowEv.title,
+            address: ctx.nowEv.address ?? null, latitude: ctx.nowEv.latitude ?? null, longitude: ctx.nowEv.longitude ?? null,
+            category: null, description: null, sourceUrl: null } : null }} />
+      )}
       {ctx && screen && (
         <Suspense fallback={<div className="tl-screen tl-screen--loading" role="status" aria-busy="true">読み込み中…</div>}>
           <TodayScreens ctx={ctx} screen={screen} arg={screenArg} crew={crew}

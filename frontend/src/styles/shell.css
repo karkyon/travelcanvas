@@ -1726,3 +1726,11 @@
   .tc-bshare__qr { grid-template-columns: minmax(0, 1fr); justify-items: center; }
   .tc-bshare__tabs button { flex: 1 1 calc(50% - 4px); justify-content: center; }
 }
+
+/* [FR-062] 当日の画面・スポットモードの ♡(親指の届く所に 1 つ。下の帯の上) */
+.tc-wish-fab {
+  position: fixed; right: 16px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); z-index: 40;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 48px; min-height: 48px; padding: 0 14px; border-radius: 999px;
+  background: #a8423c; color: #fff; /* 白の文字と約 6:1(WCAG AA) */ font-weight: 600; box-shadow: 0 6px 18px rgb(0 0 0 / 0.2);
+}
