@@ -57,9 +57,9 @@ describe('♡ 今度行きたいに残す (FR-062)', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(m.quick).toHaveBeenCalledWith(expect.objectContaining({ name: '赤福 本店', latitude: 34.4623, longitude: 136.7256,
       wish_kind: 'next', source_kind: 'quick', source_plan_id: 'p1', genre: 'restaurant' }));
-    expect(m.quick.mock.calls[0][0].client_id).toMatch(/^[A-Za-z0-9]{16,}$/);
+    expect(m.quick.mock.calls[0]![0].client_id).toMatch(/^[A-Za-z0-9]{16,}$/);
     expect(m.toast).toHaveBeenCalled();  // 取り消しのできる知らせ
-    expect(m.toast.mock.calls[0][1]).toEqual({ duration: 6000 });
+    expect(m.toast.mock.calls[0]![1]).toEqual({ duration: 6000 });
   });
 
   it('ひとこと・いつ・また行きたいを一緒に送る', async () => {
@@ -140,7 +140,7 @@ describe('♡ 今度行きたいに残す (FR-062)', () => {
     render(<WishSheet open options={{}} onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole('button', { name: /赤福 本店/ }));
     await waitFor(() => expect(m.toast).toHaveBeenCalled());
-    const render1 = m.toast.mock.calls[0][0] as (t: { id: string }) => JSX.Element;
+    const render1 = m.toast.mock.calls[0]![0] as (t: { id: string }) => JSX.Element;
     const { getByRole, unmount } = render(render1({ id: 't1' }));
     await act(async () => { fireEvent.click(getByRole('button', { name: '取り消す' })); });
     expect(m.del).toHaveBeenCalledWith('s1');
@@ -151,9 +151,9 @@ describe('♡ 今度行きたいに残す (FR-062)', () => {
       merged_into: 's2', previous: { wish_kind: 'next', again_count: 0, wish_note: null, wish_when: null } });
     m.patch.mockResolvedValue({});
     render(<WishSheet open options={{ kind: 'again' }} onClose={vi.fn()} />);
-    fireEvent.click((await screen.findAllByRole('button', { name: /赤福 本店/ })).slice(-1)[0]);
+    fireEvent.click((await screen.findAllByRole('button', { name: /赤福 本店/ })).slice(-1)[0]!);
     await waitFor(() => expect(m.toast).toHaveBeenCalled());
-    const r2 = m.toast.mock.calls[0][0] as (t: { id: string }) => JSX.Element;
+    const r2 = m.toast.mock.calls[0]![0] as (t: { id: string }) => JSX.Element;
     const view = render(r2({ id: 't2' }));
     expect(view.getByTestId('wish-saved-toast').textContent).toContain('もう残してあります(また行きたい 2 回目)');
     await act(async () => { fireEvent.click(view.getByRole('button', { name: '取り消す' })); });

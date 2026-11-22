@@ -2,7 +2,6 @@
 import { toast } from 'react-hot-toast';
 import { deleteWishSpot, patchWishSpot, quickSaveWish } from '@/services/api/spotIntake';
 import type { QuickWishInput, QuickWishResult, WishKind, WishSource, WishWhen } from '@/services/api/spotIntake';
-import { currentOfflineSession } from '@/utils/offlineSession';
 import { flushWishQueue, keepForRetry, newClientId, queueWish } from '@/utils/wishQueue';
 
 export const UNDO_MS = 6000;
@@ -52,11 +51,12 @@ export async function saveWish(args: SaveWishArgs): Promise<QuickWishResult | 'q
     }
     return r;
   } catch (e) {
+    const status = (e as { response?: { status?: number } } | null)?.response?.status;
+    // ゲスト・ログインの切れ(サーバーが会員だけと断った)は溜めずに知らせる
+    if (status === 401 || status === 403) { toast.error('ログインすると残せます'); return null; }
+    if (status === 429) { toast.error('続けて残しすぎました。1 分ほど待ってから残してください'); return null; }
     if (keepForRetry(e)) {
-      const status = (e as { response?: { status?: number } } | null)?.response?.status;
-      if (status === 429) { toast.error('続けて残しすぎました。1 分ほど待ってから残してください'); return null; }
-      if (status === 401) { toast.error('ログインすると残せます'); return null; }
-      if (await queueWish(currentOfflineSession(), input)) {
+      if (await queueWish((await import('@/utils/offlineSession')).currentOfflineSession(), input)) {
         toast('端末に残しました。つながった時に送ります', { icon: '📥' });
         return 'queued';
       }
@@ -70,7 +70,7 @@ export async function saveWish(args: SaveWishArgs): Promise<QuickWishResult | 'q
 
 
 export async function flushPendingWishes(): Promise<void> {
-  const r = await flushWishQueue(currentOfflineSession()).catch(() => null);
+  const r = await flushWishQueue((await import('@/utils/offlineSession')).currentOfflineSession()).catch(() => null);
   if (!r) return;
   if (r.sent > 0) toast.success(`端末に残していた ${r.sent} 件を行きたい場所へ送りました`);
   if (r.dropped > 0) toast.error(`${r.dropped} 件は送れませんでした(名前を確かめてもう一度残してください)`);

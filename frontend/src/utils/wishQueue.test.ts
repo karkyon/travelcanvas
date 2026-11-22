@@ -31,8 +31,8 @@ describe('pending_wishes', () => {
     m.quick.mockResolvedValue({});
     expect(await flushWishQueue(session)).toEqual({ sent: 2, dropped: 0, left: 0 });
     expect(m.quick.mock.calls.map((c) => c[0].name)).toEqual(['A', 'B']);
-    expect(m.quick.mock.calls[0][0]).not.toHaveProperty('queuedAt');
-    expect(m.quick.mock.calls[0][0].client_id).toBe(a.client_id);
+    expect(m.quick.mock.calls[0]![0]).not.toHaveProperty('queuedAt');
+    expect(m.quick.mock.calls[0]![0].client_id).toBe(a.client_id);
   });
 
   it('通信の失敗・5xx で止めて残し、内容を断られた物(422)は捨てる', async () => {
