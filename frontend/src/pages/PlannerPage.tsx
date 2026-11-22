@@ -88,6 +88,7 @@ import MemberPolicyNotice from '@/components/planner/MemberPolicyNotice';
 import { othersEditing } from '@/utils/presence';
 import { usePlanHolidays } from '@/hooks/usePlanHolidays';
 import { FIELD_LABEL, detectConflict, mergeMine, unreadConflict, type EditConflict, type EditFields } from '@/utils/editConflict';
+import BulkEditDialog from '@/components/planner/BulkEditDialog';
 
 // SearchPage.tsxから渡ってくる検索結果スポットの形状(最小限のフィールドのみ利用)
 interface IncomingSpot {
@@ -924,6 +925,9 @@ const PlannerPage: React.FC = () => {
     }
   };
 
+  // [Gate② FC-012] まとめて編集の窓
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
+
   // [Gate R3-12] FR-047 旅程複製
   const [cloningPlanId, setCloningPlanId] = useState<string | null>(null);
   const handleClonePlan = async (id: string, title: string) => {
@@ -1097,6 +1101,12 @@ const PlannerPage: React.FC = () => {
                 <button type="button" className="tc-focus-ring tc-day-tab" aria-pressed={planView === 'all'}
                   onClick={() => setPlanView('all')} data-testid="plan-view-all">全日程</button>
               </div>
+            )}
+            {/* [Gate② FC-012] この日の予定をまとめて編集 */}
+            {planView === 'day' && (currentPlan.days[currentDayIndex]?.events.length ?? 0) > 1 && (
+              <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => setIsBulkOpen(true)} data-testid="plan-bulk-edit">
+                まとめて編集
+              </button>
             )}
             <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" onClick={() => navigate(`/planner/${currentPlan.id}/candidates`)}>
               <UiIcon icon={Star} />場所を探す・候補
@@ -2050,6 +2060,16 @@ const PlannerPage: React.FC = () => {
         </Modal.Footer>
 
       </Modal>
+
+      {currentPlan && isBulkOpen && (
+        <BulkEditDialog isOpen onClose={() => setIsBulkOpen(false)} planId={currentPlan.id} revision={currentPlan.revision ?? 0}
+          days={currentPlan.days} dayIndex={currentDayIndex} categories={EDIT_CATEGORIES}
+          onDone={(n) => {
+            setIsBulkOpen(false);
+            addToast({ message: `${n} 件の予定をまとめて変えました(「元に戻す」で戻せます)`, type: 'success' });
+            void loadPlan(currentPlan.id);
+          }} />
+      )}
 
       {/* 検索結果からのスポット追加モーダル(Gate #16) */}
       <Modal

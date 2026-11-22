@@ -32,6 +32,7 @@
 | `already_committed` | 409 | no | この下書きはもう旅程にしました。並びは旅程の画面で変えてください | api/v1/trip_intents.py |
 | `already_delivered` | 409 | no | 届いた送信は送り直せません | api/v1/organizations.py |
 | `already_member` | 409 | no | すでにメンバーです | api/v1/organizations.py |
+| `already_replaced` | 409 | no | この版はもう差し替えられています。最新の版を差し替えてください | api/v1/documents.py |
 | `already_resolved` | 409 | no | 既に対応を記録しています | api/v1/corrections.py |
 | `already_restored` | 409 | no | この記録はすでに戻っています | api/v1/memory_publish.py |
 | `already_reverted` | 409 | no | 既に取り消しています | api/v1/corrections.py |
@@ -46,6 +47,7 @@
 | `blocked_host` | — | — | 内部のアドレス・localhost へは送れません | api/v1/organizations.py |
 | `budget_empty` | 422 | no | 予算(旅行全体かカテゴリ別)を入れてから版を残してください | api/v1/finance_ledger.py |
 | `budget_initial_exists` | 409 | no | 当初の予算の版は1つだけです(変えた後は「更新」で残してください) | api/v1/finance_ledger.py |
+| `bulk_area_unsupported` | 422 | no | まとめてエリアにはできません。1 つずつ変えてください | api/v1/plans.py |
 | `candidate_missing` | — | — | 決定した候補が候補箱から消えています | api/v1/decisions.py |
 | `candidate_not_found` | 409 | after_reload | 捨てる候補はありません | api/v1/admin_ops.py, api/v1/optimization.py, api/v1/spot_areas.py |
 | `candidate_unavailable` | 409 | no | この案は使えません | api/v1/day_variants.py, api/v1/replans.py, api/v1/spot_areas.py |

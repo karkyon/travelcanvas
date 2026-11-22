@@ -32,7 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -1250,6 +1250,77 @@ async def move_event(
     response = _event_out(event, hidden)
     _store_idempotency(db, current_user, "POST /plans/events/move", idempotency_key, 200, response)
     return response
+
+
+class EventBulkUpdate(BaseModel):
+    """[Gate② FC-012] 複数の予定をまとめて変える(種類・日)。1 つの変更の組(元に戻すで一度に戻る)。"""
+    model_config = ConfigDict(extra="forbid")
+    event_ids: List[str] = Field(..., min_length=1, max_length=50)
+    event_type: Optional[str] = Field(None, min_length=1, max_length=40)
+    day_id: Optional[str] = None
+
+
+@router.post("/{plan_id}/events/bulk")
+async def bulk_update_events(
+    plan_id: str,
+    body: EventBulkUpdate,
+    if_match: Optional[str] = Header(None, alias="If-Match"),
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """選んだ予定の種類を変える・別の日へ移す(移した予定はその日の最後へ、選んだ順に並べる)。
+    鍵をかけた予定・エリア(とエリアの中の予定の日の移動)は断る。全部か、何もしないか。"""
+    plan, _hidden = _plan_hidden(db, plan_id, current_user, "editor")
+    _require_if_match(plan, if_match)
+    if body.event_type is None and body.day_id is None:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "変える項目を選んでください"})
+    if body.event_type == event_area.AREA:
+        raise HTTPException(status_code=422, detail={"code": "bulk_area_unsupported",
+                                                     "message": "まとめてエリアにはできません。1 つずつ変えてください"})
+    try:
+        ids = list(dict.fromkeys(uuid.UUID(str(i)) for i in body.event_ids))
+    except ValueError:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "予定の ID が正しくありません"})
+    rows = db.query(TravelEvent).filter(TravelEvent.plan_id == plan.id, TravelEvent.id.in_(ids)).all()
+    events = {e.id: e for e in rows}
+    if len(events) != len(ids):
+        raise HTTPException(status_code=404, detail="見つからない予定があります")
+    ordered = [events[i] for i in ids]
+    if any(e.locked for e in ordered):
+        raise HTTPException(status_code=409, detail="鍵をかけた予定が含まれています(鍵を外してください)")
+    target_day = None
+    if body.day_id:
+        target_day = db.query(TravelDay).filter(TravelDay.id == body.day_id, TravelDay.plan_id == plan.id).first()
+        if not target_day:
+            raise HTTPException(status_code=404, detail="移動先の日程が見つかりません")
+        if any(e.event_type == event_area.AREA or (e.parent_event_id and e.day_id != target_day.id) for e in ordered):
+            raise HTTPException(status_code=422, detail={"code": "bulk_area_unsupported",
+                                                         "message": "エリアとエリアの中の予定は、まとめて別の日へ移せません"})
+    befores = {e.id: _event_to_dict(e) for e in ordered}
+    touched_days = {e.day_id for e in ordered}
+    if body.event_type is not None:
+        for e in ordered:
+            e.event_type = body.event_type
+    if target_day is not None:
+        last = db.query(func.max(TravelEvent.sort_order)).filter(TravelEvent.day_id == target_day.id).scalar()
+        nxt = (last if last is not None else -1) + 1
+        for e in ordered:
+            if e.day_id == target_day.id:
+                continue
+            et.shift_dates(e, e.day.local_date, target_day.local_date)
+            e.day_id = target_day.id
+            e.sort_order = nxt
+            nxt += 1
+        touched_days.add(target_day.id)
+    db.flush()
+    extra: List[tuple] = []
+    for d in touched_days:
+        extra += event_area.normalize_day(db, d, _event_to_dict)
+    db.flush()
+    changes = [("travel_event", e.id, "update", befores[e.id], _event_to_dict(e)) for e in ordered]
+    changes += [c for c in _area_changes(None, extra) if c[1] not in events]  # 選んだ予定は上で記録済み
+    new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
+    return {"updated": len(ordered), "revision": new_revision}
 
 
 class DayReorder(BaseModel):
