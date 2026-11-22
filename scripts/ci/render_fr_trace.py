@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """[Gate Hardening-A・監査 G-01/G-03] 要求の追跡の表を作る(標準ライブラリだけ)。
 
-- docs/trace/FR-TRACE.md      … docs/trace/fr-requirements.json と fr-status.json から(全60 FR の要求の根拠・画面・API・表・試験・証拠の区分)
+- docs/trace/FR-TRACE.md      … docs/trace/fr-requirements.json と fr-status.json から(全62 FR の要求の根拠・画面・API・表・試験・証拠の区分)
 - docs/spec/CANONICAL-SOURCES.md … docs/spec/canonical-sources.json から(仕様の正本の所在)
 
     python3 scripts/ci/render_fr_trace.py          # 書き換える
@@ -41,7 +41,7 @@ def render_trace() -> str:
     feats = req["features"]
     kinds = meta["evidence_kinds"]
     out = [
-        "# 全60 FR の要求の追跡(Gate Hardening-A・監査 G-01/G-03。FR-060 は Gate SpotMode)",
+        "# 全62 FR の要求の追跡(Gate Hardening-A・監査 G-01/G-03。FR-060 は Gate SpotMode・FR-061/062 は日帰り・今度行きたい)",
         "",
         "> この文書は `python3 scripts/ci/render_fr_trace.py` が `docs/trace/fr-requirements.json` と `docs/trace/fr-status.json` から作る(手で直さない)。",
         "> 要求の原文の正本は DOC-02 v6.0(`docs/spec/DOC-02_要件定義書_v6.0.md`。所在の一覧は [CANONICAL-SOURCES.md](../spec/CANONICAL-SOURCES.md))。ここの要約・受入は抜粋の言い換え。",

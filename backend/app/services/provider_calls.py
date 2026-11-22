@@ -34,6 +34,10 @@ PLACES_FIELD_MASK = ("places.id,places.displayName,places.formattedAddress,place
                      "places.googleMapsUri")
 PLACES_VERIFY_FIELD_MASK = "places.id"
 ROUTES_FIELD_MASK = "routes.duration,routes.distanceMeters"
+# [FR-061] 日帰りのルートの計算だけで使う(線・料金を足す)。確認の操作(VERIFY)は今の routes.element のまま。
+# config_hash に入るため、反映の後に管理画面で Google のサーバー用キーの「有効性を確認」をやり直す
+ROUTES_LINE_FIELD_MASK = ("routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,"
+                          "routes.travelAdvisory.tollInfo")
 ROUTE_MODES = {"driving": "DRIVE", "walking": "WALK", "bicycling": "BICYCLE", "transit": "TRANSIT"}
 
 AI_MAX_PROMPT_CHARS = 2000
@@ -92,7 +96,7 @@ def config_hash(slot: str) -> str:
     spec = {"slot": slot, "adapter": ADAPTER_VERSION, "endpoints": ph.ALLOWED,
             "model": openai_model() if slot == "openai_api_key" else None,
             "places_mask": PLACES_FIELD_MASK, "places_verify_mask": PLACES_VERIFY_FIELD_MASK,
-            "routes_mask": ROUTES_FIELD_MASK,
+            "routes_mask": ROUTES_FIELD_MASK, "routes_line_mask": ROUTES_LINE_FIELD_MASK,
             # [Gate Remaining-7] 新しい操作を足した時は確認をやり直す(足した操作も確かめるため)
             "get_endpoints": ph.ALLOWED_GET, "details_mask": DETAILS_FIELD_MASK,
             "checks": SLOT_CHECKS.get(slot)}
@@ -209,6 +213,48 @@ def _routes_request(key: str, origin: Tuple[float, float], dest: Tuple[float, fl
     return ph.post_json("google.routes.compute",
                         {"X-Goog-Api-Key": key, "X-Goog-FieldMask": ROUTES_FIELD_MASK,
                          "Content-Type": "application/json"}, payload)
+
+
+def _routes_line_request(key: str, origin: Tuple[float, float], dest: Tuple[float, float], road: str,
+                         depart_iso: Optional[str]) -> ph.ProviderResponse:
+    """[FR-061] 車の線のルート。道の使い方: local = 高速・有料を避ける、avoid_tolls = 有料を避ける、highway は料金も取る"""
+    payload: Dict[str, Any] = {
+        "origin": {"location": {"latLng": {"latitude": origin[0], "longitude": origin[1]}}},
+        "destination": {"location": {"latLng": {"latitude": dest[0], "longitude": dest[1]}}},
+        "travelMode": "DRIVE", "routingPreference": "TRAFFIC_UNAWARE", "languageCode": "ja", "units": "METRIC",
+        "routeModifiers": {"avoidHighways": road == "local", "avoidTolls": road in ("local", "avoid_tolls")},
+    }
+    if road in ("highway", "auto"):
+        payload["extraComputations"] = ["TOLLS"]
+    if depart_iso:
+        payload["departureTime"] = depart_iso
+    return ph.post_json("google.routes.compute",
+                        {"X-Goog-Api-Key": key, "X-Goog-FieldMask": ROUTES_LINE_FIELD_MASK,
+                         "Content-Type": "application/json"}, payload)
+
+
+def _route_line_summary(body: Any) -> Optional[Dict[str, Any]]:
+    routes = body.get("routes") if isinstance(body, dict) else None
+    if not routes or not isinstance(routes[0], dict):
+        return None
+    route = routes[0]
+    try:
+        seconds: Optional[int] = int(round(float(str(route.get("duration") or "").rstrip("s"))))
+    except ValueError:
+        seconds = None
+    meters = route.get("distanceMeters")
+    poly = ((route.get("polyline") or {}).get("encodedPolyline")) if isinstance(route.get("polyline"), dict) else None
+    toll: Optional[int] = None
+    adv = route.get("travelAdvisory")
+    info = adv.get("tollInfo") if isinstance(adv, dict) else None
+    for price in (info or {}).get("estimatedPrice") or []:
+        if isinstance(price, dict) and price.get("currencyCode") == "JPY":
+            try:
+                toll = int(price.get("units") or 0) + (1 if int(price.get("nanos") or 0) >= 500_000_000 else 0)
+            except (TypeError, ValueError):
+                toll = None
+    return {"duration_s": seconds, "distance_m": int(meters) if isinstance(meters, (int, float)) else None,
+            "polyline": poly if isinstance(poly, str) else None, "toll_jpy": toll}
 
 
 def _route_summary(body: Any) -> Optional[Dict[str, Any]]:
@@ -615,6 +661,19 @@ def places_search(db: Session, plan: Optional[TravelPlan], caller: User, query: 
                   consult_id=consult_id,
                   fingerprint=fingerprint("google_places", str(plan.id if plan else consult_id), query, lat, lng,
                                           radius_m))
+
+
+def route_line(db: Session, plan: TravelPlan, caller: User, origin: Tuple[float, float], dest: Tuple[float, float],
+               road: str, depart_iso: Optional[str], idempotency_key: str
+               ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """[FR-061] 日帰りの行き・帰りの 1 本(routes.element 1 単位。行きと帰りで 2 単位)"""
+    def call(units: Dict[str, int]) -> cg.ProviderResult:
+        resp = _send(db, "google_routes", "routes.element",
+                     lambda key: _routes_line_request(key, origin, dest, road, depart_iso))
+        return cg.ProviderResult(units={"elements": 1}, payload=_route_line_summary(resp.body))
+
+    return cg.run(db, plan, caller, "routes.element", "google_routes", {"elements": 1}, idempotency_key, call,
+                  fingerprint=fingerprint("google_routes_line", str(plan.id), origin, dest, road, depart_iso))
 
 
 def route_between(db: Session, plan: Optional[TravelPlan], caller: User, origin: Tuple[float, float],

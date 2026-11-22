@@ -122,7 +122,7 @@
 | `invalid_email` | — | — | メールアドレスを入力してください | api/v1/organizations.py |
 | `invalid_entitlement` | 409 | no | subject_type は user か plan です | api/v1/planning_usage.py |
 | `invalid_events` | — | — | 送るできごとを選んでください | api/v1/organizations.py |
-| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/billing.py, api/v1/candidates.py, api/v1/holidays.py, api/v1/hours_check.py, api/v1/journey.py,  |
+| `invalid_field` | 409, 422 | no | precision は region か area です | api/v1/atlas.py, api/v1/billing.py, api/v1/candidates.py, api/v1/day_trip.py, api/v1/holidays.py, api/v1/hours_check.py, |
 | `invalid_grace` | — | — | 前の秘密を使える時間は0〜…時間の整数で指定してください | api/v1/organizations.py |
 | `invalid_hardness` | — | — | 必ず守る/できれば を選んでください | services/private_profile.py |
 | `invalid_id` | — | — | %s が正しくありません | api/v1/spot_areas.py |

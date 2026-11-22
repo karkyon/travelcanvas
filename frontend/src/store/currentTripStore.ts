@@ -5,12 +5,15 @@
  */
 import { create } from 'zustand';
 
-export interface CurrentTrip { id: string; title: string; start_date?: string | null; end_date?: string | null }
+export interface CurrentTrip { id: string; title: string; start_date?: string | null; end_date?: string | null;
+  /** [FR-061] 日帰りなら上の帯に「ルート」を出す */
+  trip_style?: string | null }
 
 export const useCurrentTripStore = create<{ trip: CurrentTrip | null }>(() => ({ trip: null }));
 
 type PlanLike = {
   id?: string | null; title?: string | null; start_date?: string | null; end_date?: string | null;
+  trip_style?: string | null;
   days?: ReadonlyArray<{ date?: string | null }> | null;
 };
 
@@ -27,10 +30,10 @@ export function publishCurrentTrip(plan: PlanLike | null | undefined): void {
   // [Gate AppShell] 上の帯の旅行の切り替えに日付も出す
   const range = tripRange(plan);
   const next = plan?.id
-    ? { id: String(plan.id), title: plan.title || '', start_date: range.start, end_date: range.end }
+    ? { id: String(plan.id), title: plan.title || '', start_date: range.start, end_date: range.end, trip_style: plan.trip_style ?? null }
     : null;
   const prev = useCurrentTripStore.getState().trip;
   if (prev?.id === next?.id && prev?.title === next?.title && (prev?.start_date ?? null) === (next?.start_date ?? null)
-    && (prev?.end_date ?? null) === (next?.end_date ?? null)) return;
+    && (prev?.end_date ?? null) === (next?.end_date ?? null) && (prev?.trip_style ?? null) === (next?.trip_style ?? null)) return;
   useCurrentTripStore.setState({ trip: next });
 }

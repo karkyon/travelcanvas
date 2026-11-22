@@ -1,6 +1,6 @@
 {
  "_meta": {
-  "description": "全60 FR の要求の根拠(DOC-02 v6.0・FR-059 正本・承認済みの変更。旧版は資料室の v5.1 で保管)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
+  "description": "全62 FR の要求の根拠(DOC-02 v6.0・FR-059 正本・承認済みの変更。旧版は資料室の v5.1 で保管)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
   "gate": "Hardening-A",
   "baseline": "32c7db6ab12169dc05a9d5821d565f591714c0b4",
   "evidence_states": {
@@ -4823,6 +4823,190 @@
     "real_api": {
      "state": "pending",
      "note": "実の場所の検索での周りを探すの確認なし(CI は模擬)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし"
+    }
+   },
+   "gap_categories": [
+    "実機待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-061": {
+   "title": "日帰りモード(ルートと寄り道)",
+   "requirement": {
+    "source": "DOC-02 FR-061(v6.0 で追加。利用者の指示 2026-11-22。詳細設計 DD-2026-11-22-01 段階 2)",
+    "priority": "SHOULD",
+    "stage": "—",
+    "summary": "新しい旅行を日帰りで作り、行きと帰りのルートの近くの寄り道を、ジャンル・幅・好みで探して予定に入れる",
+    "acceptance": "日帰りを選んで保存するとルートの画面に線と寄り道の候補が出て、高速と下道で時間・距離・料金・線が変わり、幅を越える候補は出ず、あなた向けで理由の札が出て、予定に入れると家に着く見込みが変わり、Google が無い時も OSRM か直線の予備で動く"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11-22",
+     "change": "FR-061 日帰りモードを追加(モックの画板 1・2 を利用者が承認)",
+     "source": "DOC-10 r70・DD-2026-11-22-01",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-51",
+     "SC-52"
+    ],
+    "api_group": "/plans/{plan_id}/day-trip"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/day_trip.py",
+     "backend/app/services/day_trip.py",
+     "backend/app/services/preference_profile.py"
+    ],
+    "routes": [
+     "planner/:planId/day-trip"
+    ],
+    "tables": [
+     "day_trip_routes",
+     "travel_plans"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_fr061_day_trip.py",
+    "frontend/src/pages/DayTripPage.test.tsx",
+    "frontend/src/pages/dayTrip/dayTripModel.test.ts",
+    "frontend/src/pages/dayTrip/DayTripQuickFields.test.tsx",
+    "frontend/e2e/day-trip.spec.ts"
+   ],
+   "external_providers": [
+    "Google Routes(有料。鍵があれば)",
+    "OSRM(自分の server)",
+    "場所の検索(place_finder: Yahoo!・ホットペッパー・OpenStreetMap)",
+    "OpenStreetMap(地図の絵)"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 v6.0 の本文・DOC-04 v6.0 の画面(利用者の指示 2026-11-22・詳細設計 DD-2026-11-22-01)"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり。実機・実の Google Routes(線・料金)・実の店の検索の確認が済むまで(部分)"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・不正入力・同じ場所/二重送信)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider。ルートは直線の予備・店の検索は画面の受け取りで模擬)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の位置・地図・圏外の確認の記録なし"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "Google Routes の線・料金・実の店の検索の確認なし(CI は模擬。field mask を足したため鍵の確認のやり直しが要る)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし"
+    }
+   },
+   "gap_categories": [
+    "実機待ち",
+    "実通信待ち",
+    "設定待ち"
+   ]
+  },
+  "FR-062": {
+   "title": "今度行きたい・また行きたい",
+   "requirement": {
+    "source": "DOC-02 FR-062(v6.0 で追加。利用者の指示 2026-11-22。「重要」。詳細設計 DD-2026-11-22-01 段階 1)",
+    "priority": "MUST",
+    "stage": "—",
+    "summary": "どの画面からも ♡ で今度行きたいに残し、旅の記録からまた行きたいを残し、行きたい場所を今度・また・エリアで見分ける",
+    "acceptance": "♡ → 近くの候補で 2 タップで残り、圏外の分はつながると 1 件だけ入り、同じ場所を二重に作らず、旅の記録から場所・エリア・行けなかった場所を残せ、行きたい場所の画面で今度・また・エリアに分かれて残した元が出て、近くの知らせは位置を送らず、ここから日帰りで日帰りの作成が開く"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11-22",
+     "change": "FR-062 今度行きたい・また行きたいを追加(モックの画板 3〜5 を利用者が承認)",
+     "source": "DOC-10 r69/r70・DD-2026-11-22-01",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-53",
+     "SC-54"
+    ],
+    "api_group": "/spots/quick・/spots/nearby-candidates・/plans/{plan_id}/again"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/spots.py",
+     "backend/app/api/v1/again.py",
+     "backend/app/services/wishes.py",
+     "backend/app/services/again_candidates.py"
+    ],
+    "routes": [
+     "spots",
+     "planner/:planId/journey"
+    ],
+    "tables": [
+     "spots"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_fr062_quick_wish.py",
+    "backend/tests/test_fr062_again.py",
+    "frontend/src/components/wishes/WishSheet.test.tsx",
+    "frontend/src/utils/wishQueue.test.ts",
+    "frontend/src/pages/journey/AgainPanel.test.tsx",
+    "frontend/src/pages/SpotListPage.wishKinds.test.tsx",
+    "frontend/src/components/wishes/useNearbyWishReminder.test.ts",
+    "frontend/e2e/wishes.spec.ts"
+   ],
+   "external_providers": [
+    "場所の検索(近くの候補: OpenStreetMap Overpass・Wikipedia)"
+   ],
+   "day_of_travel": true,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 v6.0 の本文・DOC-04 v6.0 の画面(利用者の指示 2026-11-22・詳細設計 DD-2026-11-22-01)"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり。実機(位置・圏外・知らせ)・実の近くの候補の検索の確認が済むまで(部分)"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(正常・権限・不正入力・同じ場所/二重送信)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(CI の模擬の provider。近くの候補は画面の受け取りで模擬。保存は本物の API)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "実機(iPhone・Android・iPad)の位置・地図・圏外の確認の記録なし"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "近くの候補の実の検索(Overpass)の確認なし(CI は模擬)"
     },
     "ops": {
      "state": "pending",

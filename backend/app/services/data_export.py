@@ -108,7 +108,7 @@ PLAN_TABLES = (
     m.PlanMovementSettings,
     m.PlanOwnershipTransfer, m.DataCorrection,
     m.ProviderUsageReservation, m.ProviderUsageEvent,
-    m.SpotArea, m.SpotAreaItem, m.SpotAreaSplit,
+    m.SpotArea, m.SpotAreaItem, m.SpotAreaSplit, m.DayTripRoute,
     m.TripConsultSession,
     m.InboundMailAddress,
     m.BillingPayment,
@@ -235,6 +235,8 @@ def plan_tables(db: Session, plan: m.TravelPlan, me: uuid.UUID) -> Dict[str, Lis
         m.SpotAreaItem.area_id.in_(_ids(spot_areas))).all()] if spot_areas else []
     t["spot_area_splits"] = [row(x) for x in db.query(m.SpotAreaSplit).filter(
         m.SpotAreaSplit.area_id.in_(_ids(spot_areas))).all()] if spot_areas else []
+    # [FR-061] 日帰りの行き・帰り(出発地は丸めた値だけを保存している)
+    t["day_trip_routes"] = [row(x) for x in q(m.DayTripRoute).all()]
 
     t["plan_collaborators"] = [row(x) for x in q(m.PlanCollaborator).all()]
     t["plan_share_links"] = [row(x) for x in q(m.PlanShareLink).all()]
