@@ -94,7 +94,7 @@
 | `expense_has_refunds` | 409 | no | 返金が登録されている支出は取り消せません(先に返金を取り消してください) | api/v1/finance_ledger.py |
 | `expense_voided` | 409 | no | 取り消した支出は変更できません | api/v1/finance.py, api/v1/finance_ledger.py |
 | `expired` | 410 | no | この版は有効期限が切れています | api/v1/booklet.py |
-| `face_check_failed` | 503 | later | 顔の判定を取れませんでした。写っている人の了解を確かめてください | api/v1/server_exports.py |
+| `face_check_failed` | 503 | later | 顔の判定を取れませんでした。写っている人の了解を確かめてください | api/v1/server_exports.py, api/v1/social.py |
 | `fake_test_disabled` | 403 | no | 本番・staging の環境では Fake の試験を実行しません | api/v1/admin_ops.py |
 | `file_too_large` | 413 | no | ファイルが大きすぎます(上限 …MB) | api/v1/memories.py |
 | `finance_locked` | 409 | no | 精算を締めているため変更できません。所有者が締めを解除してから変更してください | api/v1/finance.py, api/v1/finance_ledger.py |
@@ -233,7 +233,7 @@
 | `provider_not_configured` | 503 | later | AI の鍵が未設定か確認が切れています(運用コンソールで直せます) | api/v1/spot_media.py |
 | `provider_not_ready` | 503 | later | AI を今は使えません。手で選択肢を書けます | api/v1/discussion.py, api/v1/paid_actions.py |
 | `provider_rejected` | 502, 503 | later | 提供元が要求を受け付けませんでした(鍵・権限・課金)。枠は使っていません。手で続けられます | api/v1/paid_actions.py, api/v1/spot_media.py |
-| `provider_unavailable` | 502, 503 | later | AI を呼び出せませんでした | api/v1/spot_media.py, api/v1/spots.py |
+| `provider_unavailable` | 502, 503 | later | AI で整えられませんでした。下書きのまま使えます | api/v1/social.py, api/v1/spot_media.py, api/v1/spots.py |
 | `publication_not_found` | 404 | no | 公開が見つかりません | api/v1/memory_publish.py |
 | `push_unavailable` | 503 | later | この環境では端末への通知は使えません | api/v1/push.py |
 | `quorum_not_met` | 409 | no | 回答者が定足数(%d人)に届いていないため、決定できません(今 %d人) | api/v1/discussion.py |

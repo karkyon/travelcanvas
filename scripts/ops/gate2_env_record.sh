@@ -46,7 +46,7 @@ code() {
   echo "## alembic"
   echo "current=$(docker compose exec -T backend alembic current 2>/dev/null | awk '{print $1}' | tail -1)"
   echo "heads=$(docker compose exec -T backend alembic heads 2>/dev/null | awk '{print $1}' | tail -1)"
-  echo "expected_head=f3b7d9a1c5e8"
+  echo "expected_head=a5c9e1b3d7f4"
   echo "## http"
   echo "health=$(code "$API/health")"
   echo "ready=$(code "$API/ready")"

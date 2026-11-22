@@ -1,7 +1,7 @@
 {
  "_meta": {
-  "description": "DOC-10 v6.0 の全62 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
-  "revision": "v6.0-r70",
+  "description": "DOC-10 v6.0 の全63 FR の状態の正本(機械が読む版)。docs/spec/DOC-10_*.md の §3 の表はこれと一致する(backend/tests/test_gate_g1_doc10.py)。VERIFIED の証拠は v1-verification-ledger.json。",
+  "revision": "v6.0-r71",
   "weights": {
    "SPECIFIED": 0.0,
    "IMPLEMENTED": 0.4,
@@ -506,6 +506,14 @@
    "e2e": "✓",
    "gates": "Wishes",
    "gaps": "♡ でどこからでも残す(近くの候補・同じ場所のまとめ・圏外の送信待ち・取り消し)・当日の 2 択・旅の記録の「また行きたい」・行きたい場所の札・残した元・近くに来たら知らせる(端末の中だけ)・ここから日帰りは実装済み(統合試験・E2E・画面の試験。E2E の近くの候補は模擬)。近くの候補の実の検索(Overpass)・実機(位置・圏外・知らせ)・旅行当日の確認は未実施(確認表は縦断シナリオ §11)"
+  },
+  "FR-063": {
+   "title": "SNS の下書きとリール",
+   "status": "INTEGRATED",
+   "partial": true,
+   "e2e": "✓",
+   "gates": "Social",
+   "gaps": "投稿の文のひな形(自宅の近く・時刻・名前を外す・許した写真だけ)・AI で整える(押した時だけ)・端末で作るリール(Canvas + MediaRecorder・9:16・15/30/60 秒・安全な範囲・音楽なし・自分の声)・顔をぼかす(Vision の鍵がある時)・保存・共有・書き出しの記録は実装済み(統合試験・E2E(Chromium の端末での作成)・画面の試験)。iPhone の Safari の MP4・TikTok のアプリでの読み込み・Android・iPad の実機と、実の Vision・AI の確認は未実施(確認表は縦断シナリオ §11)。サーバーで作る仕組み(段階 3b)は作らない(利用者の既定の判断)"
   }
  }
 }

@@ -1,6 +1,6 @@
 {
  "_meta": {
-  "description": "全62 FR の要求の根拠(DOC-02 v6.0・FR-059 正本・承認済みの変更。旧版は資料室の v5.1 で保管)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
+  "description": "全63 FR の要求の根拠(DOC-02 v6.0・FR-059 正本・承認済みの変更。旧版は資料室の v5.1 で保管)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
   "gate": "Hardening-A",
   "baseline": "32c7db6ab12169dc05a9d5821d565f591714c0b4",
   "evidence_states": {
@@ -5007,6 +5007,91 @@
     "real_api": {
      "state": "pending",
      "note": "近くの候補の実の検索(Overpass)の確認なし(CI は模擬)"
+    },
+    "ops": {
+     "state": "pending",
+     "note": "本番での提供なし"
+    }
+   },
+   "gap_categories": [
+    "実機待ち",
+    "実通信待ち"
+   ]
+  },
+  "FR-063": {
+   "title": "SNS の下書きとリール",
+   "requirement": {
+    "source": "DOC-02 FR-063(v6.0 で追加。利用者の指示 2026-11-22。詳細設計 DD-2026-11-22-01 段階 3)",
+    "priority": "SHOULD",
+    "stage": "—",
+    "summary": "旅の記録から SNS の投稿の文の下書きと、TikTok・Instagram リール・YouTube ショート向けの縦の動画を端末で作り、保存・共有する(アプリは投稿しない)",
+    "acceptance": "範囲・出す先・写真を選ぶと文ができて自宅の近く・時刻・名前は入らず、TikTok で 9:16・15/30/60 秒の動画を端末で作れ(iPhone は MP4)、位置情報・音楽は入らず、保存・共有ができてアプリは投稿しない"
+   },
+   "approved_changes": [
+    {
+     "date": "2026-11-22",
+     "change": "FR-063 SNS の下書きとリールを追加(モックの画板 6・7 を利用者が承認。リールの最後の文は入れて設定で消せる・段階 3b は作らない)",
+     "source": "DOC-10 r71・DD-2026-11-22-01",
+     "confidence": "高"
+    }
+   ],
+   "spec_refs": {
+    "screens": [
+     "SC-55"
+    ],
+    "api_group": "/plans/{plan_id}/social・/plans/{plan_id}/reel-exports"
+   },
+   "code": {
+    "api": [
+     "backend/app/api/v1/social.py",
+     "backend/app/services/social_draft.py"
+    ],
+    "routes": [
+     "planner/:planId/social"
+    ],
+    "tables": [
+     "reel_exports"
+    ]
+   },
+   "tests": [
+    "backend/tests/test_fr063_social.py",
+    "frontend/src/pages/SocialPage.test.tsx",
+    "frontend/src/pages/social/socialModel.test.ts",
+    "frontend/e2e/social.spec.ts"
+   ],
+   "external_providers": [
+    "OpenAI(AI で整える。押した時だけ・鍵があれば)",
+    "Google Cloud Vision(顔をぼかす。選んだ時だけ・鍵があれば)"
+   ],
+   "day_of_travel": false,
+   "evidence": {
+    "requirement": {
+     "state": "done",
+     "note": "DOC-02 v6.0 FR-063・DOC-04 v6.0 SC-55(利用者の指示 2026-11-22・詳細設計 DD-2026-11-22-01)"
+    },
+    "implementation": {
+     "state": "partial",
+     "note": "コードあり。iPhone の MP4・TikTok のアプリでの読み込みの実機の確認が済むまで(部分)"
+    },
+    "integration": {
+     "state": "done",
+     "note": "実 PostgreSQL の統合試験(ひな形・外すもの・許した写真・形だけのルート・記録・権限・不正入力)"
+    },
+    "e2e": {
+     "state": "done",
+     "note": "Playwright(Chromium の端末で実際にリールを作る。WebM。AI・Vision は使わない)"
+    },
+    "authz_failure": {
+     "state": "partial",
+     "note": "統合試験の権限・失敗系だけ(VERIFIED の証拠台帳には無い)"
+    },
+    "device": {
+     "state": "pending",
+     "note": "iPhone の Safari の MP4・TikTok のアプリでの読み込み・Android・iPad の確認の記録なし"
+    },
+    "real_api": {
+     "state": "pending",
+     "note": "AI で整える・顔の検査(Vision)の実の鍵での確認なし(CI は模擬・未設定)"
     },
     "ops": {
      "state": "pending",

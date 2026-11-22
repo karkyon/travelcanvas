@@ -436,7 +436,7 @@ Event envelopeはevent_id UUID、type、schema_version、occurred_at、actor_typ
 | 自由に歩いた | 旅帖(旅行記の下書き)に入る、エリアで着いた候補の着いた時刻の順の記録 |
 
 
-## 23. 日帰り・今度行きたい の言葉(v6.0 追加。FR-061・FR-062)
+## 23. 日帰り・今度行きたい・SNS の言葉(v6.0 追加。FR-061・FR-062・FR-063)
 
 | 用語 | 意味 |
 |---|---|
@@ -450,6 +450,9 @@ Event envelopeはevent_id UUID、type、schema_version、occurred_at、actor_typ
 | エリア(行きたい場所) | wish_scope `area`(半径 radius_m) |
 | 近くに来たら知らせる | remind_nearby。端末の中だけで比べる知らせ(当日の画面・スポットモードの間だけ・1 日 1 回) |
 | 残した元 | source_kind・source_label(旅行を消しても名前の写しで出す) |
+| リール | 縦 9:16 の短い動画(15 / 30 / 60 秒)。端末の Canvas と MediaRecorder で作り、端末だけに置く(FR-063) |
+| 安全な範囲 | SNS の画面の部品と重ならない、文字を置いてよい範囲(上 12%・下 22%・右 15% を避ける) |
+| 投稿の文の下書き | ひな形で作る文(AI を使わない。保存しない)。「AI で整える」は押した時だけ |
 
 ## 22. 旅行の状態と段階(2026-11-20 追記。実装の言葉を記録したもの)
 
