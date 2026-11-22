@@ -57,7 +57,7 @@ export async function saveWish(args: SaveWishArgs): Promise<QuickWishResult | 'q
     if (status === 429) { toast.error('続けて残しすぎました。1 分ほど待ってから残してください'); return null; }
     if (keepForRetry(e)) {
       if (await queueWish((await import('@/utils/offlineSession')).currentOfflineSession(), input)) {
-        toast('端末に残しました。つながった時に送ります', { icon: '📥' });
+        toast('端末に残しました。つながった時に送ります', { duration: 6000 });
         return 'queued';
       }
       toast.error('端末に残せませんでした。つながってからもう一度残してください');
