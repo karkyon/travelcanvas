@@ -1617,9 +1617,19 @@ class Document(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # [Gate② FC-045] 版(差し替え)。前の版は残し、一覧には出さない(superseded_at)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    replaces_document_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("documents.id", ondelete="SET NULL", name="fk_documents_replaces_document"),
+        nullable=True)
+    superseded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     plan = relationship("TravelPlan")
     owner = relationship("User")
+
+    __table_args__ = (
+        Index("ix_documents_replaces_document", "replaces_document_id"),
+    )
 
 
 class DocumentLink(Base):

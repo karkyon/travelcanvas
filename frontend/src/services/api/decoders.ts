@@ -373,6 +373,7 @@ export const travelDocument: Decoder<TravelDocument> = object<TravelDocument>({
   updated_at: nullable(str),
   link_count: optional(nullable(nonNegativeInt)),
   receipt_count: optional(nullable(nonNegativeInt)),
+  version: optional(int), replaces_document_id: optional(nullable(str)), superseded_at: optional(nullable(str)),
 });
 
 export const documentLink: Decoder<DocumentLink> = object<DocumentLink>({

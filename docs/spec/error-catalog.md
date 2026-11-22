@@ -32,6 +32,7 @@
 | `already_committed` | 409 | no | この下書きはもう旅程にしました。並びは旅程の画面で変えてください | api/v1/trip_intents.py |
 | `already_delivered` | 409 | no | 届いた送信は送り直せません | api/v1/organizations.py |
 | `already_member` | 409 | no | すでにメンバーです | api/v1/organizations.py |
+| `already_replaced` | 409 | no | この版はもう差し替えられています。最新の版を差し替えてください | api/v1/documents.py |
 | `already_resolved` | 409 | no | 既に対応を記録しています | api/v1/corrections.py |
 | `already_restored` | 409 | no | この記録はすでに戻っています | api/v1/memory_publish.py |
 | `already_reverted` | 409 | no | 既に取り消しています | api/v1/corrections.py |
