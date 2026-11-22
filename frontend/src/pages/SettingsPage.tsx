@@ -82,6 +82,9 @@ const SettingsPage: React.FC = () => {
     theme: 'light',
     travel_style: 'balanced',
     ui_style: uiStyle as string,
+    // [FR-061] 好みの傾向を寄り道の並べに使う(既定は入)・[FR-063] リールの最後の「TravelCanvas で作りました」(既定は入)
+    personalize_routes: true as boolean,
+    reel_credit: true as boolean,
   });
 
   // [Gate #20] 以前は保存ボタンがsetTimeoutで成功を偽装するだけで、
@@ -395,6 +398,19 @@ const SettingsPage: React.FC = () => {
             <option value="budget">節約重視</option>
           </select>
         </div>
+        <label className="mt-4 flex min-h-11 items-center gap-2 text-sm text-ink-900">
+          <input type="checkbox" data-testid="settings-personalize-routes" checked={preferences.personalize_routes !== false}
+            onChange={(e) => setPreferences({ ...preferences, personalize_routes: e.target.checked })} />
+          好みを並べに使う(日帰りの寄り道を、行きたい場所・行った場所の傾向で並べる。傾向は保存しません)
+        </label>
+        <label className="mt-2 flex min-h-11 items-center gap-2 text-sm text-ink-900">
+          <input type="checkbox" data-testid="settings-reel-credit" checked={preferences.reel_credit !== false}
+            onChange={(e) => {
+              setPreferences({ ...preferences, reel_credit: e.target.checked });
+              try { localStorage.setItem('tc_reel_credit', e.target.checked ? '1' : '0'); } catch { /* 覚えられなくても動く */ }
+            }} />
+          リールの最後に「TravelCanvas で作りました」を入れる
+        </label>
       </div>
     </div>
   );

@@ -67,7 +67,7 @@ describe('行きたい場所の地図', () => {
     expect(card).toHaveAttribute('data-selected', 'true');
     await waitFor(() => expect(document.querySelectorAll('.tc-pin.is-sel')).toHaveLength(1));
     const sel = document.querySelector('.tc-pin.is-sel') as HTMLElement;
-    expect(sel.textContent).toBe('2');
+    expect(sel.textContent).toBe('♡2')  // [FR-062] 種類の形(今までの行は今度 ♡);
     expect(sel.style.background).toMatch(/220, 38, 38|#dc2626/);
     const pop = await screen.findByTestId('wish-pop-s1', {}, { timeout: 2000 });
     expect(pop).toHaveTextContent('清水寺');
@@ -81,7 +81,7 @@ describe('行きたい場所の地図', () => {
     renderPage();
     await screen.findByRole('listitem', { name: '錦市場' });
     await waitFor(() => expect(pins()).toHaveLength(2));
-    const marker = document.querySelector('.leaflet-marker-icon[title="1. 錦市場"]') as HTMLElement;
+    const marker = document.querySelector('.leaflet-marker-icon[title="1. 錦市場(今度行きたい)"]') as HTMLElement;
     fireEvent.click(marker);
     await waitFor(() => expect(screen.getByRole('listitem', { name: '錦市場' })).toHaveAttribute('data-selected', 'true'));
     fireEvent.click(screen.getByTestId('wish-map-toggle'));
