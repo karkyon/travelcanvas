@@ -35,7 +35,8 @@
 import WishHeartButton from '@/components/wishes/WishHeartButton';
 import WishNearbyBanner from '@/components/wishes/WishNearbyBanner';
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useCurrentTripStore } from '@/store/currentTripStore';
 import { CalendarDays, Camera, Luggage, PartyPopper } from 'lucide-react';
 import Button from '@/components/common/Button';
 import Surface from '@/components/design/Surface';
@@ -108,6 +109,7 @@ const Notice: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 
 const TodayPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
+  const dayTrip = useCurrentTripStore((st) => st.trip?.id === planId && st.trip?.trip_style === 'day_trip');
   const navigate = useNavigate();
   const trip = useTripContext(planId);
   const [params, setParams] = useSearchParams();
@@ -446,6 +448,10 @@ const TodayPage: React.FC = () => {
       {ctx && <TodayTitleRow ctx={ctx} showZoneNote={showZoneNote} live={dash} />}
       {ctx && !screen && (
         <TodaySpotStrip planId={ctx.planId} todayDate={ctx.data.today_date} timeZone={ctx.timeZone} nowMs={ctx.nowMs} />
+      )}
+      {/* [FR-061] 日帰りの旅行は、当日の画面からも寄り道を探せる */}
+      {ctx && dayTrip && (
+        <Link to={`/planner/${ctx.planId}/day-trip`} className="tc-focus-ring tc-mbtn mb-3 min-h-11" data-testid="today-daytrip">寄り道を探す</Link>
       )}
       {/* [FR-062] 近くに来たら知らせる(当日の画面を開いている間だけ・端末の中で比べる) */}
       {ctx && view?.isCurrentDay && <WishNearbyBanner active />}

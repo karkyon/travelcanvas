@@ -66,7 +66,8 @@
   "added_fc064": "Gate② FC-064: notices・ack(discussion.py)",
   "added_fc012": "Gate② FC-012: events/bulk",
   "added_fc045": "Gate② FC-045: documents replace・versions",
-  "captured_at_head_fr062": "dev/fr062-wishes (+FR-062 spots/quick・nearby-candidates・PATCH)"
+  "captured_at_head_fr062": "dev/fr062-wishes (+FR-062 spots/quick・nearby-candidates・PATCH)",
+  "captured_at_head_fr061": "dev/fr061-day-trip (+FR-061 day-trip・FR-062 again)"
  },
  "routes": [
   "DELETE /api/v1/auth/passkeys/{passkey_id}",
@@ -197,6 +198,7 @@
   "GET /api/v1/places/{place_id}/hours",
   "GET /api/v1/plans/documents/download",
   "GET /api/v1/plans/{plan_id}",
+  "GET /api/v1/plans/{plan_id}/again-candidates",
   "GET /api/v1/plans/{plan_id}/alerts",
   "GET /api/v1/plans/{plan_id}/alerts/external",
   "GET /api/v1/plans/{plan_id}/booking-status",
@@ -217,6 +219,8 @@
   "GET /api/v1/plans/{plan_id}/cover",
   "GET /api/v1/plans/{plan_id}/cover/media",
   "GET /api/v1/plans/{plan_id}/data-export",
+  "GET /api/v1/plans/{plan_id}/day-trip",
+  "GET /api/v1/plans/{plan_id}/day-trip/along",
   "GET /api/v1/plans/{plan_id}/days/{day_id}/route-preview",
   "GET /api/v1/plans/{plan_id}/documents",
   "GET /api/v1/plans/{plan_id}/documents/{document_id}",
@@ -454,6 +458,7 @@
   "POST /api/v1/organizations/{org_id}/webhooks/{hook_id}/rotate-secret",
   "POST /api/v1/ownership-transfers/{transfer_id}/accept",
   "POST /api/v1/ownership-transfers/{transfer_id}/decline",
+  "POST /api/v1/plans/{plan_id}/again",
   "POST /api/v1/plans/{plan_id}/alerts",
   "POST /api/v1/plans/{plan_id}/alerts/{alert_id}/replans",
   "POST /api/v1/plans/{plan_id}/booklet-exports",
@@ -479,6 +484,8 @@
   "POST /api/v1/plans/{plan_id}/constraints/undo/{undo_id}",
   "POST /api/v1/plans/{plan_id}/correction-requests",
   "POST /api/v1/plans/{plan_id}/correction-requests/{request_id}/resolve",
+  "POST /api/v1/plans/{plan_id}/day-trip/compare",
+  "POST /api/v1/plans/{plan_id}/day-trip/route",
   "POST /api/v1/plans/{plan_id}/days",
   "POST /api/v1/plans/{plan_id}/days/{day_id}/insertion-preview",
   "POST /api/v1/plans/{plan_id}/days/{day_id}/optimization-candidates",

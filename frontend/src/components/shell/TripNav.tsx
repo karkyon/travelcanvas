@@ -26,7 +26,7 @@ const TripNav: React.FC<{ tripId: string; path: string; row?: boolean }> = ({ tr
   }, [tripId, knownId, inPlanner]);
   return (
     <nav className={`tc-tripnav${row ? ' tc-tripnav--row' : ''}`} aria-label="この旅行のメニュー" data-testid="trip-nav">
-      {railItems(tripId, path, { live }).filter((i) => i.group === 'trip').map(({ key, label, icon: Icon, to, match }) => (
+      {railItems(tripId, path, { live, dayTrip: current?.id === tripId && current?.trip_style === 'day_trip' }).filter((i) => i.group === 'trip').map(({ key, label, icon: Icon, to, match }) => (
         <Link key={key} to={safeInternalPath(to) ?? '/dashboard'} aria-current={match(path) ? 'page' : undefined}
           className={`tc-focus-ring${key === 'today' ? ' tc-tripnav-live' : ''}`} data-testid={`rail-${key}`}>
           <Icon size={16} aria-hidden="true" />

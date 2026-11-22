@@ -255,6 +255,8 @@ export interface TravelPlan {
   hidden_fields?: string[];
   /** [Gate JourneyEnds] 旅程の最初・最後に出発・到着を出すか。場所は短い名前、時刻は "HH:MM"(どれも任意) */
   journey_enabled?: boolean;
+  /** [FR-061] 日帰り */
+  trip_style?: string | null;
   journey_start_place?: string | null;
   journey_start_time?: string | null;
   journey_end_place?: string | null;

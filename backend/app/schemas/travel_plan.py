@@ -133,6 +133,8 @@ class TravelPlanResponse(TravelPlanBase):
     journey_start_minutes: Optional[int] = None
     journey_end_mode: Optional[str] = None
     journey_end_minutes: Optional[int] = None
+    # [FR-061] 日帰り(day_trip)。null は今までの旅行
+    trip_style: Optional[str] = None
 
     class Config:
         from_attributes = True
