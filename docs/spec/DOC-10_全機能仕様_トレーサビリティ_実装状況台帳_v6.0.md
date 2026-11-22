@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v6.0(正本)
 
-> 文書ID: DOC-10 / 版: **v6.0-r69** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-22<br>
+> 文書ID: DOC-10 / 版: **v6.0-r70** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-22<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -18,7 +18,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `d8bd1b7`(PR #60 Gate MockFit。2026-11-05 に版をそろえた時点の main) |
-| Alembic head | `e9a1c3f5b7d2`(単一の head。FR-062 今度行きたい・また行きたいで spots に種類・範囲・残した元・ひとこと・知らせ・回数・client_id の列を追加。追加だけ。その前は `d7f3b5c9e1a4` documents の版) |
+| Alembic head | `f3b7d9a1c5e8`(単一の head。FR-061 日帰りモードで travel_plans.trip_style と day_trip_routes(行き・帰りのルート)を追加。追加だけ。その前は `e9a1c3f5b7d2` FR-062 の spots の列) |
 | 基準の試験の実測(`d8bd1b7`) | backend pytest 1603 合格・1 飛ばし / frontend vitest 1057 合格(196 ファイル) / E2E 100 合格 / 最初に読む JS 428.39 kB(上限 430 kB)。GitHub Actions の main の push run 41880257997 |
 | GitHub Actions(`d8bd1b7`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41880257997)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -30,12 +30,12 @@
 
 | 成果物 | 役割 | 同期の規則 |
 |---|---|---|
-| `docs/trace/fr-status.json` | 全60 FR の状態・(部分)・主な不足の**機械が読む正本** | 状態を変える Gate は同じ commit でこれを直し、`python3 scripts/ci/render_doc10.py` で本書の表を作り直す |
+| `docs/trace/fr-status.json` | 全62 FR の状態・(部分)・主な不足の**機械が読む正本** | 状態を変える Gate は同じ commit でこれを直し、`python3 scripts/ci/render_doc10.py` で本書の表を作り直す |
 | `docs/trace/v1-verification-ledger.json` | VERIFIED の**証拠**(E2E・権限・競合・セキュリティ・運用の試験) | CI が、参照した試験の実在(`test_gate_v1_verification_ledger.py`)と、**その実行での合格**(`scripts/ci/check_ledger_results.py`)を確かめる |
 | 本書(DOC-10) | 人が読む正本(状態の判定規則・集計・リリース・次工程) | 生成部分は手で直さない(CI が落ちる) |
 | `docs/spec/FR-059_*.md` | FR-059(外部 API の原価上限・利用者クラス別 quota)の要件・データ・API・運用の正本 | 資料室の DOC-02/04/05/06/07/09/11/13 の該当箇所より優先する(同書 §12)。policy の版を変える時は同書と本書を同じ PR で直す |
 | `docs/spec/canonical-sources.json`(人が読む版 `CANONICAL-SOURCES.md`) | 資料室の正本(DOC-01〜15)の所在・版・状態と、リポジトリの正本との優先の順(Hardening-A) | 資料室の文書の版が変わったら直し、`python3 scripts/ci/render_fr_trace.py` |
-| `docs/trace/fr-requirements.json`(人が読む版 `docs/trace/FR-TRACE.md`) | 全60 FR の要求の出典・受入・承認済みの変更・画面/API/表/試験・証拠の区分(要件根拠/実装/統合/E2E/権限・失敗/実機/実 API/運用)・残件の分類 | FR の状態・残件を変える Gate は同じ commit で直す。実機・実 API・運用を「済」にするには証拠のファイルが要る(`test_gate_hardening_trace.py`) |
+| `docs/trace/fr-requirements.json`(人が読む版 `docs/trace/FR-TRACE.md`) | 全62 FR の要求の出典・受入・承認済みの変更・画面/API/表/試験・証拠の区分(要件根拠/実装/統合/E2E/権限・失敗/実機/実 API/運用)・残件の分類 | FR の状態・残件を変える Gate は同じ commit で直す。実機・実 API・運用を「済」にするには証拠のファイルが要る(`test_gate_hardening_trace.py`) |
 | `docs/security/SECURITY-TRACE.md` | DOC-11 の項目・SEC-001〜020 と実装・試験・本番の証跡の対応 | 参照の実在を CI で確かめる |
 | `docs/trace/gate-*-trace.md` | Gate ごとの要件の証拠(当時の状態) | 後の Gate で解消した行には `SUPERSEDED BY` を書く。今の状態の索引は `docs/trace/INDEX.md` |
 | 作業継続のハンドオフ(資料室) | 会話をまたぐ作業の引き継ぎ | 本書の版と commit を書く。状態の数字は本書から写す |
@@ -64,22 +64,22 @@
 - **E2E 列:** ✓=Playwright の実ブラウザ試験あり、一部=一部の能力だけ、✗=なし。E2E が無い機能は VERIFIED にしない。
 - 段を飛ばさない(SCAFFOLDED から VERIFIED へ一気に上げない)。後退する時は理由を §9 に残す。
 
-## 2. 集計(全60 FR)
+## 2. 集計(全62 FR)
 
 <!-- generated:summary -->
 | 見方 | 値 |
 |---|---|
-| コードがある機能(IMPLEMENTED 以上) | 60/60 = 100% |
-| INTEGRATED 以上 | 60/60 = 100%(うち(部分) 16) |
-| VERIFIED | 38/60 = 63% |
-| RELEASED | 0/60 = 0% |
-| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約82.7% |
+| コードがある機能(IMPLEMENTED 以上) | 62/62 = 100% |
+| INTEGRATED 以上 | 62/62 = 100%(うち(部分) 18) |
+| VERIFIED | 38/62 = 61% |
+| RELEASED | 0/62 = 0% |
+| 加重進捗(SPECIFIED 0・IMPLEMENTED 0.4・INTEGRATED 0.7・VERIFIED 0.9・RELEASED 1.0) | 約82.3% |
 | 未着手(SPECIFIED 以下) | なし |
 
 VERIFIED の一覧: 001/002/003/004/005/006/009/010/012/013/016/017/019/020/021/022/023/025/026/027/028/029/031/032/033/034/038/039/040/043/044/045/047/048/050/051/053/057。
 <!-- /generated:summary -->
 
-## 3. 親機能のトレーサビリティ(全60 FR)
+## 3. 親機能のトレーサビリティ(全62 FR)
 
 画面・DB・API・試験の対応の詳細は各 Gate の trace(`docs/trace/gate-*-trace.md`)と ADR(`docs/adr/`)。
 VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
@@ -147,6 +147,8 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | FR-058 | Entitlement・料金 | INTEGRATED(部分) | 一部 | Remaining-4 | Stripe のテストモードだけ(本番の鍵 sk_live_ は断る。利用者の決定 2026-11-13)。価格は仮(管理画面で変える)。実の Stripe のテストの鍵での確認は鍵の登録の後。組織でまとめる支払い(FR-041)・指定した支払う人は未実装。E2E は鍵の無い時の案内だけ |
 | FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ✓ | FR059-A・FR059-B・FR059-C・FR059-Tiers・ProviderConnect | OpenAI(ai.generate)・Places(places.search)・Routes(routes.element)の adapter と鍵の有効性の確認は実装済み(CI は模擬の通信。実の鍵での確認・実送信・請求の照合は omega-dev2 で未実施)。places.details・places.photo・ai.web_search・map.load(Maps Static)の adapter は Remaining-7(実の鍵での確認・請求の照合は鍵の後)、会員の機能クラス Free/Trip/Journey/Explorer の価格・販売(FR-058)、保存の数・オフライン・書き出しのクラス別の制限は未実装(既存の上限のまま)、決済(Trip Pass の購入・指定した支払う人・組織でまとめる月の枠は FR-058・FR-041)。鍵の確認は 72 時間で失効する |
 | FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | ✓ | SpotMode | エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存・別行動の集合の共有・旅帖の歩いた順は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施(確認表は縦断シナリオ §10)。地図の絵の端末への保存は OpenStreetMap の方針で一括取得をしない(圏外は方角で見る) |
+| FR-061 | 日帰りモード(ルートと寄り道) | INTEGRATED(部分) | ✓ | DayTrip | 新しい旅行の日帰り・行き帰りのルート(Google → OSRM → 直線)・道の使い方の比べ・ルートの近くの寄り道(幅・ジャンル・あなた向け・寄り道の時間)・予定に入れる・家に着く見込みは実装済み(統合試験・E2E・画面の試験。E2E の店の検索は模擬)。Google Routes の線・料金(field mask を足したため鍵の確認のやり直しが要る)・実の店の検索・実機・日帰りの当日の確認は未実施(確認表は縦断シナリオ §11) |
+| FR-062 | 今度行きたい・また行きたい | INTEGRATED(部分) | ✓ | Wishes | ♡ でどこからでも残す(近くの候補・同じ場所のまとめ・圏外の送信待ち・取り消し)・当日の 2 択・旅の記録の「また行きたい」・行きたい場所の札・残した元・近くに来たら知らせる(端末の中だけ)・ここから日帰りは実装済み(統合試験・E2E・画面の試験。E2E の近くの候補は模擬)。近くの候補の実の検索(Overpass)・実機(位置・圏外・知らせ)・旅行当日の確認は未実施(確認表は縦断シナリオ §11) |
 <!-- /generated:fr-table -->
 
 ## 4. 主要な縦切り(J-01〜J-07)
@@ -293,6 +295,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | **r67** | 2026-11-21 | Gate2-FC | **FC-012 まとめて編集(POST /plans/{id}/events/bulk。選んだ予定の種類を変える・別の日へ移すを 1 つの変更の組で。元に戻すで一度に戻る。鍵・エリアは断る。参加者は予定に持たない項目のため対象外)。DB の変更なし(Alembic head は `c5e1a7d3b9f2` のまま)。FR の状態の遷移なし** |
 | **r68** | 2026-11-22 | Gate2-FC | **FC-045 文書の差し替え(POST …/documents/{id}/replace・GET …/versions。新しい版として保存し前の版を残す。旅程・予約との紐付けは新しい版へ移し、費用のレシート・読み取りの記録は読み取った版を指したまま。Alembic `d7f3b5c9e1a4`)・OCR を 1 つのスレッドで動かす(CPU が混んだ時の時間切れを防ぐ)。FR の状態の遷移なし** |
 | **r69** | 2026-11-22 | FR-062 | **今度行きたい・また行きたい(詳細設計 DD-2026-11-22-01 段階 1): ♡ でどこからでも残す(POST /spots/quick。同じ場所・同じ client_id はまとめる・圏外は端末に暗号化して溜める)・今いる所の周り 300m の候補(GET /spots/nearby-candidates。位置は小数 4 桁に丸め、保存・ログをしない)・旅の記録の「また行きたい」(GET/POST /plans/{id}/again-candidates・again。本人の記録だけ・key は署名)・行きたい場所の札(今度・また・エリア)・残した元・近くに来たら知らせる(端末の中だけ)・ここから日帰りの入口。Alembic `e9a1c3f5b7d2`。FR-062 の行は FR-061 と同じ版で足す(FR の番号は続けて並べるため)。実機・実の場所の検索の確認は未実施** |
+| **r70** | 2026-11-22 | FR-061/062 | **FR-061 日帰りモード(詳細設計 DD-2026-11-22-01 段階 2): 新しい旅行の泊まり / 日帰り・行き帰りのルート(Google Routes → OSRM → 直線。計算の用途だけの field mask `ROUTES_LINE_FIELD_MASK` を足したため、反映の後に管理画面で Google のサーバー用キーの「有効性を確認」が要る)・道の使い方の比べ・ルートの近くの寄り道(幅・ジャンル・あなた向け・寄り道の時間)・予定に入れる・家に着く見込み。Alembic `f3b7d9a1c5e8`。FR-061・FR-062 を fr-status・fr-requirements に追加し **全62 FR**(どちらも INTEGRATED(部分)。実機・実 API の確認は未実施)。DOC-02・04・13・SECURITY-TRACE・縦断シナリオ §11 に追記。FR-063 は段階 3 で足す** |
 
 ## 10. 台帳の更新の規則
 
