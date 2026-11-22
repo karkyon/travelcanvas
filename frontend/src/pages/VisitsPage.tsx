@@ -9,6 +9,7 @@
  * - 訂正: 行った(確定)/ 通過だった / 行っていない / 地図から隠す(Atlas にも出さない)/ 自動の判定に戻す
  * 判定はあなただけのもの(同じ旅行のほかの人には見えません)。
  */
+import WishSaveButton from '@/components/wishes/WishSaveButton';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
@@ -265,6 +266,9 @@ const VisitsPage: React.FC = () => {
                         onMouseEnter={() => setSelected(it.event_id)}>
                         <div className="flex flex-wrap items-baseline gap-2">
                           <h3 id={headingId} className="font-semibold text-ink-900">{it.title}</h3>
+                          {/* [FR-062] ♡ また行きたい(本人の行きたい場所へ。旅行は変えない) */}
+                          <WishSaveButton name={it.title} latitude={it.latitude} longitude={it.longitude} genre={it.event_type}
+                            kind="again" sourceKind="visit" planId={planId} />
                           <span className="text-sm text-ink-700">{it.date}{it.planned_time ? ` ${it.planned_time}` : ''}</span>
                           <span className="text-sm font-medium text-ink-900" data-testid="layer-state">
                             <span aria-hidden="true">{LAYER_SYMBOL[it.layer_state]} </span>{LAYER_LABEL[it.layer_state]}

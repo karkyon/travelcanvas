@@ -8,13 +8,14 @@
  * - 行かなかった予定を、別の旅行の日へ予定として戻せる
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import api, { carryOverEvent, deleteEventActual, getJourney, putEventActual } from '@/services/api';
 import type { ActualInput, JourneyEvent, JourneyReview, NormalizedDay } from '@/services/api';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
+import AgainPanel from './journey/AgainPanel';
 import { diffLabel, localTime, metricRows, zonedToIso } from './journey/journeyModel';
 
 const HIDE_KEY = 'tc_journey_hide_metrics';
@@ -35,6 +36,9 @@ interface CarryState {
 
 const JourneyPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
+  // [FR-062] 上の札: 振り返る / また行きたい(?tab=again。リールの最後の「場所を選んで残す」から開く)
+  const [search, setSearch] = useSearchParams();
+  const tab = search.get('tab') === 'again' ? 'again' : 'review';
   const navigate = useNavigate();
   const [data, setData] = useState<JourneyReview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -136,10 +140,18 @@ const JourneyPage: React.FC = () => {
       <p className="text-sm text-ink-700 mt-1">
         予定ごとに、行ったか・いつ着いて出たかを記録します。予定そのものは変わりません。時刻は各日のタイムゾーンで表示します。
       </p>
-      {error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
-      {message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
+      <div className="tc-list-tabs mt-3" role="tablist" aria-label="振り返りの表示">
+        {([['review', '振り返る'], ['again', 'また行きたい']] as const).map(([k, l]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k}
+            className={`tc-focus-ring tc-pill min-h-11 ${tab === k ? 'is-active font-semibold' : ''}`}
+            onClick={() => setSearch(k === 'again' ? { tab: 'again' } : {}, { replace: true })}>{l}</button>
+        ))}
+      </div>
+      {tab === 'again' && planId && <AgainPanel planId={planId} />}
+      {tab === 'review' && error && <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</div>}
+      {tab === 'review' && message && <div className="mt-4 p-3 rounded-lg bg-green-50 text-green-900 text-sm" role="status">{message}</div>}
 
-      {isLoading || !data ? (
+      {tab !== 'review' ? null : isLoading || !data ? (
         <div className="flex justify-center py-16"><LoadingSpinner size="lg" /></div>
       ) : (
         <>
