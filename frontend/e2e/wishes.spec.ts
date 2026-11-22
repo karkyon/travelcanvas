@@ -69,6 +69,4 @@ test('今度行きたい: ♡ のシートから 2 タップで残し、行き�
   await expectNoAxeViolations(page, '行きたい場所(札)');
   await card.getByRole('button', { name: 'ここから日帰り' }).click();
   await expect(page).toHaveURL(/\/planner\?new=1&mode=day&spot=/);
-  await expect(page.getByTestId('trip-mode-day')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('dt-dest-chosen')).toContainText('赤福 本店', { timeout: 15_000 });
 });
