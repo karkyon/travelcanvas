@@ -382,9 +382,20 @@ jobs:
 
       - name: Install frontend dependencies + Playwright browser
         working-directory: frontend
+        # [Gate②] Playwright の OS の依存(フォントなど)を apt で入れる時、runner の apt の一覧の取得が一時的に失敗すると
+        # 「Unable to locate package fonts-…」で E2E が試験の前に落ちる(PR #179 の run 45009277267、2026-11-22)。
+        # 一覧の更新と依存の導入を分け、失敗したら待って 3 回まで直す。3 回とも失敗したら、どの段で落ちたかを出して止める。
+        # フォントは Ubuntu の公式のパッケージから入れる(リポジトリに同梱しない)
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          ok=""
+          for i in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install-deps chromium; then ok=1; break; fi
+            echo "::warning::Playwright の OS の依存の導入に失敗(${i} 回目)。30 秒待ってやり直す"
+            sleep 30
+          done
+          if [ -z "$ok" ]; then echo "::error::Playwright の OS の依存(apt)を 3 回とも入れられなかった(runner の apt の不調)"; exit 1; fi
+          npx playwright install chromium
 
       - name: Playwright E2E (ブロッキング)
         working-directory: frontend
