@@ -436,6 +436,21 @@ Event envelopeはevent_id UUID、type、schema_version、occurred_at、actor_typ
 | 自由に歩いた | 旅帖(旅行記の下書き)に入る、エリアで着いた候補の着いた時刻の順の記録 |
 
 
+## 23. 日帰り・今度行きたい の言葉(v6.0 追加。FR-061・FR-062)
+
+| 用語 | 意味 |
+|---|---|
+| 日帰り | `travel_plans.trip_style = day_trip` の旅行。行き・帰りのルートは day_trip_routes |
+| ルートの幅 | ルートの線からの距離の上限(300m / 1km / 3km / 5km) |
+| 寄り道 | ルートから外れて立ち寄る場所 |
+| 寄り道の時間 | 追加の時間の目安(往復 + 3 分。下道 30km/h・高速は近い IC・SA/PA から 40km/h。分からない時は +約 15 分の札) |
+| あなた向け | 好みの傾向(保存しない。本人の応答だけ)で並べること |
+| 今度行きたい | 行きたい場所の wish_kind `next`(null の今までの行も今度に数える) |
+| また行きたい | wish_kind `again`。同じ場所を残すと again_count が増える |
+| エリア(行きたい場所) | wish_scope `area`(半径 radius_m) |
+| 近くに来たら知らせる | remind_nearby。端末の中だけで比べる知らせ(当日の画面・スポットモードの間だけ・1 日 1 回) |
+| 残した元 | source_kind・source_label(旅行を消しても名前の写しで出す) |
+
 ## 22. 旅行の状態と段階(2026-11-20 追記。実装の言葉を記録したもの)
 
 旅行には、**利用者が選ぶ「状態」**と、**日付から決まる「段階」**の 2 つがあり、別の物。
@@ -456,4 +471,4 @@ Event envelopeはevent_id UUID、type、schema_version、occurred_at、actor_typ
 | 版 | 日付 | 内容 |
 |---|---|---|
 | v5.1 | 2026-09-03 | 資料室。保管 |
-| **v6.0** | 2026-11-17 | リポジトリの正本へ。§15〜19 の実装の言葉、エラーの code の正本を error-catalog に、ブランチを廃止の語に。§20 相談の言葉(Gate ChatConsensus)。§21 スポットモードの言葉(Gate SpotMode) |
+| **v6.0** | 2026-11-17 | リポジトリの正本へ。§15〜19 の実装の言葉、エラーの code の正本を error-catalog に、ブランチを廃止の語に。§20 相談の言葉(Gate ChatConsensus)。§21 スポットモードの言葉(Gate SpotMode)。§23 日帰り・今度行きたいの言葉(FR-061・FR-062) |

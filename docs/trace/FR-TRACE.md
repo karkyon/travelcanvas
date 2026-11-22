@@ -1,4 +1,4 @@
-# 全60 FR の要求の追跡(Gate Hardening-A・監査 G-01/G-03。FR-060 は Gate SpotMode)
+# 全62 FR の要求の追跡(Gate Hardening-A・監査 G-01/G-03。FR-060 は Gate SpotMode・FR-061/062 は日帰り・今度行きたい)
 
 > この文書は `python3 scripts/ci/render_fr_trace.py` が `docs/trace/fr-requirements.json` と `docs/trace/fr-status.json` から作る(手で直さない)。
 > 要求の原文の正本は DOC-02 v6.0(`docs/spec/DOC-02_要件定義書_v6.0.md`。所在の一覧は [CANONICAL-SOURCES.md](../spec/CANONICAL-SOURCES.md))。ここの要約・受入は抜粋の言い換え。
@@ -70,12 +70,14 @@
 | FR-058 | Entitlement・料金 | INTEGRATED(部分) | ● | ◐ | ◐ | ◐ | ◐ | ○ | ○ | ○ | 設定待ち・未実装・利用者判断待ち |
 | FR-059 | 旅程相談 API の原価上限・クラス別 Quota | INTEGRATED(部分) | ● | ◐ | ◐ | ● | ◐ | ○ | ○ | ○ | 設定待ち・実通信待ち・未実装 |
 | FR-060 | スポットモード(自由に歩くエリア) | INTEGRATED(部分) | ● | ◐ | ● | ● | ◐ | ○ | ○ | ○ | 実機待ち・実通信待ち |
+| FR-061 | 日帰りモード(ルートと寄り道) | INTEGRATED(部分) | ● | ◐ | ● | ● | ◐ | ○ | ○ | ○ | 実機待ち・実通信待ち・設定待ち |
+| FR-062 | 今度行きたい・また行きたい | INTEGRATED(部分) | ● | ◐ | ● | ● | ◐ | ○ | ○ | ○ | 実機待ち・実通信待ち |
 
 | 集計 | 要件の根拠 | 実装 | 統合試験 | E2E | 権限・失敗系 | 実機 | 実 API | 運用(本番) |
 |---|---|---|---|---|---|---|---|---|
-| ● 証拠あり | 60 | 44 | 45 | 57 | 38 | 0 | 0 | 0 |
-| ◐ 一部 | 0 | 16 | 15 | 3 | 22 | 0 | 0 | 0 |
-| ○ 未実施・未確認 | 0 | 0 | 0 | 0 | 0 | 60 | 25 | 60 |
+| ● 証拠あり | 62 | 44 | 47 | 59 | 38 | 0 | 0 | 0 |
+| ◐ 一部 | 0 | 18 | 15 | 3 | 24 | 0 | 0 | 0 |
+| ○ 未実施・未確認 | 0 | 0 | 0 | 0 | 0 | 62 | 27 | 62 |
 | — 対象外(理由を書く) | 0 | 0 | 0 | 0 | 0 | 0 | 35 | 0 |
 
 ## 2. FR ごとの要求の根拠と対応
@@ -813,3 +815,29 @@
 - **外部の提供元:** OpenStreetMap(地図の絵)・場所の検索(place_finder。周りを探す)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の位置・地図・画面の大きさの確認の記録なし) / 実 API ○(実の場所の検索での周りを探すの確認なし(CI は模擬)) / 運用(本番) ○(本番での提供なし)
 - **主な不足(fr-status.json):** エリア・候補・当日の着いた/行きたい印・周りを探す・次どこ？・方角で見る・端末への保存・別行動の集合の共有・旅帖の歩いた順は実装済み(統合試験・E2E・画面の試験)。周りを探すの実の場所の検索(CI は模擬)・実機(iPhone・Android・iPad の位置・地図・画面の大きさ)・旅行当日の確認は未実施(確認表は縦断シナリオ §10)。地図の絵の端末への保存は OpenStreetMap の方針で一括取得をしない(圏外は方角で見る)
+
+### FR-061 日帰りモード(ルートと寄り道)
+
+- **出典:** DOC-02 FR-061(v6.0 で追加。利用者の指示 2026-11-22。詳細設計 DD-2026-11-22-01 段階 2)(優先度 SHOULD・段階 —)
+- **要求(抜粋):** 新しい旅行を日帰りで作り、行きと帰りのルートの近くの寄り道を、ジャンル・幅・好みで探して予定に入れる
+- **受入(抜粋):** 日帰りを選んで保存するとルートの画面に線と寄り道の候補が出て、高速と下道で時間・距離・料金・線が変わり、幅を越える候補は出ず、あなた向けで理由の札が出て、予定に入れると家に着く見込みが変わり、Google が無い時も OSRM か直線の予備で動く
+- **承認済みの変更 2026-11-22:** FR-061 日帰りモードを追加(モックの画板 1・2 を利用者が承認)(出典: DOC-10 r70・DD-2026-11-22-01・確度 高)
+- **仕様の参照:** 画面 SC-51・SC-52 / API 群 /plans/{plan_id}/day-trip
+- **実装:** API `backend/app/api/v1/day_trip.py`・`backend/app/services/day_trip.py`・`backend/app/services/preference_profile.py` / 画面 `/planner/:planId/day-trip` / 表 `day_trip_routes`・`travel_plans`
+- **試験:** `backend/tests/test_fr061_day_trip.py`・`frontend/src/pages/DayTripPage.test.tsx`・`frontend/src/pages/dayTrip/dayTripModel.test.ts`・`frontend/src/pages/dayTrip/DayTripQuickFields.test.tsx`・`frontend/e2e/day-trip.spec.ts`
+- **外部の提供元:** Google Routes(有料。鍵があれば)・OSRM(自分の server)・場所の検索(place_finder: Yahoo!・ホットペッパー・OpenStreetMap)・OpenStreetMap(地図の絵)
+- **証拠:** 実機 ○(実機(iPhone・Android・iPad)の位置・地図・圏外の確認の記録なし) / 実 API ○(Google Routes の線・料金・実の店の検索の確認なし(CI は模擬。field mask を足したため鍵の確認のやり直しが要る)) / 運用(本番) ○(本番での提供なし)
+- **主な不足(fr-status.json):** 新しい旅行の日帰り・行き帰りのルート(Google → OSRM → 直線)・道の使い方の比べ・ルートの近くの寄り道(幅・ジャンル・あなた向け・寄り道の時間)・予定に入れる・家に着く見込みは実装済み(統合試験・E2E・画面の試験。E2E の店の検索は模擬)。Google Routes の線・料金(field mask を足したため鍵の確認のやり直しが要る)・実の店の検索・実機・日帰りの当日の確認は未実施(確認表は縦断シナリオ §11)
+
+### FR-062 今度行きたい・また行きたい
+
+- **出典:** DOC-02 FR-062(v6.0 で追加。利用者の指示 2026-11-22。「重要」。詳細設計 DD-2026-11-22-01 段階 1)(優先度 MUST・段階 —)
+- **要求(抜粋):** どの画面からも ♡ で今度行きたいに残し、旅の記録からまた行きたいを残し、行きたい場所を今度・また・エリアで見分ける
+- **受入(抜粋):** ♡ → 近くの候補で 2 タップで残り、圏外の分はつながると 1 件だけ入り、同じ場所を二重に作らず、旅の記録から場所・エリア・行けなかった場所を残せ、行きたい場所の画面で今度・また・エリアに分かれて残した元が出て、近くの知らせは位置を送らず、ここから日帰りで日帰りの作成が開く
+- **承認済みの変更 2026-11-22:** FR-062 今度行きたい・また行きたいを追加(モックの画板 3〜5 を利用者が承認)(出典: DOC-10 r69/r70・DD-2026-11-22-01・確度 高)
+- **仕様の参照:** 画面 SC-53・SC-54 / API 群 /spots/quick・/spots/nearby-candidates・/plans/{plan_id}/again
+- **実装:** API `backend/app/api/v1/spots.py`・`backend/app/api/v1/again.py`・`backend/app/services/wishes.py`・`backend/app/services/again_candidates.py` / 画面 `/spots`・`/planner/:planId/journey` / 表 `spots`
+- **試験:** `backend/tests/test_fr062_quick_wish.py`・`backend/tests/test_fr062_again.py`・`frontend/src/components/wishes/WishSheet.test.tsx`・`frontend/src/utils/wishQueue.test.ts`・`frontend/src/pages/journey/AgainPanel.test.tsx`・`frontend/src/pages/SpotListPage.wishKinds.test.tsx`・`frontend/src/components/wishes/useNearbyWishReminder.test.ts`・`frontend/e2e/wishes.spec.ts`
+- **外部の提供元:** 場所の検索(近くの候補: OpenStreetMap Overpass・Wikipedia)
+- **証拠:** 実機 ○(実機(iPhone・Android・iPad)の位置・地図・圏外の確認の記録なし) / 実 API ○(近くの候補の実の検索(Overpass)の確認なし(CI は模擬)) / 運用(本番) ○(本番での提供なし)
+- **主な不足(fr-status.json):** ♡ でどこからでも残す(近くの候補・同じ場所のまとめ・圏外の送信待ち・取り消し)・当日の 2 択・旅の記録の「また行きたい」・行きたい場所の札・残した元・近くに来たら知らせる(端末の中だけ)・ここから日帰りは実装済み(統合試験・E2E・画面の試験。E2E の近くの候補は模擬)。近くの候補の実の検索(Overpass)・実機(位置・圏外・知らせ)・旅行当日の確認は未実施(確認表は縦断シナリオ §11)

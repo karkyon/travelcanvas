@@ -9,6 +9,9 @@
  * /planner        -> プラン一覧 + 新規作成
  * /planner/:planId -> 選択したプランの日程編集画面(PlanHeader + 日タブ + DayView)
  */
+import DayTripQuickFields from './dayTrip/DayTripQuickFields';
+import { dayTripProblem, emptyDayTrip, pendingKey, type DayTripDraft } from './dayTrip/dayTripDraft';
+import { computeDayTripRoute, ROADS } from '@/services/api/dayTrip';
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { usePlanStore } from '@/store/planStore';
@@ -175,6 +178,20 @@ const PlannerPage: React.FC = () => {
   const [newPlanDestination, setNewPlanDestination] = useState('');
   // [Gate MemoryReel] 思い出の「同じ場所でもう一度計画する」(/planner?new=1&destination=…)は、行き先を入れてクイックを開く
   const presetDestination = !planId ? searchParams.get('destination') : null;
+  // [FR-061] 泊まり / 日帰り。「ここから日帰り」(/planner?new=1&mode=day&spot={id})は日帰りで開き、目的地を入れておく
+  const [tripMode, setTripMode] = useState<'stay' | 'day'>(() => (!planId && searchParams.get('mode') === 'day' ? 'day' : 'stay'));
+  const [dayDraft, setDayDraft] = useState<DayTripDraft>(() => emptyDayTrip());
+  const presetSpot = !planId && searchParams.get('mode') === 'day' ? searchParams.get('spot') : null;
+  useEffect(() => {
+    if (!presetSpot) return;
+    let alive = true;
+    spotApiService.getSpot(presetSpot).then((sp) => {
+      if (!alive || sp.latitude == null || sp.longitude == null) return;
+      setDayDraft((d) => ({ ...d, dest: { label: sp.name, lat: sp.latitude as number, lng: sp.longitude as number, spot_id: sp.id },
+        destAddress: sp.address ?? null }));
+    }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [presetSpot]);
   useEffect(() => {
     if (!presetDestination) return;
     setNewPlanDestination(presetDestination.slice(0, 120));
@@ -885,6 +902,7 @@ const PlannerPage: React.FC = () => {
   }, [currentPlanId, activeDayId, isGuest]);
 
   const handleCreatePlan = async () => {
+    if (tripMode === 'day') { await handleCreateDayTrip(); return; }
     // [Gate #38] CA-001の受入条件「旅行名未入力でも作成できる」に合わせ、
     // タイトル必須のガードを撤廃。空欄時はstore側で目的地/日付から自動生成する。
     setIsCreating(true);
@@ -911,6 +929,33 @@ const PlannerPage: React.FC = () => {
       }
       // createがnullの場合、createQuickPlan内部(createPlan)が既にエラー
       // トーストを表示済み。入力内容は保持されるので再試行できる。
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // [FR-061] 日帰り: 出発日 = 帰着日・最初の予定 = 目的地で作り、行きと帰りを計算してルートの画面へ
+  const handleCreateDayTrip = async () => {
+    const problem = dayTripProblem(dayDraft);
+    if (problem) { addToast({ message: problem.text, type: 'error' }); return; }
+    const dest = dayDraft.dest!;
+    setIsCreating(true);
+    try {
+      const created = await createQuickPlan({
+        title: newPlanTitle.trim() || `${dest.label}へ日帰り`, destination: dest.label,
+        startDate: dayDraft.date, endDate: dayDraft.date, firstEventTitle: dest.label, firstEventLocation: dayDraft.destAddress ?? dest.label,
+        tripStyle: 'day_trip',
+      });
+      if (!created) return;
+      const input = { origin: dayDraft.origin!, destination: dest, road: dayDraft.road, depart_at: dayDraft.depart,
+        home_by: dayDraft.homeBy || null };
+      try { sessionStorage.setItem(pendingKey(created.id), JSON.stringify(input)); } catch { /* 覚えられなくても動く */ }
+      try {
+        await computeDayTripRoute(created.id, input);
+      } catch { /* 旅行はできている。ルートの画面で「もう一度」を出す */ }
+      setNewPlanTitle('');
+      setDayDraft(emptyDayTrip());
+      navigate(`/planner/${created.id}/day-trip`);
     } finally {
       setIsCreating(false);
     }
@@ -1864,6 +1909,13 @@ const PlannerPage: React.FC = () => {
                 <span className="tc-pill tc-pill--blue">かんたん入力</span>
               </div>
               <div className="space-y-4">
+                {/* [FR-061] 泊まり / 日帰り(既定は泊まり。切り替えても入れた値は消さない) */}
+                <div className="tc-list-tabs" role="group" aria-label="泊まり・日帰り" data-testid="trip-mode">
+                  {([['stay', '泊まり'], ['day', '日帰り']] as const).map(([k, l]) => (
+                    <button key={k} type="button" aria-pressed={tripMode === k} className="tc-focus-ring" data-testid={`trip-mode-${k}`}
+                      onClick={() => setTripMode(k)}>{l}</button>
+                  ))}
+                </div>
                 <Input
                   label="旅行の名前(任意、未入力なら自動で名付けます)"
                   value={newPlanTitle}
@@ -1872,6 +1924,8 @@ const PlannerPage: React.FC = () => {
                   fullWidth
                   autoFocus
                 />
+                {tripMode === 'day' && <DayTripQuickFields value={dayDraft} onChange={setDayDraft} />}
+                <div hidden={tripMode === 'day'} className="space-y-4">
                 <Input
                   label="行き先(任意)"
                   value={newPlanDestination}
@@ -1924,14 +1978,21 @@ const PlannerPage: React.FC = () => {
                     <p className="text-xs text-ink-500">場所がまだ決まらなくても旅行を作れます。</p>
                   </div>
                 </div>
+                </div>
               </div>
             </div>
             <aside className="tc-card tc-quick-preview" aria-label="旅行カードの予告">
               <p className="tc-label">旅行カード · プレビュー</p>
               <div className="tc-preview-card">
                 <div className="tc-trip-thumb" style={{ width: '100%', height: 122 }}><Landscape /></div>
-                <span className="tc-pill tc-pill--good mt-3">新しい旅行</span>
-                <h3 data-testid="quick-preview-title">{newPlanTitle.trim() || (newPlanDestination.trim() ? `${newPlanDestination.trim()}の旅` : '名前は保存の時に付きます')}</h3>
+                <span className="tc-pill tc-pill--good mt-3">{tripMode === 'day' ? '日帰り' : '新しい旅行'}</span>
+                <h3 data-testid="quick-preview-title">{newPlanTitle.trim() || (tripMode === 'day'
+                  ? (dayDraft.dest ? `${dayDraft.dest.label}へ日帰り` : '目的地を選ぶと名前が付きます')
+                  : (newPlanDestination.trim() ? `${newPlanDestination.trim()}の旅` : '名前は保存の時に付きます'))}</h3>
+                {tripMode === 'day' && (
+                  <p className="text-xs text-ink-700" data-testid="quick-preview-day">{[dayDraft.date || '日付は未定', `${dayDraft.depart} 出発`,
+                    ROADS.find(([r]) => r === dayDraft.road)?.[1]].join(' · ')}</p>
+                )}
                 <p className="text-xs text-ink-500">
                   {[newPlanDestination.trim() || '行き先は未定',
                     newPlanStartDate ? `${newPlanStartDate}${newPlanEndDate && newPlanEndDate !== newPlanStartDate ? `〜${newPlanEndDate}` : ''}` : '日付は未定']
@@ -1964,7 +2025,7 @@ const PlannerPage: React.FC = () => {
         <form onSubmit={(e) => { e.preventDefault(); void handleCreatePlan(); }} aria-label="クイックで旅行を作る">
           {quickLayout}
           <div className="tc-quick-submit">
-            <Button variant="primary" type="submit" loading={isCreating}>この旅を保存して旅程へ →</Button>
+            <Button variant="primary" type="submit" loading={isCreating}>{tripMode === 'day' ? 'ルートと寄り道を探す →' : 'この旅を保存して旅程へ →'}</Button>
           </div>
         </form>
       </div>

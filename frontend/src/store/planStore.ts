@@ -90,6 +90,8 @@ interface PlanState {
     firstEventTitle?: string;
     firstEventTime?: string;
     firstEventLocation?: string;
+    /** [FR-061] 日帰り(promote で travel_plans.trip_style に入れる) */
+    tripStyle?: 'day_trip';
   }) => Promise<TravelPlan | null>;
 
   // Day management
@@ -436,7 +438,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         deviceToken,
         generateIdempotencyKey(),
         // [Gate2 G2-04] 新しい旅行の日は端末の時刻帯で作る(送らないと UTC になる)
-        { ...(deviceTimeZone() ? { timezone_id: deviceTimeZone() } : {}) },
+        { ...(deviceTimeZone() ? { timezone_id: deviceTimeZone() } : {}), ...(input.tripStyle ? { trip_style: input.tripStyle } : {}) },
       );
     } catch (error) {
       console.error('QuickDraft promoteエラー:', error);

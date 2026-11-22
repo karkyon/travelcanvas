@@ -5,7 +5,7 @@ TravelCanvas 旅行プラン(TravelPlan)スキーマ
 import re
 import uuid
 from datetime import date, datetime
-from typing import Optional, Dict, Any
+from typing import Literal, Optional, Dict, Any
 
 from pydantic import BaseModel, validator
 
@@ -40,6 +40,8 @@ class TravelPlanBase(BaseModel):
 
 class TravelPlanCreate(TravelPlanBase):
     """旅行プラン作成スキーマ"""
+    # [FR-061] 日帰りで作る(作った後は変えない)
+    trip_style: Optional[Literal["day_trip"]] = None
 
 
 class TravelPlanUpdate(BaseModel):
@@ -133,6 +135,8 @@ class TravelPlanResponse(TravelPlanBase):
     journey_start_minutes: Optional[int] = None
     journey_end_mode: Optional[str] = None
     journey_end_minutes: Optional[int] = None
+    # [FR-061] 日帰り(day_trip)。null は今までの旅行
+    trip_style: Optional[str] = None
 
     class Config:
         from_attributes = True

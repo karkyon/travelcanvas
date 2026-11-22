@@ -90,7 +90,7 @@ export class PlansApi extends SpotsApi {
     draftId: string,
     deviceToken: string,
     idempotencyKey: string,
-    opts?: { target_plan_id?: string; base_revision?: number; timezone_id?: string },
+    opts?: { target_plan_id?: string; base_revision?: number; timezone_id?: string; trip_style?: 'day_trip' },
   ): Promise<PromoteQuickDraftResult> {
     const response = await this.client.post(
       `/quick-drafts/${draftId}/promote`,
