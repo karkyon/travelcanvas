@@ -873,7 +873,7 @@
 @media print { .tc-trip-menu, .tc-theme-menu { display: none; } }
 /* ===== [Gate MapTools] 地図の右上の操作(最大化・Google マップ)と最大化 ===== */
 .tc-map-actions { position: absolute; right: 12px; top: 12px; z-index: 600; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: calc(100% - 24px); }
-.tc-map-action { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 5px 10px; border-radius: 10px;
+.tc-map-action { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; min-height: 32px; padding: 5px 10px; border-radius: 10px;
   border: 1px solid var(--tc-cloud-200); background: color-mix(in srgb, var(--tc-cloud-0) 95%, transparent); color: var(--tc-ink-900);
   font-size: 12px; font-weight: 700; box-shadow: 0 4px 12px rgba(36, 52, 69, .1); text-decoration: none; cursor: pointer; }
 .tc-map-action:hover { border-color: var(--tc-accent); }
