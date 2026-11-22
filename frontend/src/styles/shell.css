@@ -96,6 +96,12 @@
   font-size: 11px; font-weight: 700; border-radius: 999px; padding: 5px 9px; background: var(--tc-cloud-100);
   color: var(--tc-ink-700); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
 }
+/* 選んでいる札(押せる .tc-pill)。色だけに頼らず、塗りと枠で選んでいることが見て分かるようにする。
+   (aria-pressed・aria-selected・aria-checked・段の aria-current・is-active のどれでも同じ見た目) */
+.tc-pill[aria-pressed='true'], .tc-pill[aria-selected='true'], .tc-pill[aria-checked='true'], .tc-pill[aria-current='step'], .tc-pill.is-active,
+.tc-list-tabs button[aria-checked='true'], .tc-list-tabs button[aria-current='step'] {
+  background: var(--tc-ink-900); color: var(--tc-cloud-0); box-shadow: inset 0 0 0 1px var(--tc-ink-900); border-color: var(--tc-ink-900);
+}
 .tc-pill--good { background: var(--tc-success-soft); color: var(--tc-success); }
 .tc-pill--warn { background: var(--tc-warning-soft); color: var(--tc-warning); }
 .tc-pill--blue { background: var(--tc-info-soft); color: var(--tc-info); }
