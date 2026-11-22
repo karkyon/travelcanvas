@@ -244,6 +244,11 @@ def draft(db: Session, plan: TravelPlan, user: User, scope: str, style: str, sco
     period = None
     if period_days:
         period = {"start": period_days[0].isoformat(), "end": period_days[-1].isoformat()}
+    all_days = db.query(TravelDay).filter(TravelDay.plan_id == plan.id).order_by(TravelDay.local_date.asc()).all()
+    choices = {"days": [{"id": str(d.id), "label": d.local_date.isoformat()} for d in all_days],
+               "areas": [{"id": str(a.id), "label": a.title}
+                         for a in db.query(SpotArea).filter(SpotArea.plan_id == plan.id).all()]}
     return {"text": text, "hashtags": tags, "excluded": excluded, "photos": photos, "audios": audios,
+            "choices": choices,
             "route_shape": _route_shape(pts, home), "title": plan.title, "period": period,
             "char_limit": CHAR_LIMIT[style], "photo_range": list(REEL_PHOTOS if style in REEL_STYLES else POST_PHOTOS)}

@@ -41,6 +41,7 @@ const SocialPage: React.FC = () => {
   const [params] = useSearchParams();
   const [step, setStep] = useState<1 | 2 | 3>(params.get('step') === '3' ? 3 : 1);
   const [scope, setScope] = useState<SocialScope>('trip');
+  const [scopeRef, setScopeRef] = useState<string>('');
   const [style, setStyle] = useState<Style>('tiktok');
   const [includeTime, setIncludeTime] = useState(false);
   const [draft, setDraft] = useState<SocialDraft | null>(null);
@@ -65,7 +66,7 @@ const SocialPage: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const d = await getSocialDraft(planId, { scope, style, include_time: includeTime });
+      const d = await getSocialDraft(planId, { scope, style, include_time: includeTime, scope_ref: scope === 'trip' ? null : scopeRef || null });
       setDraft(d);
       setText([d.text, d.hashtags.join(' ')].filter(Boolean).join('\n'));
       const [, max] = d.photo_range;
@@ -74,7 +75,7 @@ const SocialPage: React.FC = () => {
     } catch (e) {
       setError(errorDetailMessage(e, '下書きを作れませんでした'));
     }
-  }, [planId, scope, style, includeTime]);
+  }, [planId, scope, style, includeTime, scopeRef]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => () => { if (result) URL.revokeObjectURL(result.url); }, [result]);
   useEffect(() => { try { localStorage.setItem(CREDIT_KEY, credit ? '1' : '0'); } catch { /* 覚えられなくても動く */ } }, [credit]);
@@ -215,7 +216,15 @@ const SocialPage: React.FC = () => {
         <section className="mt-4 space-y-4" aria-label="選ぶ">
           <fieldset><legend className="font-semibold">範囲</legend>
             <div className="mt-1 flex gap-2">{([['trip', '旅行全体'], ['day', '日ごと'], ['area', 'エリア']] as [SocialScope, string][]).map(([v, l]) => (
-              <button key={v} type="button" aria-pressed={scope === v} className="tc-focus-ring tc-pill min-h-11" onClick={() => setScope(v)}>{l}</button>))}</div>
+              <button key={v} type="button" aria-pressed={scope === v} className="tc-focus-ring tc-pill min-h-11"
+                onClick={() => { setScope(v); setScopeRef(''); }}>{l}</button>))}</div>
+            {scope !== 'trip' && (
+              <select aria-label={scope === 'day' ? 'どの日' : 'どのエリア'} data-testid="social-scope-ref" value={scopeRef}
+                className="tc-focus-ring mt-2 min-h-11 rounded-xl border px-2" onChange={(e) => setScopeRef(e.target.value)}>
+                <option value="">{scope === 'day' ? 'すべての日' : 'すべてのエリア'}</option>
+                {((scope === 'day' ? draft?.choices?.days : draft?.choices?.areas) ?? []).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            )}
           </fieldset>
           <fieldset><legend className="font-semibold">出す先</legend>
             <div className="mt-1 flex flex-wrap gap-2">{STYLES.map(([v, l]) => (

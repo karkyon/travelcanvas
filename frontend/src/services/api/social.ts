@@ -11,6 +11,8 @@ export interface SocialDraft {
   text: string; hashtags: string[]; excluded: { home_near: number; names: number }; photos: SocialPhoto[];
   audios: { memory_id: string; taken_at: string | null }[]; route_shape: number[][]; title: string;
   period: { start: string; end: string } | null; char_limit: number; photo_range: [number, number];
+  /** 範囲で選べる日・エリア */
+  choices?: { days: { id: string; label: string }[]; areas: { id: string; label: string }[] };
 }
 
 export const getSocialDraft = async (planId: string, q: { scope: SocialScope; style: Style; scope_ref?: string | null; include_time?: boolean }) =>

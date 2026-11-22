@@ -269,3 +269,15 @@ def test_hashtag_helper():
     assert sd.hashtag("おかげ横丁・おはらい町!") == "#おかげ横丁おはらい町"
     assert sd.hashtag("a") is None
     assert sd.strip_names("花子と @hana_k で", ["花子"]) == ("と で", 2)
+
+
+def test_day_scope_choices_and_filter(auth_client, db_session):
+    client, me = auth_client
+    p, (d1, d2) = _plan(client)
+    _visit(client, db_session, me, p, d1, "内宮", 34.455, 136.725, 1)
+    _visit(client, db_session, me, p, d2, "夫婦岩", 34.508, 136.788, 2)
+    db_session.commit()
+    body = client.get(f"/api/v1/plans/{p}/social/draft").json()
+    assert [c["id"] for c in body["choices"]["days"]] == [d1, d2]
+    day2 = client.get(f"/api/v1/plans/{p}/social/draft", params={"scope": "day", "scope_ref": d2}).json()
+    assert "夫婦岩" in day2["text"] and "内宮" not in day2["text"]
