@@ -6,6 +6,7 @@
  * - URL は作った時だけ表示する(サーバーには URL の照合用の値だけを残すため、後から同じ URL は分からない)。
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import FaceCheckButton from './FaceCheckButton';
 import Button from '@/components/common/Button';
 import Card from '@/components/common/Card';
@@ -118,7 +119,11 @@ const JournalPublishCard: React.FC<Props> = ({ planId, onMessage, onError }) => 
   return (
     <Card padding="md" className="mt-4">
       <section aria-label="旅行記の公開" className="space-y-3">
-        <h2 className="font-semibold text-ink-900">旅行記を公開する</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-ink-900">旅行記を公開する</h2>
+          {/* [FR-063] SNS 用に作る(作った人の自分の記録から) */}
+          <Link to={`/planner/${planId}/social`} className="tc-focus-ring tc-mbtn tc-mbtn--sm min-h-11" data-testid="publish-social">SNS 用に作る</Link>
+        </div>
         <p className="text-sm text-ink-700">
           自分の記録だけで旅行記のページを作り、URL を知っている人に見せます。他のメンバーの記録・音声メモ・緯度経度は含めません。
           公開をやめると、URL はすぐに開けなくなります。

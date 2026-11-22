@@ -110,3 +110,15 @@ describe('ScheduleItem(作り直し)', () => {
     expect(screen.getByTestId('schedule-reservation-e1')).toHaveAttribute('href', '/planner/p1/reservations');
   });
 });
+
+describe('ScheduleItem の ♡ 今度行きたい (FR-062)', () => {
+  it('詳しい所に「♡ 今度行きたい」を出す(移動の予定には出さない)', () => {
+    const { unmount } = wrap(<ScheduleItem {...base} planId="p1" />);
+    fireEvent.click(screen.getByTestId('schedule-more-e1'));
+    expect(screen.getByRole('button', { name: /今度行きたい/ })).toBeInTheDocument();
+    unmount();
+    wrap(<ScheduleItem {...base} category="transport" />);
+    fireEvent.click(screen.getByTestId('schedule-more-e1'));
+    expect(screen.queryByRole('button', { name: /今度行きたい/ })).toBeNull();
+  });
+});

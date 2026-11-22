@@ -2,7 +2,7 @@
  * [Gate② FC-041] 予約番号が同じ 2 件のうち、後から入った方を元の予約の履歴へまとめる(利用者が選んだ時だけ)。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Reservation } from '@/services/api/types/reservations';
 
@@ -69,10 +69,10 @@ describe('変更・取消のメールを元の予約へまとめる (FC-041)', (
     m.history.mockResolvedValue([{ id: 'h1', kind: 'change', source_reservation_id: 'mail', fields: ['start_at', 'total_amount', 'status'],
       created_at: '2026-11-20T01:00:00Z' }]);
     renderPage();
-    const rowsEls = await screen.findAllByRole('button', { name: /伊勢の宿/ });
-    fireEvent.click(rowsEls[0]!);
-    const hist = await screen.findByTestId('reservation-history');
-    expect(hist).toHaveTextContent('変更のお知らせをまとめた(開始・金額)');
-    expect(m.history).toHaveBeenCalledWith('p1', 'orig');
+    // 名前が同じ行が 2 つ(元の予約とメール)あるので、元の予約の行を ID で選ぶ(並びや描画の順に頼らない)
+    const row = await screen.findByTestId('reservation-row-orig');
+    fireEvent.click(within(row).getAllByRole('button')[0]!);
+    await waitFor(() => expect(m.history).toHaveBeenCalledWith('p1', 'orig'));
+    await waitFor(() => expect(screen.getByTestId('reservation-history')).toHaveTextContent('変更のお知らせをまとめた(開始・金額)'));
   });
 });

@@ -16,6 +16,7 @@ import type { EventUrl } from '@/types';
 import type { DiningInfo } from '@/components/dining/diningModel';
 import DiningSummary from '@/components/dining/DiningSummary';
 import SpotLinks from './SpotLinks';
+import WishSaveButton from '@/components/wishes/WishSaveButton';
 import {
   MapPin, Edit3, Trash2, Share2, Star, Phone, ExternalLink, AlertTriangle, MessageSquare, ChevronDown, ChevronUp,
   MapPinned, Luggage,
@@ -369,6 +370,12 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
         {isExpanded && (
           <div className="tc-event-expanded" onClick={stop} data-testid={`schedule-detail-${id}`}>
             <div className="tc-event-detail-actions">
+              {/* [FR-062] ♡ 今度行きたい(この予定の場所を入れておき、確認なしで本人の行きたい場所へ) */}
+              {category !== 'transport' && category !== 'accommodation' && (
+                <WishSaveButton name={locationName || title} latitude={latitude ?? null} longitude={longitude ?? null}
+                  address={address || null} genre={category} sourceKind="manual" planId={planId ?? null}
+                  className="tc-focus-ring tc-mbtn tc-mbtn--sm" />
+              )}
               {mapHref ? (
                 <a href={safeExternalUrl(mapHref) ?? undefined} target="_blank" rel="noopener noreferrer" className="tc-focus-ring tc-mbtn tc-mbtn--sm">
                   <MapPinned size={14} aria-hidden="true" />地図 <span aria-hidden="true">↗</span><span className="sr-only">(外の地図を新しいタブで開く)</span>

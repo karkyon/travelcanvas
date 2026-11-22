@@ -25,6 +25,8 @@ const ALLOW = new Set([
   'pages/DashboardPage.tsx::to',
   // [Gate BookletShare] QR の画像(qrcode が作る data:image/png の URL)・メールのアプリ(bookletShareModel.mailtoUrl が作る mailto:)・
   // 試しのメールの受信箱(この画面と同じホストの :8025。sandboxInboxUrl)。どれも利用者の入力をそのまま移動先にしない
+  // [FR-063] 端末で作った動画の blob: の URL(URL.createObjectURL。利用者の入力ではない)を保存のリンクにする
+  'pages/SocialPage.tsx::result.url',
   'pages/booklet/BookletShareDialog.tsx::qrPng',
   'pages/booklet/BookletShareDialog.tsx::mailHref',
   'pages/booklet/BookletShareDialog.tsx::sandboxInboxUrl(window.location)',

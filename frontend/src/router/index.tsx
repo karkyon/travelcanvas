@@ -57,6 +57,8 @@ const TodayPage = lazyPage(() => import('@/pages/TodayPage'));
 const SpotModePage = lazyPage(() => import('@/pages/SpotModePage'));
 // [FR-061] 日帰りのルートと寄り道
 const DayTripPage = lazyPage(() => import('@/pages/DayTripPage'));
+// [FR-063] SNS の下書きとリール
+const SocialPage = lazyPage(() => import('@/pages/SocialPage'));
 const SpotAreasPage = lazyPage(() => import('@/pages/SpotAreasPage'));
 const SegmentsPage = lazyPage(() => import('@/pages/SegmentsPage'));
 const RouteOptionsPage = lazyPage(() => import('@/pages/RouteOptionsPage'));
@@ -222,6 +224,11 @@ export const router = createBrowserRouter([
       {
         path: 'planner/:planId/day-trip',
         element: guard(<DayTripPage />),
+      },
+      // [FR-063] SNS の下書きとリール(TikTok・Instagram リール・YouTube ショート)
+      {
+        path: 'planner/:planId/social',
+        element: guard(<SocialPage />),
       },
 
       // 🚶 [Gate M2] 移動区間(FR-014)。backend(Gate M1)は実装済みだった

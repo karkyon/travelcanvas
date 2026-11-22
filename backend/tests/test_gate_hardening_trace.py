@@ -1,6 +1,6 @@
 """[Gate Hardening-A・監査 G-01/G-03/G-09] 要求の追跡(docs/trace/fr-requirements.json)と正本の所在(docs/spec/canonical-sources.json)。
 
-- 全62 FR に要求の出典・要約・受入があり、fr-status.json と同じ並び・題
+- 全63 FR に要求の出典・要約・受入があり、fr-status.json と同じ並び・題
 - 書いた API・試験のファイル・画面の route・表が実在する(消す・名前を変えると落ちる)
 - 証拠の区分が fr-status.json・ledger と食い違わない。実機・実 API・運用(本番)を、証拠のファイル無しに「済」にしない
 - 共通正本(DOC-02/04/05/06/11/13)の所在と版・状態を記録し、DOC-10 がそれを参照する

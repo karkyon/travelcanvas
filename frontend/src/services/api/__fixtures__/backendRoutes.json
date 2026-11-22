@@ -67,7 +67,8 @@
   "added_fc012": "Gate② FC-012: events/bulk",
   "added_fc045": "Gate② FC-045: documents replace・versions",
   "captured_at_head_fr062": "dev/fr062-wishes (+FR-062 spots/quick・nearby-candidates・PATCH)",
-  "captured_at_head_fr061": "dev/fr061-day-trip (+FR-061 day-trip・FR-062 again)"
+  "captured_at_head_fr061": "dev/fr061-day-trip (+FR-061 day-trip・FR-062 again)",
+  "captured_at_head_fr063": "dev/fr063-social (+FR-063 social・reel-exports)"
  },
  "routes": [
   "DELETE /api/v1/auth/passkeys/{passkey_id}",
@@ -273,6 +274,7 @@
   "GET /api/v1/plans/{plan_id}/preparation-tasks",
   "GET /api/v1/plans/{plan_id}/private-profile",
   "GET /api/v1/plans/{plan_id}/readiness",
+  "GET /api/v1/plans/{plan_id}/reel-exports",
   "GET /api/v1/plans/{plan_id}/replans/{replan_id}",
   "GET /api/v1/plans/{plan_id}/reservations",
   "GET /api/v1/plans/{plan_id}/reservations/participants/search",
@@ -289,6 +291,7 @@
   "GET /api/v1/plans/{plan_id}/segments",
   "GET /api/v1/plans/{plan_id}/segments/{segment_id}",
   "GET /api/v1/plans/{plan_id}/settlements",
+  "GET /api/v1/plans/{plan_id}/social/draft",
   "GET /api/v1/plans/{plan_id}/spot-areas",
   "GET /api/v1/plans/{plan_id}/spot-areas/suggest",
   "GET /api/v1/plans/{plan_id}/sync/conflicts",
@@ -554,6 +557,7 @@
   "POST /api/v1/plans/{plan_id}/polls/{poll_id}/votes/{vote_id}/resolution",
   "POST /api/v1/plans/{plan_id}/preparation-tasks",
   "POST /api/v1/plans/{plan_id}/presence",
+  "POST /api/v1/plans/{plan_id}/reel-exports",
   "POST /api/v1/plans/{plan_id}/replans/{replan_id}/apply",
   "POST /api/v1/plans/{plan_id}/replans/{replan_id}/reject",
   "POST /api/v1/plans/{plan_id}/replans/{replan_id}/save-variant",
@@ -572,6 +576,8 @@
   "POST /api/v1/plans/{plan_id}/route-options/{option_id}/legs",
   "POST /api/v1/plans/{plan_id}/segments",
   "POST /api/v1/plans/{plan_id}/settlements",
+  "POST /api/v1/plans/{plan_id}/social/face-boxes",
+  "POST /api/v1/plans/{plan_id}/social/polish",
   "POST /api/v1/plans/{plan_id}/spot-ai/places-image",
   "POST /api/v1/plans/{plan_id}/spot-ai/places-text",
   "POST /api/v1/plans/{plan_id}/spot-areas",
