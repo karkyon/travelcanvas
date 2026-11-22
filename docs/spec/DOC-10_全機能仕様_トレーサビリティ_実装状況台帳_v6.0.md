@@ -1,6 +1,6 @@
 # 10 全機能仕様 トレーサビリティ 実装状況台帳 v6.0(正本)
 
-> 文書ID: DOC-10 / 版: **v6.0-r68** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-17<br>
+> 文書ID: DOC-10 / 版: **v6.0-r69** / 状態: APPROVED FOR IMPLEMENTATION / 改訂日: 2026-11-22<br>
 > **正本の場所: このファイル(GitHub `karkyon/travelcanvas` の `docs/spec/`)。** プロジェクトの資料室(Library)に置く写しは、
 > 冒頭にこのファイルの commit を書く。資料室の `10_全機能仕様_トレーサビリティ_実装状況台帳_v5.1.md`(r11、2026-09 の版)と
 > `claude/DOC-10_r12_台帳更新_2026-10-20.md`(r12 の追補)は **廃止**(内容はこの版に統合した)。  
@@ -18,7 +18,7 @@
 | 項目 | 値 |
 |---|---|
 | 基準commit | `d8bd1b7`(PR #60 Gate MockFit。2026-11-05 に版をそろえた時点の main) |
-| Alembic head | `d7f3b5c9e1a4`(単一の head。Gate② FC-045 で documents に版(version・replaces_document_id・superseded_at)を追加。追加だけ。その前は `c5e1a7d3b9f2` travel_events.after_event_id) |
+| Alembic head | `e9a1c3f5b7d2`(単一の head。FR-062 今度行きたい・また行きたいで spots に種類・範囲・残した元・ひとこと・知らせ・回数・client_id の列を追加。追加だけ。その前は `d7f3b5c9e1a4` documents の版) |
 | 基準の試験の実測(`d8bd1b7`) | backend pytest 1603 合格・1 飛ばし / frontend vitest 1057 合格(196 ファイル) / E2E 100 合格 / 最初に読む JS 428.39 kB(上限 430 kB)。GitHub Actions の main の push run 41880257997 |
 | GitHub Actions(`d8bd1b7`) | secret-scan / dependency-audit / frontend / backend / e2e の5ジョブ合格(push の run 41880257997)。main は保護(必須の CI・管理者にも適用・強制 push と削除の禁止・直線の履歴) |
 
@@ -292,6 +292,7 @@ VERIFIED の証拠の試験名は `docs/trace/v1-verification-ledger.json`。
 | **r66** | 2026-11-21 | Gate2-FC | **FC-007 テンプレートとして保存(複製の as_template。構造だけ。自由に書いた文・電話・予算は写さない)・FC-017 予定の先行条件(travel_events.after_event_id・Alembic `c5e1a7d3b9f2`。同じ旅行の予定だけ・自分と循環は断る。先行の予定より前に始まる予定を検証で PREREQUISITE_ORDER として知らせる)。FR の状態の遷移なし** |
 | **r67** | 2026-11-21 | Gate2-FC | **FC-012 まとめて編集(POST /plans/{id}/events/bulk。選んだ予定の種類を変える・別の日へ移すを 1 つの変更の組で。元に戻すで一度に戻る。鍵・エリアは断る。参加者は予定に持たない項目のため対象外)。DB の変更なし(Alembic head は `c5e1a7d3b9f2` のまま)。FR の状態の遷移なし** |
 | **r68** | 2026-11-22 | Gate2-FC | **FC-045 文書の差し替え(POST …/documents/{id}/replace・GET …/versions。新しい版として保存し前の版を残す。旅程・予約との紐付けは新しい版へ移し、費用のレシート・読み取りの記録は読み取った版を指したまま。Alembic `d7f3b5c9e1a4`)・OCR を 1 つのスレッドで動かす(CPU が混んだ時の時間切れを防ぐ)。FR の状態の遷移なし** |
+| **r69** | 2026-11-22 | FR-062 | **今度行きたい・また行きたい(詳細設計 DD-2026-11-22-01 段階 1): ♡ でどこからでも残す(POST /spots/quick。同じ場所・同じ client_id はまとめる・圏外は端末に暗号化して溜める)・今いる所の周り 300m の候補(GET /spots/nearby-candidates。位置は小数 4 桁に丸め、保存・ログをしない)・旅の記録の「また行きたい」(GET/POST /plans/{id}/again-candidates・again。本人の記録だけ・key は署名)・行きたい場所の札(今度・また・エリア)・残した元・近くに来たら知らせる(端末の中だけ)・ここから日帰りの入口。Alembic `e9a1c3f5b7d2`。FR-062 の行は FR-061 と同じ版で足す(FR の番号は続けて並べるため)。実機・実の場所の検索の確認は未実施** |
 
 ## 10. 台帳の更新の規則
 
