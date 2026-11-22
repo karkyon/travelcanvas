@@ -92,6 +92,23 @@ describe('SNS の下書きとリール (FR-063)', () => {
     void reject;
   });
 
+  it('作っている途中でタブを裏に回すと止めて知らせ、写真の絵を返す', async () => {
+    const close = vi.fn();
+    m.load.mockResolvedValue({ width: 100, height: 100, close });
+    m.render.mockImplementation((_i: unknown, o: { signal: AbortSignal }) => new Promise((_r, rj) => {
+      o.signal.addEventListener('abort', () => rj(new RenderCancelled()));
+    }));
+    renderPage('/planner/p1/social?step=3');
+    await screen.findByText('音楽は TikTok・Instagram のアプリで付けてください');
+    await act(async () => { fireEvent.click(screen.getByTestId('reel-make')); });
+    await screen.findByRole('button', { name: 'やめる' });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(await screen.findByText(/画面を離れたため、動画を作るのを止めました/)).toBeTruthy();
+    expect(close).toHaveBeenCalledTimes(4);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+  });
+
   it('写真が足りない時は作らない', async () => {
     m.draft.mockResolvedValue(draft({ photos: draft().photos.slice(0, 2) }));
     renderPage('/planner/p1/social?step=3');

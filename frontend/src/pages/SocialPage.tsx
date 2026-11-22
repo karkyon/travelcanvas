@@ -138,23 +138,36 @@ const SocialPage: React.FC = () => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setProgress(0);
+    // タブを裏に回すと時計が間引かれ、動画の長さ・切り替えが崩れる。裏に回った時は止めて知らせる
+    let hidden = false;
+    const onHide = () => { if (document.visibilityState === 'hidden') { hidden = true; ctrl.abort(); } };
+    document.addEventListener('visibilitychange', onHide);
+    let input: ReelInput | null = null;
     try {
-      const input = await buildInput();
+      input = await buildInput();
       const r = await renderReel(input, { signal: ctrl.signal, onProgress: setProgress });
       setResult({ ...r, url: URL.createObjectURL(r.blob) });
       void recordReelExport(planId, { style, scope, duration_s: Math.round(r.seconds), frame_count: input.frames.length, status: 'ready',
         bytes: r.blob.size }).catch(() => undefined);
     } catch (e) {
-      if (e instanceof RenderCancelled) setMsg('動画を作るのをやめました');
+      if (e instanceof RenderCancelled) {
+        setMsg(hidden ? '画面を離れたため、動画を作るのを止めました。画面を開いたまま、もう一度「動画を作る」を押してください'
+          : '動画を作るのをやめました');
+      }
       else {
         setError(errorDetailMessage(e, '動画を作れませんでした'));
         void recordReelExport(planId, { style, scope, duration_s: duration, frame_count: chosen.length, status: 'failed' }).catch(() => undefined);
       }
     } finally {
+      document.removeEventListener('visibilitychange', onHide);
+      // 写真の絵(ImageBitmap)は作り終えたら返す(端末のメモリを使い続けない)
+      for (const f of input?.frames ?? []) (f.image as ImageBitmap).close?.();
       setProgress(null);
       abortRef.current = null;
     }
   };
+  // 画面を離れたら作るのをやめる(裏で録り続けない)
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const fileName = (ext: string) => `${(draft?.title || 'travelcanvas').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40)}_${style}.${ext}`;
   const canShareFile = (f: File) => {
