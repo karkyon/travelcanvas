@@ -13,7 +13,7 @@ import 'leaflet/dist/leaflet.css';
 import { ExternalLink, MapPin, NotebookPen, Pencil, Plus } from 'lucide-react';
 import { tripPinIcon } from '@/components/map/tripPins';
 // [FR-062] 種類で印の形を変える(今度 ♡・また ★・エリア ◯。色だけに頼らない)
-import { KIND_LABEL, KIND_MARK, kindOf } from './wishKindModel';
+import { KIND_MARK, kindOf } from './wishKindModel';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import SpotLinks from '@/components/planner/SpotLinks';
 import type { WishSpot } from '@/services/api/spotIntake';
@@ -90,7 +90,7 @@ const WishSpotsMap: React.FC<Props> = ({ points, noLocation, selectedId, onSelec
               const osm = osmUrl(p.at[0], p.at[1]);
               return (
                 <Marker key={p.spot.id} position={p.at} icon={tripPinIcon(`${KIND_MARK[kindOf(p.spot)]}${p.no}`, { selected: sel, small: !sel && points.length > 60 })}
-                  zIndexOffset={sel ? 1000 : 0} title={`${p.no}. ${p.spot.name}(${KIND_LABEL[kindOf(p.spot)]})`}
+                  zIndexOffset={sel ? 1000 : 0} title={`${p.no}. ${p.spot.name}`}
                   ref={(m) => { if (m) refs.current.set(p.spot.id, m); else refs.current.delete(p.spot.id); }}
                   eventHandlers={{ click: () => onSelect(p.spot.id), popupclose: () => { if (sel) onSelect(null); } }}>
                   {!sel && <Tooltip className="tc-pin-tip" direction="top" offset={[0, -30]}>{`${p.no}. ${p.spot.name}`}</Tooltip>}

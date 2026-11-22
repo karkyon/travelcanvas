@@ -81,7 +81,7 @@ describe('行きたい場所の地図', () => {
     renderPage();
     await screen.findByRole('listitem', { name: '錦市場' });
     await waitFor(() => expect(pins()).toHaveLength(2));
-    const marker = document.querySelector('.leaflet-marker-icon[title="1. 錦市場(今度行きたい)"]') as HTMLElement;
+    const marker = document.querySelector('.leaflet-marker-icon[title="1. 錦市場"]') as HTMLElement;
     fireEvent.click(marker);
     await waitFor(() => expect(screen.getByRole('listitem', { name: '錦市場' })).toHaveAttribute('data-selected', 'true'));
     fireEvent.click(screen.getByTestId('wish-map-toggle'));
