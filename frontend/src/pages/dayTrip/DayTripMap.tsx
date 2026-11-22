@@ -48,11 +48,12 @@ const DayTripMap: React.FC<DayTripMapProps> = ({ line, widthM, results, wishes, 
       {line.length > 1 && <Polyline positions={line} pathOptions={{ color: '#2f6f8f', weight: bandPx, opacity: 0.15 }} />}
       {line.length > 1 && <Polyline positions={line} pathOptions={{ color: '#2f6f8f', weight: 4, dashArray: straight ? '6 6' : undefined }} />}
       {start && <CircleMarker center={start} radius={7} pathOptions={{ color: '#1f2937', fillColor: '#fff', fillOpacity: 1 }}><Tooltip>出発地</Tooltip></CircleMarker>}
-      {end && <Marker position={end} icon={flag}><Tooltip>目的地</Tooltip></Marker>}
-      {wishes.map((w) => <Marker key={w.spot_id} position={[w.lat, w.lng]} icon={heart}><Tooltip>{`行きたい場所: ${w.name}`}</Tooltip></Marker>)}
+      {end && <Marker position={end} icon={flag} title="目的地" alt="目的地" keyboard={false}><Tooltip>目的地</Tooltip></Marker>}
+      {wishes.map((w) => <Marker key={w.spot_id} position={[w.lat, w.lng]} icon={heart} title={`行きたい場所: ${w.name}`}
+        alt={`行きたい場所: ${w.name}`} keyboard={false}><Tooltip>{`行きたい場所: ${w.name}`}</Tooltip></Marker>)}
       {results.map((r, i) => (
         <Marker key={`${r.name}-${r.lat}`} position={[r.lat, r.lng]} icon={pin(i + 1, selected === i, !!r.saved_spot_id)}
-          eventHandlers={{ click: () => onSelect(i) }}>
+          title={`${i + 1}. ${r.name}`} alt={`${i + 1}. ${r.name}`} eventHandlers={{ click: () => onSelect(i) }}>
           <Tooltip>{`${i + 1}. ${r.name}`}</Tooltip>
         </Marker>
       ))}

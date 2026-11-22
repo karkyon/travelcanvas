@@ -85,6 +85,7 @@ async def create_travel_plan(
             budget=plan_data.budget,
             preferences=plan_data.preferences,
             status="draft",
+            trip_style=plan_data.trip_style,
         )
 
         db.add(new_plan)
