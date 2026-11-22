@@ -407,8 +407,34 @@ class Spot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now())
 
+    # [FR-062] 今度行きたい・また行きたい(DD-2026-11-22-01 §2.1。migration e9a1c3f5b7d2)
+    wish_kind: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)  # next / again(null = 今度に数える)
+    wish_scope: Mapped[str] = mapped_column(String(8), nullable=False, default="place", server_default="place")
+    radius_m: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    source_kind: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    source_plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="SET NULL", name="fk_spots_source_plan"),
+        nullable=True)
+    source_label: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    wish_note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    wish_when: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    remind_nearby: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    again_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    client_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    last_visited_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # リレーションシップ
     creator = relationship("User", back_populates="created_spots")
+
+    __table_args__ = (
+        CheckConstraint("wish_kind IS NULL OR wish_kind IN ('next', 'again')", name="ck_spots_wish_kind"),
+        CheckConstraint("wish_scope IN ('place', 'area')", name="ck_spots_wish_scope"),
+        CheckConstraint("radius_m IS NULL OR (radius_m >= 100 AND radius_m <= 5000)", name="ck_spots_radius"),
+        CheckConstraint("wish_when IS NULL OR wish_when IN ('next_trip', 'someday')", name="ck_spots_wish_when"),
+        Index("ix_spots_source_plan", "source_plan_id"),
+        Index("uq_spots_owner_client_id", "created_by", "client_id", unique=True,
+              postgresql_where=text("client_id IS NOT NULL")),
+    )
 
 
 class UserSpotFavorite(Base):

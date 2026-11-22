@@ -18,7 +18,8 @@ import { Search, MapPin, Globe, Camera, Mic, Info, Hash } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { searchSpots } from '../services/api';
 import { searchNearby } from '../services/api/g11discover';
-import { createWishSpot, enrichWishSpot } from '../services/api/spotIntake';
+import { enrichWishSpot, quickSaveWish } from '../services/api/spotIntake';
+import { newClientId } from '../utils/wishQueue';
 import { FILLED_LABEL, wishCategory } from './spotListModel';
 import FindByOther from '@/components/search/FindByOther';
 import type { GpsPoint } from '@/components/search/findModel';
@@ -147,10 +148,13 @@ const SearchPage: React.FC = () => {
   // [Gate WishPlaces] SC-47 場所を探して保存する
   const saveWish = async (spot: SearchResult) => {
     try {
-      const created = await createWishSpot({ name: spot.name, category: wishCategory(spot.category), description: null,
+      // [FR-062] ♡ 今度行きたい: 同じ場所はまとめる(二重に作らない)。種類は「今度行きたい」・元は検索
+      const r = await quickSaveWish({ name: spot.name, genre: wishCategory(spot.category),
         address: spot.location?.address || spot.address || null,
-        latitude: spot.location?.latitude ?? null, longitude: spot.location?.longitude ?? null });
-      setPhotoNote(`「${spot.name}」を行きたい場所に保存しました`);
+        latitude: spot.location?.latitude ?? null, longitude: spot.location?.longitude ?? null,
+        wish_kind: 'next', source_kind: 'manual', client_id: newClientId() });
+      const created = r.spot;
+      setPhotoNote(r.created ? `「${spot.name}」を行きたい場所に保存しました` : `「${spot.name}」はもう行きたい場所に残してあります`);
       // [Gate SpotInfo] 住所・電話・公式サイト・食事の情報・写真を、空の項目だけ自動で埋める(失敗しても保存は済んでいる)
       try {
         const r = await enrichWishSpot(created.id);
@@ -286,7 +290,7 @@ const SearchPage: React.FC = () => {
                       </button>
                       <button type="button" onClick={() => void saveWish(spot)} className="tc-focus-ring tc-mbtn tc-mbtn--sm ml-2"
                         aria-label={`「${spot.name}」を行きたい場所に保存`}>
-                        行きたい場所に保存
+                        ♡ 今度行きたい
                       </button>
                     </div>
                   </li>

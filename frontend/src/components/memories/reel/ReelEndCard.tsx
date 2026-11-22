@@ -53,6 +53,10 @@ const ReelEndCard: React.FC<{
         <Link to={`/planner?new=1${replanQuery(data)}`} className="tc-focus-ring tc-reel-end-primary" data-testid="memory-reel-replan">
           同じ場所でもう一度計画する
         </Link>
+        {/* [FR-062] 旅の記録の「また行きたい」の札へ移る */}
+        <Link to={`/planner/${data.plan_id}/journey?tab=again`} className="tc-focus-ring tc-reel-end-sub" data-testid="memory-reel-again">
+          場所を選んで残す
+        </Link>
         <div>
           <button type="button" className="tc-focus-ring tc-reel-end-sub" onClick={onReplay}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>最初から見る

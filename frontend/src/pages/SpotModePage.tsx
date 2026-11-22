@@ -9,6 +9,8 @@
  * - 今いる場所は端末の中だけで使う(周りを探す時だけ送り、保存しない)。位置の許可が既にある時だけ自動で取る
  * - エリアの情報は端末に暗号化して保存し(offlineVault)、通信できない時はそれを出す
  */
+import WishHeartButton from '@/components/wishes/WishHeartButton';
+import WishNearbyBanner from '@/components/wishes/WishNearbyBanner';
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock, Compass, Crosshair, List, Map as MapIcon, Maximize2, Search, Sparkles } from 'lucide-react';
@@ -279,6 +281,10 @@ const SpotModePage: React.FC = () => {
 
   return (
     <div className="tc-spot" data-sheet={sheet}>
+      {/* [FR-062] ♡ 今度行きたいに残す(画面ごとに 1 つ) */}
+      <WishHeartButton isGuest={false} className="tc-focus-ring tc-wish-fab" label="今度行きたい"
+        options={{ sourceKind: 'today', planId }} />
+      <WishNearbyBanner active />
       <header className="tc-spot-top">
         <div className="tc-spot-bar">
           <Link className="tc-spot-icon" to={`/planner/${planId}/today`} aria-label="旅行の予定へ戻る"><ArrowLeft size={22} /></Link>

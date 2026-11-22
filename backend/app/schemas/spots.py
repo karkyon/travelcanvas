@@ -90,6 +90,40 @@ class SpotCreate(SpotBase, SpotExtras):
     """スポット作成スキーマ"""
 
 
+WISH_KIND_RE = r"^(next|again)$"
+WISH_WHEN_RE = r"^(next_trip|someday)$"
+SOURCE_KIND_RE = r"^(manual|quick|today|memory|visit|route|sns|import)$"
+
+
+class SpotQuickCreate(BaseModel):
+    """[FR-062] ♡ 今度行きたいに残す(どこからでも)。位置は任意。client_id で二重保存を防ぐ"""
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(..., min_length=1, max_length=200)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    address: Optional[str] = Field(None, max_length=300)
+    genre: Optional[str] = Field(None, max_length=40)
+    wish_kind: str = Field("next", pattern=WISH_KIND_RE)
+    wish_note: Optional[str] = Field(None, max_length=200)
+    wish_when: Optional[str] = Field(None, pattern=WISH_WHEN_RE)
+    source_kind: str = Field("quick", pattern=SOURCE_KIND_RE)
+    source_plan_id: Optional[uuid.UUID] = None
+    client_id: Optional[str] = Field(None, min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+
+    @field_validator("name")
+    @classmethod
+    def _v_name(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("場所の名前を入れてください")
+        return v.strip()
+
+    @model_validator(mode="after")
+    def _v_pos(self) -> "SpotQuickCreate":
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("位置は緯度と経度の両方を入れてください")
+        return self
+
+
 class SpotUpdate(BaseModel):
     """スポット更新スキーマ"""
     name: Optional[str] = None
@@ -105,6 +139,13 @@ class SpotUpdate(BaseModel):
     urls: Optional[List[SpotUrl]] = Field(None, max_length=event_urls.MAX_URLS)
     photo: Optional[SpotPhoto] = None
     dining: Optional[DiningInfo] = None
+    # [FR-062] 種類・ひとこと・いつ・近くに来たら知らせる(本人だけが直せる)
+    wish_kind: Optional[str] = Field(None, pattern=WISH_KIND_RE)
+    wish_note: Optional[str] = Field(None, max_length=200)
+    wish_when: Optional[str] = Field(None, pattern=WISH_WHEN_RE)
+    remind_nearby: Optional[bool] = None
+    radius_m: Optional[int] = Field(None, ge=100, le=5000)
+    again_count: Optional[int] = Field(None, ge=0, le=10000)  # 取り消しで元の回数へ戻す時
 
 
 class SpotResponse(SpotBase):
@@ -119,6 +160,18 @@ class SpotResponse(SpotBase):
     urls: Optional[List[Dict[str, Any]]] = None
     photo: Optional[Dict[str, Any]] = None
     dining: Optional[Dict[str, Any]] = None
+    # [FR-062]
+    wish_kind: Optional[str] = None
+    wish_scope: Optional[str] = "place"
+    radius_m: Optional[int] = None
+    source_kind: Optional[str] = None
+    source_plan_id: Optional[uuid.UUID] = None
+    source_label: Optional[str] = None
+    wish_note: Optional[str] = None
+    wish_when: Optional[str] = None
+    remind_nearby: Optional[bool] = False
+    again_count: Optional[int] = 0
+    last_visited_at: Optional[datetime] = None
 
     @field_validator("photo", mode="before")
     @classmethod
@@ -188,3 +241,26 @@ class VisitResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SpotQuickResponse(BaseModel):
+    """[FR-062] 残した結果。created=false は既にあった場所(同じ client_id・同じ場所)。previous は取り消しで戻す値"""
+    spot: SpotResponse
+    created: bool
+    merged_into: Optional[uuid.UUID] = None
+    previous: Optional[Dict[str, Any]] = None
+
+
+class NearbyCandidate(BaseModel):
+    name: str
+    genre: Optional[str] = None
+    distance_m: int
+    lat: float
+    lng: float
+    address: Optional[str] = None
+
+
+class NearbyCandidatesResponse(BaseModel):
+    results: List[NearbyCandidate]
+    source: List[str]
+    unavailable: List[str] = []

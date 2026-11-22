@@ -11,7 +11,15 @@ export interface WishSpot {
   latitude: number | null; longitude: number | null; price_range: string | null; image_url: string | null; created_at: string;
   /** [Gate SpotInfo] 電話・URL(最大 5)・写真の出典(Commons)・食事の情報 */
   phone?: string | null; urls?: EventUrl[] | null; photo?: SpotPhoto | null; dining?: DiningInfo | null;
+  /** [FR-062] 種類(null は今までの行。「今度行きたい」に数える)・範囲・残した元・ひとこと・いつ・知らせ・回数 */
+  wish_kind?: WishKind | null; wish_scope?: 'place' | 'area' | null; radius_m?: number | null;
+  source_kind?: WishSource | null; source_plan_id?: string | null; source_label?: string | null;
+  wish_note?: string | null; wish_when?: WishWhen | null; remind_nearby?: boolean | null; again_count?: number | null;
+  last_visited_at?: string | null;
 }
+export type WishKind = 'next' | 'again';
+export type WishWhen = 'next_trip' | 'someday';
+export type WishSource = 'manual' | 'quick' | 'today' | 'memory' | 'visit' | 'route' | 'sns' | 'import';
 export interface WishInput {
   name: string; description?: string | null; category: string; address?: string | null;
   latitude?: number | null; longitude?: number | null;
@@ -61,11 +69,39 @@ export async function aiPlacesFromImage(planId: string, file: File): Promise<Med
     { places: MediaPlace[] }).places;
 }
 
-export const listWishSpots = async (category: string): Promise<WishSpot[]> =>
-  (await api.get(`/spots/?mine=true&limit=500${category === 'all' ? '' : `&category=${encodeURIComponent(category)}`}`, SILENT)).data as WishSpot[];
+export const listWishSpots = async (category: string, kind?: 'next' | 'again' | 'area'): Promise<WishSpot[]> =>
+  (await api.get(`/spots/?mine=true&limit=500${category === 'all' ? '' : `&category=${encodeURIComponent(category)}`}${
+    kind ? `&kind=${kind}` : ''}`, SILENT)).data as WishSpot[];
 export const createWishSpot = async (input: WishInput): Promise<WishSpot> => (await api.post('/spots/', input, SILENT)).data as WishSpot;
 export const updateWishSpot = async (id: string, input: WishInput): Promise<WishSpot> =>
   (await api.put(`/spots/${id}`, input, SILENT)).data as WishSpot;
+/** [FR-062] 種類・ひとこと・いつ・近くの知らせだけを直す(本人だけ) */
+export interface WishPatch {
+  wish_kind?: WishKind | null; wish_note?: string | null; wish_when?: WishWhen | null; remind_nearby?: boolean;
+  radius_m?: number | null; again_count?: number;
+}
+export const patchWishSpot = async (id: string, patch: WishPatch): Promise<WishSpot> =>
+  (await api.patch(`/spots/${id}`, patch, SILENT)).data as WishSpot;
+
+/** [FR-062] ♡ 今度行きたいに残す。client_id で二重保存を防ぐ(同じ場所・同じ client_id は created=false) */
+export interface QuickWishInput {
+  name: string; latitude?: number | null; longitude?: number | null; address?: string | null; genre?: string | null;
+  wish_kind: WishKind; wish_note?: string | null; wish_when?: WishWhen | null; source_kind: WishSource;
+  source_plan_id?: string | null; client_id: string;
+}
+export interface QuickWishResult {
+  spot: WishSpot; created: boolean; merged_into: string | null;
+  previous: { wish_kind: WishKind | null; again_count: number; wish_note: string | null; wish_when: WishWhen | null } | null;
+}
+export const quickSaveWish = async (input: QuickWishInput): Promise<QuickWishResult> =>
+  (await api.post('/spots/quick', input, SILENT)).data as QuickWishResult;
+
+/** [FR-062] 今いる所の周り 300m の候補(最大 8 件)。位置は小数 4 桁に丸めて送る */
+export interface NearbyCandidate { name: string; genre: string | null; distance_m: number; lat: number; lng: number; address: string | null }
+export const nearbyCandidates = async (lat: number, lng: number): Promise<{ results: NearbyCandidate[]; source: string[] }> =>
+  (await api.get(`/spots/nearby-candidates?lat=${lat.toFixed(4)}&lng=${lng.toFixed(4)}`, SILENT)).data as
+    { results: NearbyCandidate[]; source: string[] };
+
 export const deleteWishSpot = async (id: string): Promise<void> => { await api.delete(`/spots/${id}`, SILENT); };
 /** [Gate SpotOwnPhoto] 自分の写真(ファイル・クリップボードから)を入れる。前の自分の写真は消える */
 export const uploadSpotPhoto = async (id: string, file: File): Promise<WishSpot> => {

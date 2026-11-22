@@ -8,6 +8,8 @@
  * 食事の情報(ジャンル・名物・予算・予約・駐車場など)を持てる。「自動取得」で OpenStreetMap から住所・電話・公式サイト・
  * 食事の情報・場所の写真を入れる(フォームでは候補を選んで入れる。カードの「自動取得」は空の項目だけを埋める)。
  * 新しく保存した時も、空の項目だけを自動で埋める。
+ * [FR-062] 種類の札(すべて・今度行きたい・また行きたい・エリア。数つき)・近い順(端末の中だけで並べる)・地域でまとめる・
+ * 残した元の文・「近くに来たら知らせる」のスイッチ・ここから日帰り・エリアを歩くエリアにする。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -16,7 +18,7 @@ import PageHead from '@/components/shell/PageHead';
 import PlaceArt from '@/components/shell/PlaceArt';
 import PlaceFinder, { type PlaceDraft, type PlaceTab } from '@/components/search/PlaceFinder';
 import {
-  createWishSpot, deleteWishSpot, enrichWishSpot, listWishSpots, updateWishSpot, uploadSpotPhoto, type WishInput, type WishSpot,
+  createWishSpot, deleteWishSpot, enrichWishSpot, listWishSpots, patchWishSpot, updateWishSpot, uploadSpotPhoto, type WishInput, type WishSpot,
 } from '@/services/api/spotIntake';
 import { getPlaceInfo, getPlacePhoto, type PlaceInfoCandidate, type PlaceInfoResult } from '@/services/api/planEdit';
 import { appendNotes, mergeUrlRows } from '@/components/places/placeHelpers';
@@ -37,6 +39,9 @@ import type { ExternalImage } from '@/services/api/types/g11discover';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import { FILLED_LABEL, localDay, splitNote, toSpotPhoto } from './spotListModel';
+import {
+  KIND_LABEL, KIND_MARK, WISH_TABS, groupByRegion, kindCounts, kindOf, sortNear, sourceText, type WishTab,
+} from './spots/wishKindModel';
 
 const CATEGORIES: [string, string][] = [
   ['sightseeing', '観光地'], ['restaurant', 'レストラン'], ['accommodation', '宿泊'], ['shopping', 'ショッピング'], ['other', 'その他'],
@@ -94,7 +99,27 @@ const SpotListPage: React.FC = () => {
   }, []);
   useEffect(() => { void load(); }, [load]);
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<'new' | 'name'>('new');
+  const [sort, setSort] = useState<'new' | 'name' | 'near' | 'region'>('new');
+  const [kindTab, setKindTab] = useState<WishTab>('all');
+  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
+  const kinds = useMemo(() => kindCounts(spots ?? []), [spots]);
+  // [FR-062] 近い順: 選んだ時だけ位置を 1 回取る。サーバーには送らず、端末で並べる
+  const chooseSort = (v: 'new' | 'name' | 'near' | 'region') => {
+    setSort(v);
+    if (v !== 'near' || here) return;
+    if (!navigator.geolocation) { setError('この端末では位置を取れません'); setSort('new'); return; }
+    navigator.geolocation.getCurrentPosition((p) => setHere({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => { setError('位置を取れなかったため、新しい順で並べます'); setSort('new'); },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 });
+  };
+  const toggleRemind = async (s: WishSpot) => {
+    try {
+      const r = await patchWishSpot(s.id, { remind_nearby: !s.remind_nearby });
+      setSpots((list) => (list ? list.map((x) => (x.id === s.id ? { ...x, remind_nearby: r.remind_nearby } : x)) : list));
+    } catch (err) {
+      setError(errorDetailMessage(err, '知らせの設定を変えられませんでした'));
+    }
+  };
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of spots ?? []) m.set(toCategory(s.category), (m.get(toCategory(s.category)) ?? 0) + 1);
@@ -102,10 +127,12 @@ const SpotListPage: React.FC = () => {
   }, [spots]);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = (spots ?? []).filter((s) => (category === 'all' || toCategory(s.category) === category)
-      && (!q || [s.name, s.address, s.description].some((v) => (v ?? '').toLowerCase().includes(q))));
+    const list = (spots ?? []).filter((s) => (kindTab === 'all' || kindOf(s) === kindTab)
+      && (category === 'all' || toCategory(s.category) === category)
+      && (!q || [s.name, s.address, s.description, s.wish_note].some((v) => (v ?? '').toLowerCase().includes(q))));
+    if (sort === 'near' && here) return sortNear(list, here);
     return [...list].sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name, 'ja') : b.created_at.localeCompare(a.created_at)));
-  }, [spots, category, query, sort]);
+  }, [spots, category, query, sort, kindTab, here]);
   const located = (spots ?? []).filter((s) => s.latitude != null && s.longitude != null).length;
   // [Gate WishMap] 地図: 絞り込んだ結果だけを、一覧と同じ番号の印で出す。カードを選ぶと地図で目立たせ、小窓で詳しく出す
   const [showMap, setShowMap] = useState(true);
@@ -113,7 +140,7 @@ const SpotListPage: React.FC = () => {
   const cardRefs = useRef<Map<string, HTMLLIElement>>(new Map());
   const mapColRef = useRef<HTMLElement | null>(null);
   const mapData = useMemo(() => wishPoints(shown), [shown]);
-  const filterKey = `${category}|${query.trim()}|${sort}|${spots?.length ?? 0}`;
+  const filterKey = `${kindTab}|${category}|${query.trim()}|${sort}|${spots?.length ?? 0}`;
   useEffect(() => { if (selectedId && !shown.some((x) => x.id === selectedId)) setSelectedId(null); }, [shown, selectedId]);
   const selectFromMap = (id: string | null) => {
     setSelectedId(id);
@@ -373,6 +400,12 @@ const SpotListPage: React.FC = () => {
         </div>
         {spots && spots.length > 0 && (
           <div className="tc-wish-tools">
+            <div className="tc-list-tabs" role="group" aria-label="今度・また・エリアで絞り込む" data-testid="wish-kind-tabs">
+              {WISH_TABS.map(([v, l]) => (
+                <button key={v} type="button" aria-pressed={kindTab === v} className="tc-focus-ring" data-testid={`wish-kind-${v}`}
+                  onClick={() => setKindTab(v)}>{v === 'all' ? l : `${KIND_MARK[v]} ${l}`}<span>{kinds[v]}</span></button>
+              ))}
+            </div>
             <div className="tc-list-tabs" role="group" aria-label="種類で絞り込む">
               {[['all', 'すべて'] as [string, string], ...CATEGORIES].map(([v, l]) => (
                 <button key={v} type="button" aria-pressed={category === v} className="tc-focus-ring" data-testid={`wish-cat-${v}`}
@@ -391,8 +424,10 @@ const SpotListPage: React.FC = () => {
             </button>
             <div>
               <label htmlFor="wish-sort" className="sr-only">並べ替え</label>
-              <select id="wish-sort" className="tc-focus-ring tc-wish-sort" value={sort} onChange={(e) => setSort(e.target.value as 'new' | 'name')}>
+              <select id="wish-sort" className="tc-focus-ring tc-wish-sort" value={sort}
+                onChange={(e) => chooseSort(e.target.value as 'new' | 'name' | 'near' | 'region')}>
                 <option value="new">保存の新しい順</option><option value="name">名前順</option>
+                <option value="near">近い順(位置は送りません)</option><option value="region">地域でまとめる</option>
               </select>
             </div>
           </div>
@@ -409,13 +444,17 @@ const SpotListPage: React.FC = () => {
           {showMap && (
             <aside className="tc-wish-mapcol" aria-label="地図" ref={mapColRef}>
               <WishSpotsMap points={mapData.points} noLocation={mapData.noLocation} selectedId={selectedId} onSelect={selectFromMap}
-                filterKey={filterKey} categoryLabel={(x) => CATEGORIES.find(([v]) => v === toCategory(x.category))?.[1] ?? 'その他'}
+                filterKey={filterKey} categoryLabel={(x) => `${KIND_MARK[kindOf(x)]} ${KIND_LABEL[kindOf(x)]} · ${CATEGORIES.find(([v]) => v === toCategory(x.category))?.[1] ?? 'その他'}`}
                 memoOf={(x) => splitNote(x.description).memo}
                 onAddToTrip={(x) => navigate('/planner', { state: { spotId: x.id } })} onEdit={(x) => edit(x)} />
             </aside>
           )}
+          <div>
+          {(sort === 'region' ? groupByRegion(shown) : [{ region: '', items: shown }]).map((g) => (
+          <section key={g.region || 'all'} aria-label={g.region || undefined}>
+          {g.region && <h3 className="tc-section-title mt-2 mb-2" data-testid="wish-region">{`${g.region}(${g.items.length})`}</h3>}
           <ul className="grid tc-trip-grid" aria-label="行きたい場所の一覧">
-            {shown.map((s) => {
+            {g.items.map((s) => {
               const kind = toCategory(s.category);
               const { memo, links } = splitNote(s.description);
               const source = links.map((u) => safeExternalUrl(u)).find(Boolean) ?? null;
@@ -432,11 +471,20 @@ const SpotListPage: React.FC = () => {
                     {no != null && <span className="tc-wish-no" aria-hidden="true">{no}</span>}
                     {s.photo ? <SpotPhotoView photo={s.photo} spotId={s.id} alt={s.name} fallback={<PlaceArt kind={kind} seed={s.name} />} />
                       : <PlaceArt kind={kind} seed={s.name} />}
+                    <span className="tc-trip-chip" data-testid={`wish-kindchip-${s.id}`}>{`${KIND_MARK[kindOf(s)]} ${KIND_LABEL[kindOf(s)]}`}</span>
                     <span className="tc-trip-chip">{CATEGORIES.find(([v]) => v === kind)?.[1] ?? 'その他'}</span>
+                    {s.wish_when === 'next_trip' && <span className="tc-trip-chip">次の旅行で</span>}
                     {map && <span className="tc-trip-chip tc-trip-chip--role"><MapPin size={11} aria-hidden="true" />地図の位置あり</span>}
                   </div>
                   <div className="tc-lcard-body">
                     <h3 className="break-words">{s.name}</h3>
+                    {sourceText(s) && <p className="text-xs text-ink-700" data-testid={`wish-source-${s.id}`}>{sourceText(s)}</p>}
+                    {kindOf(s) === 'area' && s.radius_m && (
+                      <p className="tc-trip-dest" data-testid={`wish-area-${s.id}`}>
+                        <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="12" fill="none" stroke="currentColor" strokeDasharray="3 2" /><circle cx="14" cy="14" r="2" fill="currentColor" /></svg>
+                        {`半径 ${s.radius_m}m${s.source_label ? ` · ${s.source_label}` : ''}`}
+                      </p>
+                    )}
                     {s.address ? <p className="tc-trip-dest"><MapPin size={14} aria-hidden="true" />{s.address}</p>
                       : <p className="tc-trip-dest tc-muted"><MapPin size={14} aria-hidden="true" />住所は未入力</p>}
                     {s.dining && <DiningSummary dining={s.dining} compact />}
@@ -454,6 +502,16 @@ const SpotListPage: React.FC = () => {
                           aria-label={`「${s.name}」の出典を開く(新しいタブ)`}><ExternalLink size={14} aria-hidden="true" />出典を開く</a>}
                       </p>
                     )}
+                    {/* [FR-062] 近くに来たら知らせる(当日の画面・スポットモードを開いている間だけ・端末の中で比べる) */}
+                    {s.latitude != null && (
+                      <label className="flex min-h-11 items-center gap-2 text-sm text-ink-900">
+                        <button type="button" role="switch" aria-checked={!!s.remind_nearby} data-testid={`wish-remind-${s.id}`}
+                          className={`tc-focus-ring tc-mbtn tc-mbtn--sm min-h-11 ${s.remind_nearby ? 'tc-mbtn--primary' : ''}`} onClick={() => void toggleRemind(s)}>
+                          {s.remind_nearby ? 'オン' : 'オフ'}
+                        </button>
+                        近くに来たら知らせる
+                      </label>
+                    )}
                     <div className="tc-trip-actions">
                       {no != null && (
                         <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-pressed={isSel} data-testid={`wish-show-${s.id}`}
@@ -462,6 +520,12 @@ const SpotListPage: React.FC = () => {
                         </button>
                       )}
                       <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-mbtn--primary" onClick={() => navigate('/planner', { state: { spotId: s.id } })}>旅行に追加</button>
+                      <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" data-testid={`wish-daytrip-${s.id}`}
+                        onClick={() => navigate(`/planner?new=1&mode=day&spot=${encodeURIComponent(s.id)}`)}>ここから日帰り</button>
+                      {kindOf(s) === 'area' && (
+                        <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" data-testid={`wish-walkarea-${s.id}`}
+                          onClick={() => navigate('/planner', { state: { spotId: s.id, asArea: true } })}>ここを歩くエリアにする</button>
+                      )}
                       <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-label={`「${s.name}」を編集`} onClick={() => edit(s)}><Pencil size={14} aria-hidden="true" />編集</button>
                       <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-label={`「${s.name}」の情報を自動取得`} disabled={enriching === s.id}
                         title="OpenStreetMap から住所・電話・公式サイト・食事の情報・写真を探し、空の項目だけを埋めます" onClick={() => void autoFill(s)}>
@@ -474,6 +538,9 @@ const SpotListPage: React.FC = () => {
               );
             })}
           </ul>
+          </section>
+          ))}
+          </div>
           </div>
         )}
       </div>

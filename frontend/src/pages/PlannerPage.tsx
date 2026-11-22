@@ -582,7 +582,8 @@ const PlannerPage: React.FC = () => {
   // [Gate #17] SpotListPage.tsxの「詳細」ボタンも同様にlocation.state.spotId
   // (登録済みスポットのID)を渡していたが、こちらも一切受け取られていなかった。
   // spotIdのみの場合はAPIから詳細を取得してから同じ追加フローに合流させる。
-  const routeState = location.state as { newSpot?: IncomingSpot; spotId?: string; focusEventId?: string } | null;
+  // [FR-062] asArea: 行きたい場所のエリアを「歩くエリア」(種類 area)として足す
+  const routeState = location.state as { newSpot?: IncomingSpot; spotId?: string; asArea?: boolean; focusEventId?: string } | null;
   const [incomingSpot, setIncomingSpot] = useState<IncomingSpot | undefined>(routeState?.newSpot);
   const [isAddSpotModalOpen, setIsAddSpotModalOpen] = useState(false);
   const [isAddingSpot, setIsAddingSpot] = useState(false);
@@ -594,6 +595,7 @@ const PlannerPage: React.FC = () => {
   // (以前はeslint-disableで抑制していた。発火条件はnewSpot/spotIdの変化時のみで不変)。
   const routeNewSpot = routeState?.newSpot;
   const routeSpotId = routeState?.spotId;
+  const routeAsArea = !!routeState?.asArea;
 
   useEffect(() => {
     if (routeNewSpot) {
@@ -606,7 +608,7 @@ const PlannerPage: React.FC = () => {
           setIncomingSpot({
             name: spot.name,
             description: spot.description,
-            category: spot.category,
+            category: routeAsArea ? 'area' : spot.category,
             address: spot.address,
             location: { latitude: spot.latitude, longitude: spot.longitude },
           });
@@ -617,7 +619,7 @@ const PlannerPage: React.FC = () => {
         }
       })();
     }
-  }, [routeNewSpot, routeSpotId, addToast]);
+  }, [routeNewSpot, routeSpotId, routeAsArea, addToast]);
 
   const addSpotToExistingOrNewPlan = async (targetPlanId?: string, chosenDay?: number) => {
     if (!incomingSpot) return;

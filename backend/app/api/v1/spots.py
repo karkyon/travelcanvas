@@ -4,6 +4,7 @@ TravelCanvas MVP スポットAPI
 import logging
 import uuid
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -12,12 +13,13 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.models import Spot, User, UserSpotFavorite, UserSpotVisit
 from app.schemas.spots import (
-    SpotCreate, SpotUpdate, SpotResponse,
+    SpotCreate, SpotUpdate, SpotResponse, SpotQuickCreate, SpotQuickResponse, NearbyCandidatesResponse,
     FavoriteCreate, FavoriteResponse,
     VisitCreate, VisitResponse,
 )
-from app.core.auth import get_current_user_or_guest
-from app.services import dining, event_urls
+from app.core.auth import get_current_active_user, get_current_user_or_guest
+from app.services import dining, event_urls, wishes
+from app.utils.rate_limiter import check_rate_limit
 
 logger = logging.getLogger("travelcanvas")
 
@@ -106,8 +108,10 @@ async def get_spots(
     category: Optional[str] = None,
     limit: int = Query(20, ge=1, le=500),
     mine: bool = False,
+    kind: Optional[str] = Query(None, pattern=r"^(next|again|area)$"),
 ):
-    """スポット一覧取得。mine=true は本人が保存した場所だけ([Gate WishPlaces] 行きたい場所の一覧)"""
+    """スポット一覧取得。mine=true は本人が保存した場所だけ([Gate WishPlaces] 行きたい場所の一覧)。
+    [FR-062] kind=next|again|area で種類を絞る(wish_kind が無い今までの行は「今度行きたい」に数える)"""
     try:
         query = db.query(Spot).filter(
             (Spot.created_by == current_user.id) if mine
@@ -116,6 +120,14 @@ async def get_spots(
 
         if category and category != "all":
             query = query.filter(Spot.category == category)
+        if kind:
+            query = query.filter(Spot.created_by == current_user.id)  # 種類は本人の行きたい場所だけの値
+            if kind == "area":
+                query = query.filter(Spot.wish_scope == "area")
+            else:
+                query = query.filter(Spot.wish_scope.is_distinct_from("area"))
+                query = query.filter(Spot.wish_kind == "again") if kind == "again" else query.filter(
+                    (Spot.wish_kind == "next") | Spot.wish_kind.is_(None))
 
         spots = query.order_by(Spot.created_at.desc()).limit(limit).all()
         return spots
@@ -126,6 +138,97 @@ async def get_spots(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="スポットの取得に失敗しました。しばらくしてから再試行してください。"
         )
+
+# ===== [FR-062] ♡ 今度行きたいに残す(どこからでも) =====
+# 固定パスなので /{spot_id} より前に置く。
+
+
+@router.post("/quick", response_model=SpotQuickResponse)
+async def quick_save_spot(
+    body: SpotQuickCreate,
+    response: Response,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """名前(と任意の位置)だけで行きたい場所に残す。同じ client_id・同じ場所は新しく作らない(200 で既存を返す)"""
+    if not check_rate_limit(f"spots_quick:{current_user.id}", 30, 60):
+        raise HTTPException(status_code=429, detail={"code": "rate_limited",
+                                                     "message": "続けて残しすぎました。1 分ほど待ってから残してください"})
+    if body.client_id:
+        dup = db.query(Spot).filter(Spot.created_by == current_user.id, Spot.client_id == body.client_id).first()
+        if dup is not None:
+            response.status_code = status.HTTP_200_OK
+            return {"spot": dup, "created": False, "merged_into": dup.id, "previous": None}
+    plan_id, label = wishes.source_label_for(db, body.source_plan_id, current_user)
+    same = wishes.find_same(db, current_user.id, body.name, body.latitude, body.longitude)
+    try:
+        if same is not None:
+            previous = wishes.snapshot(same)
+            wishes.apply_wish(same, wish_kind=body.wish_kind, note=body.wish_note, when=body.wish_when)
+            if body.client_id and not same.client_id:
+                same.client_id = body.client_id
+            db.commit()
+            db.refresh(same)
+            response.status_code = status.HTTP_200_OK
+            return {"spot": same, "created": False, "merged_into": same.id, "previous": previous}
+        spot = wishes.new_wish(
+            current_user.id, name=body.name, lat=body.latitude, lng=body.longitude, address=body.address,
+            genre=body.genre, wish_kind=body.wish_kind, note=body.wish_note, when=body.wish_when,
+            source_kind=body.source_kind, source_plan_id=plan_id, source_label=label, client_id=body.client_id)
+        db.add(spot)
+        db.commit()
+        db.refresh(spot)
+    except IntegrityError:
+        # 同じ client_id が同時に届いた(二重送信)。先に入った 1 件を返す
+        db.rollback()
+        dup = db.query(Spot).filter(Spot.created_by == current_user.id, Spot.client_id == body.client_id).first()
+        if dup is None:
+            raise HTTPException(status_code=409, detail="もう一度残してください")
+        response.status_code = status.HTTP_200_OK
+        return {"spot": dup, "created": False, "merged_into": dup.id, "previous": None}
+    response.status_code = status.HTTP_201_CREATED
+    return {"spot": spot, "created": True, "merged_into": None, "previous": None}
+
+
+@router.get("/nearby-candidates", response_model=NearbyCandidatesResponse)
+async def nearby_candidates(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    current_user: User = Depends(get_current_active_user),
+):
+    """今いる所の周り 300m の候補(最大 8 件)。結果は保存しない。位置は小数 4 桁に丸めて使い、ログに残さない
+    (アクセスの記録は経路の型だけ。位置の引数は記録しない)"""
+    if not check_rate_limit(f"spots_nearby:{current_user.id}", 10, 60):
+        raise HTTPException(status_code=429, detail={"code": "rate_limited",
+                                                     "message": "続けて探しすぎました。1 分ほど待ってから探してください"})
+    from app.services.search_provider import search_all_providers  # 遅延(起動を軽く)
+    r_lat, r_lng = wishes.round_position(lat, lng)
+    km = wishes.NEARBY_RADIUS_M / 1000.0
+    rows: List[Dict[str, Any]] = []
+    sources: List[str] = []
+    unavailable: List[str] = []
+    for cat in ("sightseeing", "food"):
+        found = await search_all_providers("", r_lat, r_lng, km, cat)
+        rows.extend(list(found))
+        sources.extend(x for x in getattr(found, "called", []) if x not in sources)
+        unavailable.extend(x for x in getattr(found, "unavailable", []) if x not in unavailable)
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        name = (row.get("name") or "").strip()
+        if not name or row.get("latitude") is None or row.get("longitude") is None:
+            continue
+        d = wishes.distance_m(r_lat, r_lng, float(row["latitude"]), float(row["longitude"]))
+        if d > wishes.NEARBY_RADIUS_M:
+            continue
+        key = wishes.normalize_name(name)
+        if key in out and out[key]["distance_m"] <= d:
+            continue
+        out[key] = {"name": name[:200], "genre": row.get("category"), "distance_m": int(round(d)),
+                    "lat": float(row["latitude"]), "lng": float(row["longitude"]),
+                    "address": row.get("address")}
+    results = sorted(out.values(), key=lambda x: x["distance_m"])[:wishes.NEARBY_MAX]
+    return {"results": results, "source": sources, "unavailable": unavailable}
+
 
 # ===== 固定パスの静的ルート =====
 # [Gate #27 / A-011] /categories/list, /test/ping は /{spot_id}(UUID型パスパラメータ)
@@ -461,6 +564,7 @@ async def get_spot(
     return spot
 
 
+@router.patch("/{spot_id}", response_model=SpotResponse)
 @router.put("/{spot_id}", response_model=SpotResponse)
 async def update_spot(
     spot_id: uuid.UUID,
