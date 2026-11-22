@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.core.auth import get_current_user_or_guest
+from app.core.auth import get_current_active_user, get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import ReelExport, User
@@ -61,9 +61,17 @@ def social_draft(plan_id: str, scope: Scope = "trip", style: Style = "tiktok", s
 
 @router.post("/{plan_id}/social/polish")
 def polish(plan_id: str, body: PolishIn, db: Session = Depends(get_db),
-           current_user: User = Depends(get_current_user_or_guest),
+           current_user: User = Depends(get_current_active_user),
            idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")) -> Any:
+    """AI で整える(押した時だけ)。ほかの AI の機能と同じく、登録した利用者で、AI の利用に同意している時だけ送る"""
+    from app.services import consents
+
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    if not consents.has_consent(current_user, "ai_processing"):
+        # [Gate ConsultAI] 同意が無ければ AI へ送らない(枠も使わない)
+        raise HTTPException(status_code=403, detail={
+            "code": "consent_required",
+            "message": "AI の利用に同意していないため、AI へ送りません。設定のプライバシーで同意できます。下書きのまま使えます"})
     if not check_rate_limit(f"social_polish:{current_user.id}", 5, 60):
         raise HTTPException(status_code=429, detail={"code": "rate_limited", "message": "続けて整えすぎました。1 分ほど待ってください"})
     from app.services import cost_guard as cg

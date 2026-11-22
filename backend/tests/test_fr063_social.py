@@ -254,6 +254,14 @@ def test_polish_sends_only_text_and_face_boxes_need_key(auth_client, db_session,
         return {"text": "伊勢へ1泊2日。整えた文", "model": "m"}, {"used": 1}
 
     monkeypatch.setattr(pc, "ai_suggest", fake)
+    from app.services import consents
+    # 同意が無ければ AI へ送らない(403・送った文は無い)
+    consents.update(me, {"ai_processing": False})
+    db_session.commit()
+    r = client.post(f"/api/v1/plans/{p}/social/polish", json={"text": "伊勢へ1泊2日。", "style": "tiktok"})
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "consent_required" and sent == []
+    consents.update(me, {"ai_processing": True})
+    db_session.commit()
     r = client.post(f"/api/v1/plans/{p}/social/polish", json={"text": "伊勢へ1泊2日。", "style": "tiktok"})
     assert r.status_code == 200 and r.json()["text"] == "伊勢へ1泊2日。整えた文"
     assert "伊勢へ1泊2日。" in sent[0] and "下書きに無い場所" in sent[0]
