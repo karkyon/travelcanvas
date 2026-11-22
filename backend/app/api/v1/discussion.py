@@ -50,6 +50,8 @@ from app.models.models import (
     Expense,
     PlanCandidate,
     PlanCollaborator,
+    PlanNotice,
+    PlanNoticeAck,
     Poll,
     PollOption,
     Reservation,
@@ -1059,3 +1061,95 @@ def delete_comment(
     db.commit()
     _audit("comment_deleted", "comment", request, current_user, c.id, plan.id)
     return {"message": "コメントを削除しました", "revision": c.revision}
+
+
+# ---- [Gate② FC-064] 既読の確認(重大な変更・集合の変更のお知らせ) ---------------------------------------------------
+# DOC-02 FC-064「重大変更、集合変更、B2B改訂の閲覧確認を保持」。B2B の改訂は対象外(B2B の機能が無い)。
+# 編集できる人がお知らせを出す → メンバーへ通知(急ぎの種類。即時のメールの対象) → 各メンバーが「確認しました」。
+# 編集できる人には誰が確認したか・まだかを出す。閲覧だけの人には自分の状態と件数だけ。
+
+NOTICE_KIND_LABEL = {"major_change": "重大な変更", "meeting_change": "集合の変更"}
+MAX_NOTICES_PER_PLAN = 200
+
+
+class NoticeIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: str = Field(..., pattern="^(major_change|meeting_change)$")
+    title: str = Field(..., min_length=1, max_length=120)
+    body: Optional[str] = Field(None, max_length=1000)
+
+
+def _notice_view(db: Session, plan: TravelPlan, n: PlanNotice, viewer: User, can_edit: bool,
+                 members: Set[uuid.UUID], names: Dict[Any, str]) -> Dict[str, Any]:
+    acks = {a.user_id: a.acknowledged_at for a in db.query(PlanNoticeAck).filter(PlanNoticeAck.notice_id == n.id)}
+    targets = [m for m in members if m != n.created_by_user_id]
+    out: Dict[str, Any] = {
+        "id": str(n.id), "kind": n.kind, "kind_label": NOTICE_KIND_LABEL.get(n.kind, n.kind), "title": n.title,
+        "body": n.body, "created_at": _iso(n.created_at), "created_by": names.get(n.created_by_user_id, "(退会した利用者)"),
+        "acknowledged": viewer.id in acks, "acknowledged_at": _iso(acks.get(viewer.id)),
+        "ack_count": sum(1 for m in targets if m in acks), "member_count": len(targets),
+        "needs_my_ack": viewer.id != n.created_by_user_id and viewer.id not in acks,
+    }
+    if can_edit:
+        out["members"] = sorted(
+            ({"name": names.get(m, "ゲスト"), "acknowledged": m in acks, "acknowledged_at": _iso(acks.get(m))}
+             for m in targets), key=lambda r: (r["acknowledged"], r["name"]))
+    return out
+
+
+@router.get("/{plan_id}/notices")
+def list_notices(plan_id: str, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    can_edit = role in ("owner", "editor")
+    members = set(member_user_ids(db, plan))
+    rows = db.query(PlanNotice).filter(PlanNotice.plan_id == plan.id).order_by(PlanNotice.created_at.desc()).all()
+    names = member_names(db, members | {r.created_by_user_id for r in rows if r.created_by_user_id})
+    return {"items": [_notice_view(db, plan, n, current_user, can_edit, members, names) for n in rows],
+            "can_edit": can_edit}
+
+
+@router.post("/{plan_id}/notices", status_code=201)
+def create_notice(plan_id: str, body: NoticeIn, request: Request, db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    if db.query(PlanNotice).filter(PlanNotice.plan_id == plan.id).count() >= MAX_NOTICES_PER_PLAN:
+        raise HTTPException(status_code=409, detail={"code": "too_many",
+                                                     "message": f"お知らせは 1 つの旅行で {MAX_NOTICES_PER_PLAN} 件までです"})
+    n = PlanNotice(plan_id=plan.id, kind=body.kind, title=body.title.strip(),
+                   body=_strip_or_none(body.body), created_by_user_id=current_user.id)
+    db.add(n)
+    db.flush()
+    members = set(member_user_ids(db, plan))
+    others = [m for m in members if m != current_user.id]
+    # 通知の本文は題名だけ(本文はアプリで開いて読む)。全員に確かめてほしいので direct(メンションと同じ扱い)
+    _notify(db, plan, others, "important_notice", f"確認してください: {NOTICE_KIND_LABEL[body.kind]}",
+            n.title, target_type="notice", target_id=n.id, direct_ids=others)
+    db.commit()
+    _audit("plan_notice_created", "plan_notice", request, current_user, n.id, plan.id, {"kind": body.kind})
+    names = member_names(db, members | {current_user.id})
+    return _notice_view(db, plan, n, current_user, role in ("owner", "editor"), members, names)
+
+
+@router.post("/{plan_id}/notices/{notice_id}/ack")
+def acknowledge_notice(plan_id: str, notice_id: str, request: Request, db: Session = Depends(get_db),
+                       current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    nid = _parse_uuid(notice_id, "お知らせ")
+    n = db.query(PlanNotice).filter(PlanNotice.id == nid, PlanNotice.plan_id == plan.id).first()
+    if n is None:
+        raise HTTPException(status_code=404, detail="お知らせが見つかりません")
+    if not db.query(PlanNoticeAck).filter(PlanNoticeAck.notice_id == n.id,
+                                          PlanNoticeAck.user_id == current_user.id).first():
+        from sqlalchemy.exc import IntegrityError
+
+        db.add(PlanNoticeAck(notice_id=n.id, user_id=current_user.id))
+        try:
+            db.commit()
+        except IntegrityError:  # 二度押し・別の端末から同時に押した: 先の確認が残っているので何もしない
+            db.rollback()
+        else:
+            _audit("plan_notice_acknowledged", "plan_notice", request, current_user, n.id, plan.id)
+    members = set(member_user_ids(db, plan))
+    names = member_names(db, members | ({n.created_by_user_id} if n.created_by_user_id else set()))
+    return _notice_view(db, plan, n, current_user, role in ("owner", "editor"), members, names)

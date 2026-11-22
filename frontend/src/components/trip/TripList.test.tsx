@@ -72,6 +72,19 @@ describe('TripList', () => {
     expect(onDelete).toHaveBeenCalledWith(up.id);
   });
 
+  it('[Gate② FC-007] 「テンプレートに」を押すとテンプレートとして保存を呼ぶ(渡さない画面では出さない)', async () => {
+    const onTemplate = vi.fn();
+    const { unmount } = render(<TripList plans={plans} onOpen={vi.fn()} onClone={vi.fn()} onTemplate={onTemplate} onDelete={vi.fn()} cloningId={null} />);
+    await screen.findByText('予定 4');
+    fireEvent.click(screen.getByTestId('trip-tab-planning'));
+    fireEvent.click(screen.getByRole('button', { name: `「${up.title}」をテンプレートとして保存` }));
+    expect(onTemplate).toHaveBeenCalledWith(up.id, up.title);
+    unmount();
+    render(<TripList plans={plans} onOpen={vi.fn()} onClone={vi.fn()} onDelete={vi.fn()} cloningId={null} />);
+    await screen.findByText('予定 4');
+    expect(screen.queryByRole('button', { name: /テンプレートとして保存/ })).toBeNull();
+  });
+
   it('集約を読めない時も旅行の一覧の値で出す', async () => {
     g9.getDashboard.mockRejectedValue(new Error('500'));
     render(<TripList plans={plans} onOpen={vi.fn()} onClone={vi.fn()} onDelete={vi.fn()} cloningId={null} />);

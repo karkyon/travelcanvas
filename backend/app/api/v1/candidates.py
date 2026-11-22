@@ -28,8 +28,8 @@ from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
-    FieldSource, Place, PlanCandidate, PollOption, SearchCandidate, SourceRecord, TravelDay, TravelEvent, TravelPlan,
-    User,
+    CandidateReport, FieldSource, Place, PlanCandidate, PollOption, SearchCandidate, SourceRecord, TravelDay,
+    TravelEvent, TravelPlan, User,
 )
 from app.services import candidates as cs
 from app.services.audit_service import record_audit_event
@@ -80,7 +80,7 @@ def _names(db: Session, ids) -> Dict[uuid.UUID, str]:
 
 
 def _to_dict(c: PlanCandidate, event_ids: set, names: Dict[uuid.UUID, str], dupes: List[Dict[str, Any]],
-             merged_from: List[Dict[str, Any]]) -> Dict[str, Any]:
+             merged_from: List[Dict[str, Any]], reports: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
     status = _effective_status(c, event_ids)
     return {
         "id": str(c.id), "title": c.title, "note": c.note, "source_kind": c.source_kind,
@@ -93,6 +93,8 @@ def _to_dict(c: PlanCandidate, event_ids: set, names: Dict[uuid.UUID, str], dupe
         "created_by": names.get(c.created_by_user_id, "(退会した利用者)"),
         "created_at": _iso(c.created_at), "revision": c.revision,
         "duplicates": dupes, "merged_from": merged_from,
+        # [Gate② FC-026] 報告の理由ごとの件数(誰が報告したかは出さない)
+        "reports": dict(reports or {}),
     }
 
 
@@ -110,7 +112,13 @@ def _list(db: Session, plan: TravelPlan) -> Dict[str, Any]:
         if r.merged_into_id:
             merged.setdefault(str(r.merged_into_id), []).append(
                 {"id": str(r.id), "title": r.title, "source_url": r.source_url, "provider": r.provider})
-    items = [_to_dict(r, event_ids, names, dupes.get(str(r.id), []), merged.get(str(r.id), [])) for r in rows]
+    reports: Dict[str, Dict[str, int]] = {}
+    for cid, reason in db.query(CandidateReport.candidate_id, CandidateReport.reason).filter(
+            CandidateReport.plan_id == plan.id).all():
+        per = reports.setdefault(str(cid), {})
+        per[reason] = per.get(reason, 0) + 1
+    items = [_to_dict(r, event_ids, names, dupes.get(str(r.id), []), merged.get(str(r.id), []),
+                      reports.get(str(r.id))) for r in rows]
     counts = {k: sum(1 for i in items if i["status"] == k) for k in STATUS_LABEL}
     return {"plan_id": str(plan.id), "items": items, "counts": counts,
             "duplicate_pairs": sum(len(v) for v in dupes.values()) // 2}
@@ -415,3 +423,44 @@ def merge_candidate(plan_id: str, candidate_id: str, body: MergeInput, db: Sessi
     db.commit()
     _audit("candidate.merge", current_user, plan, {})
     return _list(db, plan)
+
+
+# ---- [Gate② FC-026] 不適切な候補の報告 -----------------------------------------------------------------------------
+# DOC-02 FC-026「閉業・誤住所・危険・重複を報告しソース状態へ反映」。報告は旅行のメンバー(閲覧だけの人も)ができる。
+# 候補が場所に紐付いていれば、その場所の出典を「要確認」(freshness_state = stale)にする。候補・場所の値は変えない。
+
+REPORT_REASONS = {"closed": "閉業・休業", "wrong_address": "住所・位置の誤り", "dangerous": "危険・注意",
+                  "duplicate": "重複"}
+MAX_REPORTS_PER_USER_PER_CANDIDATE = 5
+
+
+class ReportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(..., pattern="^(closed|wrong_address|dangerous|duplicate)$")
+    note: Optional[str] = Field(None, max_length=300)
+
+
+@router.post("/{plan_id}/candidates/{candidate_id}/reports", status_code=201)
+def report_candidate(plan_id: str, candidate_id: str, body: ReportInput, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user_or_guest)):
+    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    c = _get(db, plan, candidate_id)
+    mine = db.query(CandidateReport).filter(CandidateReport.candidate_id == c.id,
+                                            CandidateReport.reporter_user_id == current_user.id).count()
+    if mine >= MAX_REPORTS_PER_USER_PER_CANDIDATE:
+        raise _bad("too_many", "この候補への報告は、1 人 5 件までです", 429)
+    note = (body.note or "").strip() or None
+    db.add(CandidateReport(plan_id=plan.id, candidate_id=c.id, reason=body.reason, note=note,
+                           reporter_user_id=current_user.id))
+    marked = 0
+    if c.place_id is not None:
+        marked = db.query(SourceRecord).filter(SourceRecord.place_id == c.place_id,
+                                               SourceRecord.freshness_state == "fresh").update(
+            {SourceRecord.freshness_state: "stale"}, synchronize_session=False)
+    db.commit()
+    _audit("candidate_reported", current_user, plan,
+           {"candidate_id": str(c.id), "reason": body.reason, "sources_marked_stale": marked})
+    counts: Dict[str, int] = {}
+    for (reason,) in db.query(CandidateReport.reason).filter(CandidateReport.candidate_id == c.id).all():
+        counts[reason] = counts.get(reason, 0) + 1
+    return {"candidate_id": str(c.id), "reports": counts, "sources_marked_stale": marked}

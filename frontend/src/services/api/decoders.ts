@@ -1882,6 +1882,13 @@ export const visitCorrectionResult: Decoder<VisitCorrectionResult> = object<Visi
 
 // ===== [Gate C2] 候補箱(FR-007)・場所の一元管理(FR-008) =====
 const candidateStatus = oneOf('open', 'scheduled', 'dismissed');
+// [Gate② FC-026] 理由 → 件数
+const countMap: Decoder<Record<string, number>> = (v, path) => {
+  const r = record(v, path);
+  const out: Record<string, number> = {};
+  for (const [k, n] of Object.entries(r)) out[k] = int(n, `${path}.${k}`);
+  return out;
+};
 const planCandidateItem: Decoder<PlanCandidateItem> = object<PlanCandidateItem>({
   id: str, title: str, note: nullable(str), source_kind: oneOf('url', 'text', 'manual', 'search', 'social'),
   source_url: nullable(str), source_label: nullable(str), provider: nullable(str), retrieved_at: nullable(str),
@@ -1894,6 +1901,7 @@ const planCandidateItem: Decoder<PlanCandidateItem> = object<PlanCandidateItem>(
     reasons: arrayOf(oneOf('same_provider_id', 'same_name', 'nearby', 'same_address', 'same_url')),
   })),
   merged_from: arrayOf(object({ id: str, title: str, source_url: nullable(str), provider: nullable(str) })),
+  reports: optional(countMap),
 });
 export const candidateList: Decoder<CandidateList> = object<CandidateList>({
   plan_id: str,

@@ -139,6 +139,7 @@
 | `invalid_plan` | — | — | 配布する旅行を選んでください | api/v1/organizations.py |
 | `invalid_planning_units` | — | — | 操作の量はオブジェクトで指定してください | api/v1/planning_usage.py |
 | `invalid_position` | — | — | 位置(緯度・経度)が正しくありません | api/v1/home_place.py |
+| `invalid_prerequisite` | 422 | no | 自分自身を先行の予定にはできません | api/v1/plans.py |
 | `invalid_reason` | 422 | no | 止める理由を200文字までで入力してください | api/v1/admin_support.py, api/v1/day_variants.py |
 | `invalid_request` | — | — | 本文の形が正しくありません | api/v1/organizations.py |
 | `invalid_role` | — | — | 役割は member か admin です(owner へは役割の変更で) | api/v1/organizations.py |
@@ -274,7 +275,7 @@
 | `thumbnail_unavailable` | 422 | no | この写真の縮小版を作れません | api/v1/memories.py |
 | `tier_feature_not_included` | 403 | no | このデザインは … クラスから使えます | api/v1/booklet.py |
 | `too_long` | 422 | no | 日程は 90 日までです | api/v1/plans.py |
-| `too_many` | 409 | no | 1つの旅行の候補は…件までです | api/v1/candidates.py |
+| `too_many` | 409, 429 | later, no | 1つの旅行の候補は…件までです | api/v1/candidates.py, api/v1/discussion.py |
 | `too_many_areas` | — | — | エリアは1つの旅行に30までです | api/v1/spot_areas.py |
 | `too_many_budget_versions` | 409 | no | 予算の版は…件までです | api/v1/finance_ledger.py |
 | `too_many_clients` | 409 | no | 使える連携は…件までです | api/v1/organizations.py |

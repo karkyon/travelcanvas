@@ -173,6 +173,8 @@ class EventUpdate(BaseModel):
     dining: Optional[dining_info.DiningInfo] = None
     # [Gate EventArea] 入れる先のエリア(null・空で外す)
     parent_event_id: Optional[str] = None
+    # [Gate② FC-017] 先行条件: この予定の前に終えておく予定(null・空で外す)
+    after_event_id: Optional[str] = None
 
 
 class EventMove(BaseModel):
@@ -204,8 +206,10 @@ class EventResponse(BaseModel):
     dining: Optional[Dict[str, Any]] = None
     # [Gate EventArea] この予定が入っているエリアの予定の ID
     parent_event_id: Optional[str] = None
+    # [Gate② FC-017] 先行条件の予定の ID
+    after_event_id: Optional[str] = None
 
-    @field_validator("id", "day_id", "place_id", "parent_event_id", mode="before")
+    @field_validator("id", "day_id", "place_id", "parent_event_id", "after_event_id", mode="before")
     @classmethod
     def _stringify_ids(cls, v):
         return str(v) if v is not None else v
@@ -449,7 +453,39 @@ def _event_to_dict(event: TravelEvent) -> dict:
         "urls": event.urls,
         "dining": event.dining,
         "parent_event_id": str(event.parent_event_id) if event.parent_event_id else None,
+        "after_event_id": str(event.after_event_id) if event.after_event_id else None,
     }
+
+
+def _check_prerequisite(db: Session, plan_id, event_id, raw: Optional[str]):
+    """[Gate② FC-017] 先行条件の予定を確かめる。空なら外す。同じ旅行の別の予定だけ。たどって自分に戻る(循環)は断る"""
+    if not (raw or "").strip():
+        return None
+    try:
+        target = uuid.UUID(str(raw))
+    except ValueError:
+        raise HTTPException(status_code=422, detail={"code": "invalid_field", "message": "先行の予定が正しくありません"})
+    if target == event_id:
+        raise HTTPException(status_code=422, detail={"code": "invalid_prerequisite",
+                                                     "message": "自分自身を先行の予定にはできません"})
+    seen = {event_id}
+    cur = target
+    for _ in range(100):
+        row = db.query(TravelEvent.id, TravelEvent.after_event_id).filter(
+            TravelEvent.id == cur, TravelEvent.plan_id == plan_id).first()
+        if row is None:
+            if cur == target:
+                raise HTTPException(status_code=422, detail={"code": "invalid_prerequisite",
+                                                             "message": "先行の予定はこの旅行の予定から選んでください"})
+            break
+        if row[1] is None:
+            break
+        if row[1] in seen:
+            raise HTTPException(status_code=422, detail={"code": "invalid_prerequisite",
+                                                         "message": "先行の予定が互いに相手を指しています(循環)"})
+        seen.add(row[1])
+        cur = row[1]
+    return target
 
 
 def _area_error(e: "event_area.AreaError") -> HTTPException:
@@ -1044,6 +1080,9 @@ async def update_event(
     # [Gate EventArea] エリアの指定(列はそのまま当てず、決まりを確かめてから)
     parent_given = "parent_event_id" in update_data
     parent_raw = update_data.pop("parent_event_id", None)
+    # [Gate② FC-017] 先行条件(同じ旅行の別の予定。自分・循環は断る)
+    after_given = "after_event_id" in update_data
+    after_raw = update_data.pop("after_event_id", None)
     # [Gate G7] FR-005 終了時刻の入力(列ではない)を取り出してから項目を当てる
     end_given = "local_end_time" in update_data or "end_day_offset" in update_data
     local_end_time = update_data.pop("local_end_time", None)
@@ -1077,6 +1116,8 @@ async def update_event(
         event.parent_event_id = pid
     elif event.event_type == event_area.AREA and event.parent_event_id is not None:
         event.parent_event_id = None
+    if after_given:
+        event.after_event_id = _check_prerequisite(db, plan.id, event.id, after_raw)
     if before["event_type"] == event_area.AREA and event.event_type != event_area.AREA:
         extra += event_area.detach_members(db, event.id, _event_to_dict)
     db.flush()
@@ -1128,11 +1169,17 @@ async def delete_event(
 
     # [Gate EventArea] エリアを消す時は中の予定を外す(元に戻すとまた入る)
     members = event_area.detach_members(db, event_uuid, _event_to_dict) if event.event_type == event_area.AREA else []
+    # [Gate② FC-017] この予定を先行条件にしている予定から外す(記録するので、元に戻すとまた付く)
+    dependents = []
+    for d in db.query(TravelEvent).filter(TravelEvent.after_event_id == event_uuid).all():
+        dependents.append((d, _event_to_dict(d)))
+        d.after_event_id = None
     db.delete(event)
     db.flush()
 
     changes = [("travel_event", event_uuid, "delete", before, None)] + detachment.changes
     changes += [("travel_event", m.id, "update", b, _event_to_dict(m)) for m, b in members]
+    changes += [("travel_event", d.id, "update", b, _event_to_dict(d)) for d, b in dependents]
     new_revision = _record_batch_change_and_bump_revision(db, plan, current_user, "manual", changes)
     return {"message": "イベントを削除しました", "revision": new_revision, "detached": detachment.impact()}
 
@@ -1839,6 +1886,7 @@ def _restore_event(plan: TravelPlan, event_id, before: dict) -> TravelEvent:
         locked=before.get("locked", False), sort_order=before.get("sort_order", 0),
         phone=before.get("phone"), urls=before.get("urls"), dining=before.get("dining"),
         parent_event_id=before.get("parent_event_id"),
+        after_event_id=before.get("after_event_id"),
     )
 
 

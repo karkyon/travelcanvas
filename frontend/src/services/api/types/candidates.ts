@@ -33,6 +33,8 @@ export interface PlanCandidateItem {
   revision: number;
   duplicates: Array<{ id: string; title: string; reasons: DuplicateReason[] }>;
   merged_from: Array<{ id: string; title: string; source_url: string | null; provider: string | null }>;
+  /** [Gate② FC-026] 報告の理由ごとの件数(closed・wrong_address・dangerous・duplicate)。誰が報告したかは出さない */
+  reports?: Record<string, number>;
 }
 
 export interface CandidateList {

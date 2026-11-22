@@ -199,3 +199,35 @@ def test_guest_can_clone_own_plan(client):
     clone_res = client.post(f"/api/v1/travel-plans/{plan_id}/clone", json={})
     assert clone_res.status_code == 201
     assert clone_res.json()["title"] == "ゲストの旅行のコピー"
+
+
+def test_clone_as_template_keeps_structure_and_drops_free_text(auth_client, db_session):
+    """[Gate② FC-007] テンプレートとして保存: 日・予定の名前・種類・時刻は写し、説明・メモ・電話・予算・旅行の説明は写さない。
+    予約・費用・コメント・位置の記録は、複製と同じく写さない。"""
+    from app.models.models import TravelDay, TravelEvent, TravelPlan
+
+    client, _user = auth_client
+    plan_id, day1_id = _create_plan_with_days_and_events(client)
+    plan = db_session.get(TravelPlan, uuid.UUID(plan_id))
+    plan.description, plan.budget = "家族 4 人。父の誕生日", 120000
+    db_session.get(TravelDay, uuid.UUID(day1_id)).notes = "母の薬を忘れない"
+    ev = db_session.query(TravelEvent).filter(TravelEvent.day_id == uuid.UUID(day1_id)).one()
+    ev.description, ev.phone = "予約は田中さんの名前で", "090-0000-0000"
+    db_session.flush()
+    client.post(f"/api/v1/plans/{plan_id}/reservations", json={"type": "restaurant", "provider_name": "店"})
+
+    res = client.post(f"/api/v1/travel-plans/{plan_id}/clone", json={"as_template": True})
+    assert res.status_code == 201, res.text
+    tpl = res.json()
+    assert tpl["title"] == "京都旅行(テンプレート)"
+    new = db_session.get(TravelPlan, uuid.UUID(tpl["id"]))
+    assert new.description is None and new.budget is None and (new.preferences or {}).get("template") is True
+    day = db_session.query(TravelDay).filter(TravelDay.plan_id == new.id).one()
+    assert day.title == "1日目" and day.notes is None
+    copied = db_session.query(TravelEvent).filter(TravelEvent.plan_id == new.id).one()
+    assert copied.title == "清水寺" and copied.event_type == "sightseeing" and copied.start_at is not None
+    assert copied.description is None and copied.phone is None
+    assert client.get(f"/api/v1/plans/{tpl['id']}/reservations").json() == []
+    # 普通の複製は前と同じく説明を写す
+    plain = client.post(f"/api/v1/travel-plans/{plan_id}/clone", json={}).json()
+    assert db_session.get(TravelPlan, uuid.UUID(plain["id"])).description == "家族 4 人。父の誕生日"

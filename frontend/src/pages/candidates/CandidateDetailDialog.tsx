@@ -10,6 +10,7 @@ import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import type { PlanCandidateItem } from '@/services/api';
 import { createWishSpot, enrichWishSpot } from '@/services/api/spotIntake';
+import { REPORT_REASON_LABEL, reportCandidate, type ReportReason } from '@/services/api/candidateReports';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import { FILLED_LABEL, wishCategory } from '../spotListModel';
@@ -27,7 +28,31 @@ const CandidateDetailDialog: React.FC<Props> = ({ candidate: c, planId, canEdit,
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // [Gate② FC-026] 報告(閉業・住所の誤り・危険・重複)。件数はサーバーの返す値で更新する
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reason, setReason] = useState<ReportReason>('closed');
+  const [reportNote, setReportNote] = useState('');
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
   if (!c) return null;
+  const shown = counts ?? c.reports ?? {};
+  const sendReport = async () => {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      const r = await reportCandidate(planId, c.id, reason, reportNote);
+      setCounts(r.reports);
+      setReportOpen(false);
+      setReportNote('');
+      setNote(r.sources_marked_stale > 0
+        ? '報告しました。この場所の出典を「要確認」にしました(情報は変えていません)'
+        : '報告しました(情報は変えていません)');
+    } catch (e) {
+      setError(errorDetailMessage(e, '報告できませんでした'));
+    } finally {
+      setBusy(false);
+    }
+  };
   const source = safeExternalUrl(c.source_url);
   const map = c.latitude != null && c.longitude != null
     ? safeExternalUrl(`https://www.openstreetmap.org/?mlat=${c.latitude}&mlon=${c.longitude}#map=16/${c.latitude}/${c.longitude}`) : null;
@@ -66,6 +91,30 @@ const CandidateDetailDialog: React.FC<Props> = ({ candidate: c, planId, canEdit,
             <ExternalLink size={14} aria-hidden="true" />出典を開く<span className="sr-only">(新しいタブ)</span></a>}
           {c.place_id && <Link className="text-accent underline" to={`/planner/${planId}/places/${c.place_id}`}>場所の詳細</Link>}
         </p>
+        {Object.keys(shown).length > 0 && (
+          <p className="rounded-lg border border-cloud-200 p-2 text-xs" data-testid="candidate-reports">
+            {`メンバーからの報告: ${Object.entries(shown).map(([k, n]) => `${REPORT_REASON_LABEL[k as ReportReason] ?? k} ${n}件`).join('・')}。確かめてから使ってください`}
+          </p>
+        )}
+        {reportOpen && (
+          <div className="rounded-lg border border-cloud-200 p-2 space-y-2" data-testid="candidate-report-form">
+            <label className="block text-xs font-medium text-ink-700">報告の理由
+              <select className="tc-focus-ring mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-2 py-1"
+                value={reason} onChange={(e) => setReason(e.target.value as ReportReason)} data-testid="candidate-report-reason">
+                {(Object.keys(REPORT_REASON_LABEL) as ReportReason[]).map((k) => <option key={k} value={k}>{REPORT_REASON_LABEL[k]}</option>)}
+              </select>
+            </label>
+            <label className="block text-xs font-medium text-ink-700">ひとこと(任意・300 字まで。個人の情報は書かないでください)
+              <input className="tc-focus-ring mt-1 block w-full rounded-lg border border-cloud-200 bg-cloud-0 px-2 py-1" maxLength={300}
+                value={reportNote} onChange={(e) => setReportNote(e.target.value)} />
+            </label>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" onClick={() => void sendReport()} loading={busy} disabled={busy}
+                data-testid="candidate-report-send">報告する</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setReportOpen(false)}>やめる</Button>
+            </div>
+          </div>
+        )}
         {error && <p role="alert" className="text-danger">{error}</p>}
         {note && <p role="status" className="rounded-lg bg-cloud-100 p-2">{note}</p>}
         <div className="flex flex-wrap gap-2 pt-1">
@@ -73,6 +122,10 @@ const CandidateDetailDialog: React.FC<Props> = ({ candidate: c, planId, canEdit,
             icon={<Heart size={15} aria-hidden="true" />}>行きたい場所に保存</Button>
           {canEdit && c.status === 'open' && (
             <Button type="button" variant="outline" onClick={() => { onSchedule(c); onClose(); }}>旅程に追加</Button>
+          )}
+          {!reportOpen && (
+            <Button type="button" variant="ghost" onClick={() => setReportOpen(true)} data-testid="candidate-report-open">
+              情報の問題を報告</Button>
           )}
           <Button type="button" variant="ghost" onClick={onClose}>閉じる</Button>
         </div>

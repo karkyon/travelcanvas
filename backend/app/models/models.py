@@ -561,6 +561,11 @@ class TravelEvent(Base):
         UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="SET NULL", deferrable=True, initially="DEFERRED",
                                        name="fk_travel_events_parent_event_id"),
         nullable=True, index=True)
+    # [Gate② FC-017] 先行条件: この予定の前に終えておく予定(同じ旅行。チェックインの後・集合の後 など)
+    after_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_events.id", ondelete="SET NULL", deferrable=True, initially="DEFERRED",
+                                       name="fk_travel_events_after_event"),
+        nullable=True)
     # [Gate G11] 予定のカードの写真(同じ旅行の kind=photo の記録。記録が消えたら NULL)
     image_memory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("memories.id", ondelete="SET NULL", use_alter=True,
@@ -573,6 +578,7 @@ class TravelEvent(Base):
 
     __table_args__ = (
         Index("ix_travel_events_variant_standby", "plan_id", "variant_standby"),
+        Index("ix_travel_events_after_event", "after_event_id"),
     )
 
 
@@ -3045,6 +3051,69 @@ class PlanCandidate(Base):
         CheckConstraint("(status = 'scheduled') = (scheduled_event_id IS NOT NULL)",
                         name="ck_plan_candidates_scheduled"),
         Index("ix_plan_candidates_plan", "plan_id", "status"),
+    )
+
+
+class CandidateReport(Base):
+    """[Gate② FC-026] 候補箱の候補への報告(閉業・住所の誤り・危険・重複)。出典の状態へ反映する(api/v1/candidates.py)"""
+    __tablename__ = "candidate_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_candidates.id", ondelete="CASCADE"), nullable=False)
+    reason: Mapped[str] = mapped_column(String(16), nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    reporter_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("reason IN ('closed', 'wrong_address', 'dangerous', 'duplicate')",
+                        name="ck_candidate_reports_reason"),
+        Index("ix_candidate_reports_candidate", "candidate_id", "created_at"),
+        Index("ix_candidate_reports_plan", "plan_id"),
+        Index("ix_candidate_reports_reporter", "reporter_user_id"),
+    )
+
+
+class PlanNotice(Base):
+    """[Gate② FC-064] 重大な変更・集合の変更のお知らせ。メンバーごとの確認は PlanNoticeAck"""
+    __tablename__ = "plan_notices"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # major_change / meeting_change
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    body: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('major_change', 'meeting_change')", name="ck_plan_notices_kind"),
+        Index("ix_plan_notices_plan", "plan_id", "created_at"),
+        Index("ix_plan_notices_creator", "created_by_user_id"),
+    )
+
+
+class PlanNoticeAck(Base):
+    """[Gate② FC-064] お知らせを確認したメンバー(1 人 1 行)"""
+    __tablename__ = "plan_notice_acks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    notice_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plan_notices.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    acknowledged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("notice_id", "user_id", name="uq_plan_notice_acks_member"),
+        Index("ix_plan_notice_acks_user", "user_id"),
     )
 
 

@@ -158,7 +158,7 @@ function readEventUrls(raw: unknown): EventUrl[] | undefined {
 function mapEvent(e: NormalizedEvent): ScheduleItem {
   // [Gate G7] FR-005 終了時刻と日をまたぐ日数(backend の EventResponse。以前の型に無いため読み取りだけ)
   const g7 = e as NormalizedEvent & { local_end_time?: string | null; end_day_offset?: number | null; phone?: string | null; urls?: unknown; dining?: unknown;
-    parent_event_id?: string | null };
+    parent_event_id?: string | null; after_event_id?: string | null };
   return {
     id: e.id,
     title: e.title,
@@ -182,6 +182,8 @@ function mapEvent(e: NormalizedEvent): ScheduleItem {
     dining: g7.dining && typeof g7.dining === 'object' && !Array.isArray(g7.dining) ? (g7.dining as ScheduleItem['dining']) : null,
     // [Gate EventArea] 入っているエリア
     parent_event_id: g7.parent_event_id ?? null,
+    // [Gate② FC-017] 先行条件
+    after_event_id: g7.after_event_id ?? null,
   };
 }
 
@@ -809,6 +811,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           ...(item.dining === undefined ? {} : { dining: item.dining }),
           // [Gate EventArea] エリアに入れる・外す(変えた時だけ。null で外す)
           ...(item.parent_event_id === undefined ? {} : { parent_event_id: item.parent_event_id }),
+          // [Gate② FC-017] 先行条件(変えた時だけ。空で外す)
+          ...(item.after_event_id === undefined ? {} : { after_event_id: item.after_event_id ?? '' }),
         },
         plan.revision!
       );

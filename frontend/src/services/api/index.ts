@@ -62,7 +62,7 @@ export const travelAPI = {
   getPlan: (id: string) => api.getPlan(id),
   updatePlan: (id: string, data: Partial<TravelPlan>) => api.updatePlan(id, data),
   deletePlan: (id: string) => api.deletePlan(id),
-  clonePlan: (id: string, data?: { title?: string; start_date?: string }) => api.clonePlan(id, data),
+  clonePlan: (id: string, data?: { title?: string; start_date?: string; as_template?: boolean }) => api.clonePlan(id, data),
   promoteQuickDraft: (
     draftId: string,
     deviceToken: string,

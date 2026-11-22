@@ -38,11 +38,13 @@ interface Props {
   plans: TravelPlan[];
   onOpen: (id: string) => void;
   onClone: (id: string, title: string) => void;
+  /** [Gate② FC-007] テンプレートとして保存(構造だけ。自由に書いた文・電話・予算・予約・費用・コメントは写さない) */
+  onTemplate?: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   cloningId: string | null;
 }
 
-const TripCard: React.FC<{ row: TripRow } & Omit<Props, 'plans'>> = ({ row, onOpen, onClone, onDelete, cloningId }) => {
+const TripCard: React.FC<{ row: TripRow } & Omit<Props, 'plans'>> = ({ row, onOpen, onClone, onTemplate, onDelete, cloningId }) => {
   const { plan, trip, id, title } = row;
   const cover = useCoverPhoto(trip ? id : null, trip?.cover ?? null);
   const { start, end, totalDays } = tripSpan(plan, trip);
@@ -95,6 +97,12 @@ const TripCard: React.FC<{ row: TripRow } & Omit<Props, 'plans'>> = ({ row, onOp
             disabled={cloningId === id} onClick={() => onClone(id, title)}>
             <Copy size={14} aria-hidden="true" />{cloningId === id ? '複製中…' : '複製'}
           </button>
+          {onTemplate && (
+            <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm" aria-label={`「${title}」をテンプレートとして保存`}
+              disabled={cloningId === id} onClick={() => onTemplate(id, title)} data-testid={`trip-template-${id}`}>
+              テンプレートに
+            </button>
+          )}
           <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--sm tc-trip-del" aria-label={`「${title}」を削除`}
             onClick={() => onDelete(id)}>
             <Trash2 size={14} aria-hidden="true" />削除
