@@ -4501,3 +4501,38 @@ class DayTripRoute(Base):
         Index("ix_day_trip_routes_plan", "plan_id"),
         Index("ix_day_trip_routes_dest_spot", "dest_spot_id"),
     )
+
+
+class ReelExport(Base):
+    """[FR-063] 書き出したリールの記録(詳細設計 DD-2026-11-22-01 §2.3)。動画そのものは端末だけに置く。
+
+    写真の ID・位置・文は入れない(型・長さ・枚数・作った所・結果だけ)。storage_key・bytes はサーバーで作る段階 3b
+    (作っていない)のための列。
+    """
+    __tablename__ = "reel_exports"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("travel_plans.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    scope: Mapped[str] = mapped_column(String(8), nullable=False)
+    scope_ref: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    style: Mapped[str] = mapped_column(String(12), nullable=False)
+    duration_s: Mapped[int] = mapped_column(Integer, nullable=False)
+    frame_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    renderer: Mapped[str] = mapped_column(String(8), nullable=False, default="device", server_default="device")
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    storage_key: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("scope IN ('trip', 'day', 'area')", name="ck_reel_exports_scope"),
+        CheckConstraint("style IN ('tiktok', 'ig_reels', 'shorts', 'instagram', 'x', 'line')",
+                        name="ck_reel_exports_style"),
+        CheckConstraint("renderer IN ('device', 'server')", name="ck_reel_exports_renderer"),
+        CheckConstraint("status IN ('ready', 'failed', 'queued', 'rendering')", name="ck_reel_exports_status"),
+        Index("ix_reel_exports_plan", "plan_id"),
+        Index("ix_reel_exports_user", "user_id"),
+    )

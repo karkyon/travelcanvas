@@ -140,6 +140,8 @@ const JourneyPage: React.FC = () => {
       <p className="text-sm text-ink-700 mt-1">
         予定ごとに、行ったか・いつ着いて出たかを記録します。予定そのものは変わりません。時刻は各日のタイムゾーンで表示します。
       </p>
+      {/* [FR-063] SNS の下書き・リール */}
+      {planId && <Link to={`/planner/${planId}/social`} className="tc-focus-ring tc-mbtn mt-2 min-h-11" data-testid="journey-social">SNS の下書き・リールを作る</Link>}
       <div className="tc-list-tabs mt-3" role="tablist" aria-label="振り返りの表示">
         {([['review', '振り返る'], ['again', 'また行きたい']] as const).map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k}

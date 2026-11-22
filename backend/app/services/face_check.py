@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import base64
 import io
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 from sqlalchemy.orm import Session
@@ -78,4 +78,51 @@ def count_faces(db: Session, photos: List[bytes]) -> List[int]:
     for i, resp in zip(index, body.get("responses") or []):
         if isinstance(resp, dict) and not resp.get("error"):
             out[i] = len(resp.get("faceAnnotations") or [])
+    return out
+
+
+def face_boxes(db: Session, photos: List[bytes]) -> List[Optional[List[List[float]]]]:
+    """[FR-063] 写真ごとの顔の枠(0〜1 の x, y, 幅, 高さ。縮めた絵の大きさで割る)。読めない写真は None。保存しない。
+    鍵が無い・失敗は ValueError。顔の絵そのものは返さない(ぼかすのは端末の Canvas)"""
+    try:
+        key = ps.resolve(db, SLOT)
+    except ps.SecretUnavailable:
+        raise ValueError("not_configured")
+    from PIL import Image
+
+    reqs: List[Dict[str, Any]] = []
+    index: List[int] = []
+    sizes: List[Any] = []
+    out: List[Optional[List[List[float]]]] = [None] * len(photos)
+    for i, raw in enumerate(photos[:MAX_PHOTOS]):
+        try:
+            img = _shrink(raw)
+            with Image.open(io.BytesIO(img)) as im:
+                sizes.append(im.size)
+        except Exception:  # noqa: BLE001 - 読めない写真は飛ばす
+            continue
+        reqs.append({"image": {"content": base64.b64encode(img).decode()},
+                     "features": [{"type": "FACE_DETECTION", "maxResults": 20}]})
+        index.append(i)
+    if not reqs:
+        return out
+    try:
+        with httpx.Client(timeout=httpx.Timeout(20.0), transport=_transport) as client:
+            r = client.post(URL, params={"key": key}, json={"requests": reqs})
+            r.raise_for_status()
+            body = r.json()
+    except (httpx.HTTPError, ValueError):
+        raise ValueError("failed")
+    for i, (w, h), resp in zip(index, sizes, body.get("responses") or []):
+        if not isinstance(resp, dict) or resp.get("error"):
+            continue
+        boxes = []
+        for face in resp.get("faceAnnotations") or []:
+            vs = ((face.get("fdBoundingPoly") or face.get("boundingPoly") or {}).get("vertices")) or []
+            xs = [float(v.get("x", 0)) for v in vs if isinstance(v, dict)]
+            ys = [float(v.get("y", 0)) for v in vs if isinstance(v, dict)]
+            if xs and ys and w and h:
+                boxes.append([round(min(xs) / w, 4), round(min(ys) / h, 4),
+                              round((max(xs) - min(xs)) / w, 4), round((max(ys) - min(ys)) / h, 4)])
+        out[i] = boxes
     return out

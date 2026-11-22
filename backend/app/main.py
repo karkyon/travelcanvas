@@ -25,6 +25,7 @@ from app.api.v1 import (
     spot_areas,
     again,
     day_trip,
+    social,
 )
 from app.core.exceptions import TravelCanvasException, ErrorCategory
 from app.core.config import settings
@@ -669,6 +670,7 @@ app.include_router(paid_actions.router, prefix="/api/v1")
 app.include_router(spot_areas.router, prefix="/api/v1")
 app.include_router(again.router, prefix="/api/v1")  # [FR-062]
 app.include_router(day_trip.router, prefix="/api/v1")  # [FR-061]
+app.include_router(social.router, prefix="/api/v1")  # [FR-063]
 from app.services import provider_calls as _provider_calls  # noqa: E402
 _provider_calls.register_all()
 # [Gate ConsultAI] 試験用の模擬の提供元(CI の E2E だけ。本番・ステージングでは起動を拒む)
