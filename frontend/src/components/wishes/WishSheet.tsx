@@ -8,6 +8,7 @@
  * - 保存の後、取り消しのできる知らせ(6 秒)。作った時は削除、既にあった時は元の値へ戻す
  */
 import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, MapPin, Search, Image as ImageIcon, Link2, CalendarCheck } from 'lucide-react';
 import { nearbyCandidates } from '@/services/api/spotIntake';
 import type { NearbyCandidate, WishKind, WishWhen } from '@/services/api/spotIntake';
@@ -111,7 +112,8 @@ export const WishSheet: React.FC<Props> = ({ open, options, onClose }) => {
   const pickDraft = (d: PlaceDraft) => void save({ name: d.name, latitude: d.latitude, longitude: d.longitude,
     address: d.address, genre: d.category });
 
-  return (
+  // ヘッダーの中(backdrop-filter のある帯)に置くと fixed が帯に閉じ込められるため、body の直下に出す
+  return createPortal(
     <div className="fixed inset-0 z-[60]" data-testid="wish-sheet-root">
       <div className="absolute inset-0 bg-black/40" aria-hidden="true" data-testid="wish-sheet-backdrop" onClick={onClose} />
       <div role="dialog" aria-modal="true" aria-labelledby="wish-sheet-title"
@@ -221,7 +223,8 @@ export const WishSheet: React.FC<Props> = ({ open, options, onClose }) => {
 
         <p className="mt-4 text-xs text-ink-600">圏外でも残せます(つながった時に送ります)。住所・写真はあとから自動で入れられます。</p>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
