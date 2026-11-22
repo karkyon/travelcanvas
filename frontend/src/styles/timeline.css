@@ -355,10 +355,17 @@ div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: 
 /* 移動の概算は地図の下の帯 */
 .tc-planmap-foot { left: 0; right: 0; bottom: 0; max-width: none; border-radius: 0; border: 0; border-top: 1px solid var(--tc-cloud-200); box-shadow: none; padding: 7px 12px; }
 @media (max-width: 760px) {
-  .tc-mapov-check { width: auto; left: 12px; top: 50px; }
+  /* [監査 §4.C 375px] 狭い画面: 凡例は語の途中で折らずに 2 行まで包む。地図の操作は凡例の下の右・拡大縮小は左。
+     旅程チェックは下へ置き(初めはたたむ)、選んだ予定の欄が出ている間は隠す(重ならない) */
+  .tc-mapov-chip { right: 12px; flex-wrap: wrap; row-gap: 2px; border-radius: 14px; }
+  .tc-mapov-legend { white-space: nowrap; font-size: 11px; }
+  .tc-mapov-date { white-space: nowrap; }
+  .tc-mapov-check { width: auto; left: 12px; right: 12px; top: auto; bottom: 56px; }
+  .tc-map-frame:has(.tc-mapov-sel) .tc-mapov-check { display: none; }
   .tc-mapov-sel { max-width: calc(100% - 24px); }
   .tc-mapov-next { display: none; }
-  .tc-map-frame .tc-map-actions { left: auto; right: 8px; top: 52px; }
+  .tc-map-frame .tc-map-actions { left: auto; right: 8px; top: 76px; max-width: calc(100% - 64px); }
+  .tc-map-frame .leaflet-top.leaflet-left { top: 76px; }
 }
 
 /* ===== [Gate MapFloatTimeline] 地図の最大化の時の小さな旅程(左に重ねる) ===== */

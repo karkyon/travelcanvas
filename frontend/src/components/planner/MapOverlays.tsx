@@ -41,7 +41,9 @@ interface Props {
 const yen = (n: number) => `¥${Math.round(n).toLocaleString()}`;
 
 const MapOverlays: React.FC<Props> = ({ dateLabel, check, budget, cost, selected, onOpenCard, onClearSelected, next, autoDetect, onToggleAutoDetect }) => {
-  const [open, setOpen] = useState(true);
+  // 狭い画面(760px 以下)では初めはたたむ(地図を覆わない)。開けば項目が出る
+  const [open, setOpen] = useState(() => typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+    || !window.matchMedia('(max-width: 760px)').matches);
   const pace = check && check.late.length === 0;
   return (
     <>
