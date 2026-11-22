@@ -2,6 +2,7 @@
 
 詳細設計 DD-2026-11-22-01 §5。
 """
+
 import logging
 import uuid
 
@@ -50,8 +51,13 @@ def test_same_place_within_100m_is_not_created_and_again_counts(auth_client, db_
     body = res.json()
     assert body["created"] is False and body["merged_into"] == first["id"]
     assert body["spot"]["wish_kind"] == "again" and body["spot"]["again_count"] == 1
-    assert body["previous"] == {"wish_kind": "next", "again_count": 0, "wish_note": None, "wish_when": None,
-                                "last_visited_at": None}
+    assert body["previous"] == {
+        "wish_kind": "next",
+        "again_count": 0,
+        "wish_note": None,
+        "wish_when": None,
+        "last_visited_at": None,
+    }
     again = _quick(client, wish_kind="again").json()
     assert again["spot"]["again_count"] == 2
     # 1km 離れた同じ名前は別の場所
@@ -72,8 +78,9 @@ def test_undo_restores_previous_values_by_patch(auth_client, db_session):
     first = _quick(client).json()["spot"]
     merged = _quick(client, wish_kind="again").json()
     prev = merged["previous"]
-    res = client.patch(f"/api/v1/spots/{first['id']}", json={"wish_kind": prev["wish_kind"],
-                                                               "again_count": prev["again_count"]})
+    res = client.patch(
+        f"/api/v1/spots/{first['id']}", json={"wish_kind": prev["wish_kind"], "again_count": prev["again_count"]}
+    )
     assert res.status_code == 200, res.text
     assert res.json()["wish_kind"] == "next" and res.json()["again_count"] == 0
     # 作った時の取り消しは削除
@@ -90,6 +97,7 @@ def test_source_plan_label_only_for_own_plans(auth_client, make_user, db_session
     # 見られない旅行は結び付けない(名前を写さない)
     other, _ = make_user()
     from app.models.models import TravelPlan
+
     tp = TravelPlan(id=uuid.uuid4(), title="他人の旅", user_id=other.id)
     db_session.add(tp)
     db_session.commit()
@@ -115,7 +123,9 @@ def test_guest_cannot_quick_save(client, make_user):
         res = _quick(client)
         assert res.status_code in (401, 403)
         assert client.get("/api/v1/spots/nearby-candidates", params={"lat": 34.46, "lng": 136.72}).status_code in (
-            401, 403)
+            401,
+            403,
+        )
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -130,15 +140,19 @@ def test_quick_rate_limit(auth_client, monkeypatch):
 def test_kind_filter_counts_legacy_rows_as_next(auth_client, db_session):
     client, user = auth_client
     db_session.add(Spot(name="今までの場所", created_by=user.id, category="other"))
-    db_session.add(Spot(name="エリア", created_by=user.id, category="other", wish_scope="area", radius_m=400,
-                        wish_kind="again"))
+    db_session.add(
+        Spot(name="エリア", created_by=user.id, category="other", wish_scope="area", radius_m=400, wish_kind="again")
+    )
     db_session.commit()
     _quick(client, name="今度の店")
     _quick(client, name="また行く店", wish_kind="again")
 
     def names(kind):
-        return sorted(s["name"] for s in client.get("/api/v1/spots/", params={"mine": "true", "kind": kind,
-                                                                               "limit": 100}).json())
+        return sorted(
+            s["name"]
+            for s in client.get("/api/v1/spots/", params={"mine": "true", "kind": kind, "limit": 100}).json()
+        )
+
     assert names("next") == ["今までの場所", "今度の店"]
     assert names("again") == ["また行く店"]
     assert names("area") == ["エリア"]
@@ -148,8 +162,9 @@ def test_kind_filter_counts_legacy_rows_as_next(auth_client, db_session):
 def test_patch_wish_fields_and_owner_only(auth_client, make_user, db_session):
     client, user = auth_client
     s = _quick(client).json()["spot"]
-    res = client.patch(f"/api/v1/spots/{s['id']}", json={"remind_nearby": True, "wish_when": "someday",
-                                                         "wish_note": "朝に行く"})
+    res = client.patch(
+        f"/api/v1/spots/{s['id']}", json={"remind_nearby": True, "wish_when": "someday", "wish_note": "朝に行く"}
+    )
     assert res.status_code == 200 and res.json()["remind_nearby"] is True and res.json()["wish_when"] == "someday"
     assert client.patch(f"/api/v1/spots/{s['id']}", json={"wish_when": "tomorrow"}).status_code == 422
     other, _ = make_user()
@@ -165,16 +180,33 @@ def _fake_search(calls):
     async def fake(query, latitude, longitude, radius_km=5.0, category="all"):
         calls.append((query, latitude, longitude, radius_km, category))
         if category == "sightseeing":
-            rows = [{"name": "おかげ横丁", "category": "sightseeing", "latitude": latitude + 0.001,
-                     "longitude": longitude, "address": "伊勢市"},
-                    {"name": "遠い寺", "category": "temple", "latitude": latitude + 0.01, "longitude": longitude}]
+            rows = [
+                {
+                    "name": "おかげ横丁",
+                    "category": "sightseeing",
+                    "latitude": latitude + 0.001,
+                    "longitude": longitude,
+                    "address": "伊勢市",
+                },
+                {"name": "遠い寺", "category": "temple", "latitude": latitude + 0.01, "longitude": longitude},
+            ]
         else:
-            rows = [{"name": "赤福 本店", "category": "restaurant", "latitude": latitude, "longitude": longitude + 0.0005},
-                    {"name": "赤福本店", "category": "restaurant", "latitude": latitude, "longitude": longitude + 0.002},
-                    {"name": "名前なし", "category": "restaurant", "latitude": None, "longitude": None}]
-            rows += [{"name": f"店{i}", "category": "cafe", "latitude": latitude + 0.0001 * i, "longitude": longitude}
-                     for i in range(1, 10)]
+            rows = [
+                {
+                    "name": "赤福 本店",
+                    "category": "restaurant",
+                    "latitude": latitude,
+                    "longitude": longitude + 0.0005,
+                },
+                {"name": "赤福本店", "category": "restaurant", "latitude": latitude, "longitude": longitude + 0.002},
+                {"name": "名前なし", "category": "restaurant", "latitude": None, "longitude": None},
+            ]
+            rows += [
+                {"name": f"店{i}", "category": "cafe", "latitude": latitude + 0.0001 * i, "longitude": longitude}
+                for i in range(1, 10)
+            ]
         return sp.ProviderResults(rows, [], ["overpass"])
+
     return fake
 
 
@@ -210,7 +242,11 @@ def test_nearby_rate_limit_and_bad_position(auth_client, monkeypatch):
 
 
 def test_normalize_and_category_helpers():
-    assert wishes.normalize_name("赤福　本店") == wishes.normalize_name("赤福本店") == wishes.normalize_name("赤福・本店")
+    assert (
+        wishes.normalize_name("赤福　本店")
+        == wishes.normalize_name("赤福本店")
+        == wishes.normalize_name("赤福・本店")
+    )
     assert wishes.normalize_name("ＡＢＣ Cafe") == "abccafe"
     assert wishes.category_of("cafe") == "restaurant" and wishes.category_of(None) == "other"
     assert wishes.category_of("temple") == "sightseeing"
