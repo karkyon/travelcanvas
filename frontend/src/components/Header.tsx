@@ -6,6 +6,10 @@ import { useCurrentTripStore } from '../store/currentTripStore';
 import { notificationsAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import CommandPaletteLauncher from './CommandPaletteLauncher';
+import WishHeartButton from './wishes/WishHeartButton';
+
+// [FR-062] ♡ 今度行きたいに残すのシート(開いた時だけ読み込む)
+const WishSheetHost = lazy(() => import('./wishes/WishSheetHost'));
 
 // [Gate AppShell] 利用者のメニュー・スマホのメニューは開いた時に読む(最初に読む JS を増やさない)
 const TripNav = lazy(() => import('./shell/TripNav'));
@@ -186,6 +190,10 @@ const Header: React.FC = () => {
 
           {/* [Gate HeaderPicker] 見た目(端末に合わせる / 明るい / 暗い)。以前はホームの見出しの大きな選択の欄だった */}
           <Suspense fallback={<span className="tc-top-icon" aria-hidden="true" />}><ThemeToggle /></Suspense>
+
+          {/* [FR-062] ♡ 今度行きたいに残す(通知の左。ゲストは「ログインすると残せます」) */}
+          <WishHeartButton isGuest={!!isGuest} />
+          <Suspense fallback={null}><WishSheetHost enabled={!!isAuthenticated && !isGuest} /></Suspense>
 
           {/* 通知 */}
           <Link
