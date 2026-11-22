@@ -545,6 +545,8 @@ async def replace_document(
     # 保存・形・大きさ・ウイルスの確かめ・暗号化・使った量の数え方は、新しく入れる時と同じ
     created = await upload_document(plan_id, request, file, old.classification, old.document_type, db, current_user)
     new = db.get(Document, uuid_module.UUID(created.id))
+    if new is None:  # 作った直後なので起きないが、型の上で確かめる
+        raise HTTPException(status_code=500, detail="差し替えに失敗しました。もう一度入れてください")
     new.version = (old.version or 1) + 1
     new.replaces_document_id = old.id
     new.owner_user_id = old.owner_user_id
