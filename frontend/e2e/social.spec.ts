@@ -32,6 +32,10 @@ test('SNS: 旅の記録から下書きの文を作り、端末でリールを作
   await expect(page.getByRole('heading', { name: 'SNS の下書きとリール', level: 1 })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('写真(3 / 3〜20 枚)')).toBeVisible();
   await expectNoAxeViolations(page, 'SNS(選ぶ)');
+  // 選んでいる札は見た目でも分かる(aria-pressed だけでなく塗りが変わる)
+  const bg = (id: string) => page.getByTestId(id).evaluate((e) => getComputedStyle(e).backgroundColor);
+  await expect(page.getByTestId('social-style-tiktok')).toHaveAttribute('aria-pressed', 'true');
+  expect(await bg('social-style-tiktok')).not.toBe(await bg('social-style-x'));
   await page.getByRole('button', { name: '次へ(文)' }).click();
   const area = page.getByLabel('投稿の文(そのまま直せます)');
   await expect(area).toHaveValue(/^伊勢へ日帰り。|^伊勢へ/);
