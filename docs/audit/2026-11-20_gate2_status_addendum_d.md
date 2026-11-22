@@ -167,3 +167,56 @@ cd ~/projects/travelcanvas && bash scripts/ops/gate2_env_record.sh
   cd ~/projects/travelcanvas && bash scripts/ops/gcp_vm.sh check
   ```
   (`check` は確認だけで、反映・バックアップはしない。`bash <(git show …)` の形では流さない。道具は自分の置き場所から作業の場所を決めるため)
+
+## 9. 次の反映(2026-11-22 時点の main・**未実施**)
+
+反映する版: main **`2dd854a3275031dceb3422dcf26277e8fbb12560`**(#179 FR-063 のマージ)。同じ SHA の PR の head `9e5fb3e6` で必須の 6 件(secret-scan・dependency-audit・frontend・backend・e2e・GitGuardian)がすべて success。`git diff 9e5fb3e6 2dd854a3275031dceb3422dcf26277e8fbb12560` は空。
+両環境は利用者のログ上 `214b179` のまま(§8)。Claude は接続できないため、**反映・記録は未実施**。
+
+### 9.1 `214b179` からの migration(9 件・この順に流れる。Alembic head は `a5c9e1b3d7f4` になる)
+
+| revision | 内容 | 既存のデータへの影響 |
+|---|---|---|
+| `e6a4c2b8d0f3` | T2 採用した場所の一意(部分 index) | **重複の組があると止まる**(§8 の記録は 0 組)。止まったら DB を触らずに報告する |
+| `f1b5d3a9c7e2` | FC-041 予約の変更・取消の記録(表を足す) | なし |
+| `a3c7e9b1d5f4` | FC-026 候補の報告(表を足す) | なし |
+| `b8d2f4a6c1e3` | FC-064 確認してほしいお知らせ(表を足す) | なし |
+| `c5e1a7d3b9f2` | FC-017 予定の先行条件(列を足す) | なし |
+| `d7f3b5c9e1a4` | FC-045 文書の版(`documents.version` 既定 1) | 既存の文書は版 1 になる |
+| `e9a1c3f5b7d2` | FR-062 今度行きたい(`spots` に列・`client_id` の部分一意) | 既存の行は既定値(新しい列は空なので一意に当たらない) |
+| `f3b7d9a1c5e8` | FR-061 日帰り(`day_trip_routes`・`travel_plans.trip_style`) | 既存の旅行は泊まり |
+| `a5c9e1b3d7f4` | FR-063 リールの書き出しの記録(`reel_exports`) | なし |
+
+どれも足すだけで、upgrade に列・表の削除やデータの書き換えは無い(T2 の重複の確かめの読み出しだけ)。
+
+### 9.2 手順(§2 と同じ道具。SHA だけ変える)
+
+omega-dev2:
+```bash
+cd ~/projects/travelcanvas && git fetch origin main && bash <(git show origin/main:scripts/ops/gate2_env_record.sh)
+```
+```bash
+cd ~/projects/travelcanvas && TC_BRANCH=main bash <(git show origin/main:scripts/ops/local_dev_apply.sh)
+```
+```bash
+cd ~/projects/travelcanvas && bash scripts/ops/gate2_env_record.sh
+```
+GCP VM(omega-dev2 で OK の後):
+```bash
+cd ~/projects/travelcanvas && bash scripts/ops/gcp_vm.sh deploy 2dd854a3275031dceb3422dcf26277e8fbb12560
+```
+```bash
+cd ~/projects/travelcanvas && bash scripts/ops/gcp_vm.sh check
+```
+反映の後、管理画面で Google のサーバー用キーの「有効性を確認」をもう一度押す(FR-061 で Routes の field mask を足したため)。
+
+### 9.3 記入欄
+
+| 項目 | 期待 | omega-dev2 前 | omega-dev2 後 | GCP VM 前 | GCP VM 後 |
+|---|---|---|---|---|---|
+| head | `2dd854a`(後) | 未実施 | 未実施 | 未実施 | 未実施 |
+| Alembic current = heads | `a5c9e1b3d7f4` | 未実施 | 未実施 | 未実施 | 未実施 |
+| /health・/ready(checks すべて true) | 200・200 | 未実施 | 未実施 | 未実施 | 未実施 |
+| 画面 `/`・`/admin/ops`・`/planner/<id>/day-trip`・`/planner/<id>/social` | 200 | 未実施 | 未実施 | 未実施 | 未実施 |
+| バックアップの ID | 道具の出力 | — | 未実施 | — | 未実施 |
+| T2 重複の組 | 0 | 未実施 | — | 未実施 | — |
