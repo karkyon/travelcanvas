@@ -139,6 +139,23 @@ function readChallenge(error: AxiosError): ChallengeProblem | null {
   return { token, difficulty };
 }
 
+
+/** 失敗の本文が JSON の Blob なら読み直して response.data に戻す(JSON でなければそのまま。投げない) */
+export async function parseBlobErrorBody(error: { response?: { data?: unknown } }): Promise<void> {
+  const res = error.response;
+  if (!res || typeof Blob === 'undefined' || !(res.data instanceof Blob)) return;
+  const blob = res.data;
+  try {
+    const text = typeof blob.text === 'function' ? await blob.text() : await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result ?? ''));
+      r.onerror = () => reject(r.error);
+      r.readAsText(blob);
+    });
+    res.data = JSON.parse(text);
+  } catch { /* JSON でない(HTML の 502 など)はそのまま */ }
+}
+
 export class ApiCore {
   protected client: AxiosInstance;
   private accessToken: string | null = null;
@@ -240,6 +257,9 @@ export class ApiCore {
     this.client.interceptors.response.use(
       (response: AxiosResponse) => response,
       async (error: AxiosError) => {
+        // [監査 2026-11-23] ファイルで受ける要求(responseType: 'blob')は失敗の本文も Blob になり、画面も共通の知らせも
+        // サーバーの説明(回数の上限・権限など)を読めない。JSON の本文なら読み直して、ほかの要求と同じ形にする
+        await parseBlobErrorBody(error);
         const originalRequest = error.config as
           (typeof error.config & { _retry?: boolean; _challengeTokens?: string[] }) | undefined;
 
