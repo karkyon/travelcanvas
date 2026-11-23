@@ -43,7 +43,8 @@ def test_wish_spots_are_exported_and_deleted_with_the_account(auth_client, make_
 
     # 自分の旅行の予定が非公開の行きたい場所を指している(旅行は退会で論理削除され、行は猶予の間残る)
     plan = client.post("/api/v1/travel-plans/", json={"title": "伊勢", "destination": "伊勢"}).json()["id"]
-    day = client.post(f"/api/v1/plans/{plan}/days", json={"local_date": "2026-11-28", "timezone_id": "Asia/Tokyo"}).json()
+    day = client.post(f"/api/v1/plans/{plan}/days",
+                      json={"local_date": "2026-11-28", "timezone_id": "Asia/Tokyo"}).json()
     ev = client.post(f"/api/v1/plans/{plan}/events", json={"day_id": day["id"], "title": "赤福"}).json()
     row = db_session.get(TravelEvent, uuid.UUID(ev["id"]))
     row.spot_id = private.id
