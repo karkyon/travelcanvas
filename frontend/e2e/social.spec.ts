@@ -36,6 +36,18 @@ test('SNS: 旅の記録から下書きの文を作り、端末でリールを作
   const bg = (id: string) => page.getByTestId(id).evaluate((e) => getComputedStyle(e).backgroundColor);
   await expect(page.getByTestId('social-style-tiktok')).toHaveAttribute('aria-pressed', 'true');
   expect(await bg('social-style-tiktok')).not.toBe(await bg('social-style-x'));
+  // 暗い表示でも選んだ札が区別でき、文字の対比が足りる(#184。範囲は出す先の札の欄だけ)
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  expect(await bg('social-style-tiktok')).not.toBe(await bg('social-style-x'));
+  await expectNoAxeViolations(page, 'SNS(選ぶ・暗い表示の札)', '[data-testid="social-style-tiktok"]');
+  await page.getByTestId('social-style-tiktok').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('social-style-ig_reels')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('social-style-tiktok')).toHaveAttribute('aria-pressed', 'true');
+  await page.evaluate(() => document.documentElement.removeAttribute('data-theme'));
   await page.getByRole('button', { name: '次へ(文)' }).click();
   const area = page.getByLabel('投稿の文(そのまま直せます)');
   await expect(area).toHaveValue(/^伊勢へ日帰り。|^伊勢へ/);
