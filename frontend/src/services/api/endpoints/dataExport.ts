@@ -19,6 +19,30 @@ function toFile(response: { data: unknown }, fallbackName: string, endpoint: str
   return { blob: response.data, filename: name, sha256: /^[0-9a-f]{64}$/.test(sha) ? sha : null };
 }
 
+/**
+ * ファイルで受ける要求(responseType: 'blob')は、失敗の時の本文も Blob になり、画面がサーバーの説明(回数の上限・所有者だけ等)を
+ * 読めない。JSON の本文なら読み直して、ほかの API と同じ形(response.data.detail)にしてから投げ直す。
+ */
+function blobText(b: Blob): Promise<string> {
+  if (typeof b.text === 'function') return b.text();
+  return new Promise((resolve, reject) => {  // 古い環境(text() が無い)
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result ?? ''));
+    r.onerror = () => reject(r.error);
+    r.readAsText(b);
+  });
+}
+
+async function readBlobError(e: unknown): Promise<never> {
+  const res = (e as { response?: { data?: unknown } }).response;
+  if (res && res.data instanceof Blob) {
+    try {
+      res.data = JSON.parse(await blobText(res.data));
+    } catch { /* JSON でなければそのまま */ }
+  }
+  throw e;
+}
+
 export class DataExportApi extends ItineraryExportApi {
   async getRetentionInfo(): Promise<RetentionInfo> {
     const response = await this.client.get('/privacy/retention');
@@ -26,12 +50,12 @@ export class DataExportApi extends ItineraryExportApi {
   }
 
   async downloadPlanDataExport(planId: string): Promise<DataExportFile> {
-    const response = await this.client.get(`/plans/${planId}/data-export`, { responseType: 'blob' });
+    const response = await this.client.get(`/plans/${planId}/data-export`, { responseType: 'blob' }).catch(readBlobError);
     return toFile(response, 'travelcanvas-plan.json', 'GET /plans/{plan_id}/data-export');
   }
 
   async downloadAccountDataExport(): Promise<DataExportFile> {
-    const response = await this.client.get('/privacy/data-export', { responseType: 'blob' });
+    const response = await this.client.get('/privacy/data-export', { responseType: 'blob' }).catch(readBlobError);
     return toFile(response, 'travelcanvas-account.json', 'GET /privacy/data-export');
   }
 }
