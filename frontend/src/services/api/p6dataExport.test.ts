@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import type { AxiosRequestConfig } from 'axios';
 import fx from './__fixtures__/backendContractResponses.json';
 import { api, downloadAccountDataExport, downloadPlanDataExport, getRetentionInfo } from './index';
+import { errorDetailMessage } from '@/utils/apiErrorDetail';
 import type { MinimalHttpClient } from './types';
 
 type Call = { url: string; config?: AxiosRequestConfig };
@@ -35,6 +36,25 @@ describe('データポータビリティAPIクライアント (Gate P6)', () => 
     expect(calls[0]?.url).toBe('/privacy/data-export');
     respondWith({ detail: 'x' });
     await expect(downloadAccountDataExport()).rejects.toThrow(/ファイルではありません/);
+  });
+
+  it('[監査 2026-11-23] 失敗の本文(Blob の JSON)を読み直し、画面にサーバーの説明(回数の上限など)を出せる', async () => {
+    const body = new Blob([JSON.stringify({ detail: { code: 'export_rate_limited', message: '書き出しが続いています' } })],
+      { type: 'application/json' });
+    api.setHttpClientForTesting({
+      get: async () => { throw Object.assign(new Error('429'), { response: { status: 429, data: body } }); },
+    } as Partial<MinimalHttpClient>);
+    const err = await downloadAccountDataExport().catch((e: unknown) => e);
+    expect((err as { response: { data: unknown } }).response.data).toEqual(
+      { detail: { code: 'export_rate_limited', message: '書き出しが続いています' } });
+    expect(errorDetailMessage(err, '失敗')).toContain('書き出しが続いています');
+    // JSON でない本文はそのまま(落ちない)
+    const html = new Blob(['<html>'], { type: 'text/html' });
+    api.setHttpClientForTesting({
+      get: async () => { throw Object.assign(new Error('502'), { response: { status: 502, data: html } }); },
+    } as Partial<MinimalHttpClient>);
+    const err2 = await downloadPlanDataExport('p1').catch((e: unknown) => e);
+    expect((err2 as { response: { data: unknown } }).response.data).toBe(html);
   });
 
   it('保持期間の説明: 実応答を受理し、未知の項目や負の日数は拒否する', async () => {
