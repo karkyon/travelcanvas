@@ -14,7 +14,9 @@ export interface DayTripLeg {
   polyline: string; distance_m: number | null; duration_s: number | null; toll_jpy: number | null;
   provider: 'google' | 'osrm' | 'straight'; arrive_at: string | null; computed_at: string; revision: number;
 }
-export interface DayTripView { trip_style: string | null; routes: Partial<Record<'out' | 'back', DayTripLeg>> }
+export interface DayTripView { trip_style: string | null; routes: Partial<Record<'out' | 'back', DayTripLeg>>;
+  /** 予定に入れる・計算し直すができるか(古いサーバーには無い → できる扱い) */
+  can_edit?: boolean }
 export interface RouteInput { origin: DayTripPlace; destination: DayTripPlace; road: Road; depart_at: string; home_by?: string | null }
 export interface CompareOption { road: Road; duration_s: number | null; distance_m: number | null; toll_jpy: number | null;
   polyline: string; provider: string; warnings: string[] }
