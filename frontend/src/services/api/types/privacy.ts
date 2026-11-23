@@ -27,6 +27,8 @@ export interface AccountDeletionPreview {
   confirmation_text: string;
   owned_plans: Array<{ id: string; title: string; member_count: number }>;
   member_plan_count: number;
+  /** [FR-062] 本人の行きたい場所の数(消す。公開のものは本人のメモ・いつ・残した元だけ消す)。古いサーバーの応答には無い */
+  wish_spots?: number;
   deleted_in_member_plans: {
     personal_packing_items: number; private_constraints: number; member_budgets: number; documents: number;
     /** [Gate P12] 参加している旅行に残した旅の記録(古いサーバーの応答には無い) */

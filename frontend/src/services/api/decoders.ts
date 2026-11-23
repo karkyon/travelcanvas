@@ -1172,6 +1172,7 @@ export const accountDeletionPreview: Decoder<AccountDeletionPreview> = object<Ac
   confirmation_text: str,
   owned_plans: arrayOf(object({ id: str, title: str, member_count: nonNegativeInt })),
   member_plan_count: nonNegativeInt,
+  wish_spots: optional(nonNegativeInt),
   deleted_in_member_plans: object({
     personal_packing_items: nonNegativeInt, private_constraints: nonNegativeInt, member_budgets: nonNegativeInt,
     documents: nonNegativeInt, memories: optional(nonNegativeInt), location_tracks: optional(nonNegativeInt),
