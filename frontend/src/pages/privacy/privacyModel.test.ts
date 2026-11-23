@@ -32,6 +32,12 @@ describe('privacyModel (Gate P9)', () => {
     expect(none).toContain('参加している旅行1件から抜けます。');
   });
 
+  it('[FR-062] 行きたい場所があれば件数を説明する(無ければ書かない)', () => {
+    expect(deletionEffects({ ...base, wish_spots: 3 })).toContain('行きたい場所3件(今度行きたい・また行きたい)を削除します。');
+    expect(deletionEffects({ ...base, wish_spots: 0 }).some((x) => x.includes('行きたい場所'))).toBe(false);
+    expect(deletionEffects(base).some((x) => x.includes('行きたい場所'))).toBe(false);
+  });
+
   it('確認の文字が一致し、必要ならパスワードがある時だけ削除できる', () => {
     expect(canDelete(base, '退会する', '')).toBe(false);
     expect(canDelete(base, ' 退会する ', 'pw')).toBe(true);
