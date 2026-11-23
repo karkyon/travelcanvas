@@ -100,6 +100,15 @@ describe('ルートと寄り道 (FR-061)', () => {
     expect(screen.getByTestId('dt-eta')).toHaveTextContent('家に着く見込み 18:28(19:00 まで あと 32 分)');
   });
 
+  it('[監査 2026-11-23] 閲覧だけの人には「予定に入れる」を出さず、道の比べで計算し直さない(♡ は出す)', async () => {
+    m.view.mockResolvedValue({ trip_style: 'day_trip', routes: { out: leg('out'), back: leg('back') }, can_edit: false });
+    renderPage();
+    await screen.findByText('森のカフェ', { exact: false });
+    expect(screen.queryByTestId('dt-add-0')).toBeNull();
+    for (const b of screen.getByRole('group', { name: '道の使い方の比べ' }).querySelectorAll('button')) expect(b).toBeDisabled();
+    expect(m.route).not.toHaveBeenCalled();
+  });
+
   it('日帰りでない旅行・ルートが無い時', async () => {
     m.view.mockResolvedValueOnce({ trip_style: null, routes: {} });
     const { unmount } = renderPage();
