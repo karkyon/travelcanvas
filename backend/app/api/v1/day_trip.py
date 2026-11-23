@@ -102,8 +102,9 @@ async def compute_route(plan_id: str, body: RouteIn, db: Session = Depends(get_d
 @router.get("/{plan_id}/day-trip")
 def get_day_trip(plan_id: str, db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
-    plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    return dt.get_view(db, plan)
+    plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    # [監査 2026-11-23] 閲覧だけの人には「計算し直す」「予定に入れる」を出さない(押してもサーバーが断るため)
+    return {**dt.get_view(db, plan), "can_edit": role in ("owner", "editor")}
 
 
 @router.post("/{plan_id}/day-trip/compare")
