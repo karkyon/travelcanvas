@@ -6,7 +6,7 @@
  * - 右下: 次の予定(旅行の当日だけ)
  * 移動の概算は地図の下の帯(PlanMap の tc-planmap-foot)。
  */
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { CalendarCheck, ChevronDown, ChevronUp, ChevronRight, Car, X, Navigation, LocateFixed } from 'lucide-react';
 import { safeExternalUrl } from '@/utils/safeNavigation';
 import { minutesText, type DayCheck } from './mapCheckModel';
@@ -38,12 +38,20 @@ interface Props {
   onToggleAutoDetect: () => void;
 }
 
+/** 地図の枠がこの幅以下なら狭い時の並び(timeline.css の @container tcmap と同じ) */
+const NARROW_MAP_PX = 720;
+
 const yen = (n: number) => `¥${Math.round(n).toLocaleString()}`;
 
 const MapOverlays: React.FC<Props> = ({ dateLabel, check, budget, cost, selected, onOpenCard, onClearSelected, next, autoDetect, onToggleAutoDetect }) => {
-  // 狭い画面(760px 以下)では初めはたたむ(地図を覆わない)。開けば項目が出る
-  const [open, setOpen] = useState(() => typeof window === 'undefined' || typeof window.matchMedia !== 'function'
-    || !window.matchMedia('(max-width: 760px)').matches);
+  // 地図の枠が狭い時(720px 以下。スマホ・タブレット縦・2 列の小さい PC)は初めはたたむ(地図を覆わない)。開けば項目が出る。
+  // 画面の幅ではなく地図の枠の幅で決める(CSS の @container tcmap と同じ境目)
+  const [open, setOpen] = useState(true);
+  const checkRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const frame = checkRef.current?.closest('.tc-map-frame');
+    if (frame && frame.clientWidth > 0 && frame.clientWidth <= NARROW_MAP_PX) setOpen(false);
+  }, []);
   const pace = check && check.late.length === 0;
   return (
     <>
@@ -56,7 +64,7 @@ const MapOverlays: React.FC<Props> = ({ dateLabel, check, budget, cost, selected
       </div>
 
       {check && (
-        <section className="tc-mapov tc-mapov-check" aria-label="この日の旅程チェック" data-testid="map-check">
+        <section ref={checkRef} className="tc-mapov tc-mapov-check" aria-label="この日の旅程チェック" data-testid="map-check">
           <h3>
             <CalendarCheck size={15} aria-hidden="true" />この日の旅程チェック
             <button type="button" className="tc-focus-ring tc-mapov-fold" aria-expanded={open}

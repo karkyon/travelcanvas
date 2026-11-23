@@ -25,6 +25,14 @@
   .tc-planner-layout { grid-template-columns: minmax(0, 560px) minmax(0, 1fr); }
   .tc-planner-layout--nomap { grid-template-columns: minmax(0, 1fr); }
 }
+/* [監査 2026-11-23 §4.B] 761〜1023px(タブレット縦・小さい PC): 2 列だと旅程の欄が 560px を取って地図が 60px ほどに潰れ、
+   半々にすると旅程のカードが狭くて 1 字ずつ折れる。スマホと同じく縦に積む(旅程は全幅・地図は 420px の高さ) */
+@media (min-width: 761px) and (max-width: 1023px) {
+  .tc-planner-layout { display: flex; flex-direction: column; align-items: stretch; }
+  .tc-planner-layout > .tc-timeline-card { position: static; height: auto; min-height: 0; overflow: visible; }
+  .tc-timeline-card .tc-day-body { overflow: visible; }
+  .tc-planner-layout > .tc-map-frame { position: relative; top: auto; height: 420px; min-height: 0; }
+}
 @media (max-width: 760px) {
   .tc-planner-layout > .tc-timeline-card { padding: 0 10px 14px; }
   .tc-planner-layout > .tc-map-frame { height: 360px; }
@@ -354,13 +362,15 @@ div[role='listitem'].tc-segment-row, .tc-anchor-move { margin: 4px auto; width: 
 .tc-mapov-nextbtns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 /* 移動の概算は地図の下の帯 */
 .tc-planmap-foot { left: 0; right: 0; bottom: 0; max-width: none; border-radius: 0; border: 0; border-top: 1px solid var(--tc-cloud-200); box-shadow: none; padding: 7px 12px; }
-@media (max-width: 760px) {
-  /* [監査 §4.C 375px] 狭い画面: 凡例は語の途中で折らずに 2 行まで包む。地図の操作は凡例の下の右・拡大縮小は左。
-     旅程チェックは下へ置き(初めはたたむ)、選んだ予定の欄が出ている間は隠す(重ならない) */
+/* [監査 §4.C/§4.B] 地図そのものの幅が狭い時(スマホ・タブレット縦・小さい PC で 2 列の時): 凡例は語の途中で折らずに包む。
+   地図の操作は凡例の下の右・拡大縮小は左。旅程チェックは下へ置き(初めはたたむ)、選んだ予定の欄が出ている間は隠す。
+   画面の幅ではなく地図の枠の幅で切り替える(2 列の時は画面が広くても地図は狭い) */
+.tc-map-frame { container-type: inline-size; container-name: tcmap; }
+@container tcmap (max-width: 720px) {
   .tc-mapov-chip { right: 12px; flex-wrap: wrap; row-gap: 2px; border-radius: 14px; }
   .tc-mapov-legend { white-space: nowrap; font-size: 11px; }
   .tc-mapov-date { white-space: nowrap; }
-  .tc-mapov-check { width: auto; left: 12px; right: 12px; top: auto; bottom: 56px; }
+  .tc-mapov-check { width: auto; left: 12px; right: 12px; top: auto; bottom: 56px; max-height: calc(100% - 210px); overflow-y: auto; }
   .tc-map-frame:has(.tc-mapov-sel) .tc-mapov-check { display: none; }
   .tc-mapov-sel { max-width: calc(100% - 24px); }
   .tc-mapov-next { display: none; }
