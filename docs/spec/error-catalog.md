@@ -94,6 +94,7 @@
 | `expense_has_refunds` | 409 | no | 返金が登録されている支出は取り消せません(先に返金を取り消してください) | api/v1/finance_ledger.py |
 | `expense_voided` | 409 | no | 取り消した支出は変更できません | api/v1/finance.py, api/v1/finance_ledger.py |
 | `expired` | 410 | no | この版は有効期限が切れています | api/v1/booklet.py |
+| `export_rate_limited` | 429 | later | 書き出しが続いています。少し時間をおいてから、もう一度書き出してください(1 時間ごとに回数の上限があります) | api/v1/data_export.py |
 | `face_check_failed` | 503 | later | 顔の判定を取れませんでした。写っている人の了解を確かめてください | api/v1/server_exports.py, api/v1/social.py |
 | `fake_test_disabled` | 403 | no | 本番・staging の環境では Fake の試験を実行しません | api/v1/admin_ops.py |
 | `file_too_large` | 413 | no | ファイルが大きすぎます(上限 …MB) | api/v1/memories.py |
