@@ -23,7 +23,7 @@ from app.core.auth import get_current_user_or_guest
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
-from app.models.models import Notification, PlanCollaborator, TravelPlan, User
+from app.models.models import Notification, PlanCollaborator, Spot, TravelPlan, User
 from app.services import data_export as dx
 from app.services.audit_service import record_audit_event
 from app.services.quickdraft_purge import QUICK_DRAFT_EXPIRED_RETENTION_DAYS, QUICK_DRAFT_PROMOTED_RETENTION_DAYS
@@ -143,6 +143,9 @@ def export_account(request: Request, db: Session = Depends(get_db),
         offline_devices=dx.own_offline_devices(db, current_user.id),
         # [Gate G8] FR-039 訂正の履歴・所有者への訂正の申し出(本人の分。復号した値)
         corrections=_corrections(db, current_user),
+        # [FR-062・監査 2026-11-23] 行きたい場所(今度行きたい・また行きたい。メモ・いつ・残した元を含む本人の物すべて)
+        wish_spots=[dx.row(s) for s in db.query(Spot).filter(Spot.created_by == current_user.id)
+                    .order_by(Spot.created_at).all()],
     )
     _audit(request, current_user, "account_data_exported", "user", current_user.id,
            {"owned_plans": len(owned), "member_plans": len(member_plans)})

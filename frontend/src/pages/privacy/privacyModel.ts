@@ -10,6 +10,7 @@ export function deletionEffects(p: AccountDeletionPreview): string[] {
     ? 'あなたが所有する旅行はありません。'
     : `あなたが所有する旅行${owned}件を削除します。共有リンクはすぐに使えなくなり、参加者も見られなくなります。` +
       `${p.plan_delete_grace_days}日後に予定・予約・文書の原本を含めて完全に削除します。`);
+  if (p.wish_spots) out.push(`行きたい場所${p.wish_spots}件(今度行きたい・また行きたい)を削除します。`);
   if (p.member_plan_count > 0) {
     const d = p.deleted_in_member_plans;
     const parts = [

@@ -30,8 +30,8 @@ from sqlalchemy.orm import Session
 from app.models.models import (
     Budget, Comment, Document, DocumentPurgeStatus, Expense, IdempotencyRecord, LocationTrack, Memory, Notification,
     PackingItem,
-    PlanCollaborator, PlanConstraint, Poll, PreparationTask, SyncOperation, TravelPlan, User, UserSession,
-    UserSpotFavorite, UserSpotVisit, Vote,
+    PlanCollaborator, PlanConstraint, Poll, PreparationTask, ReelExport, Spot, SyncOperation, TravelEvent, TravelPlan,
+    User, UserSession, UserSpotFavorite, UserSpotVisit, Vote,
 )
 from app.services import plan_deletion
 from app.services.plan_item_deletion import detach_collaborator_references
@@ -125,6 +125,8 @@ def preview(db: Session, user: User) -> Dict[str, Any]:
         "owned_plans": [{"id": str(p.id), "title": p.title, "member_count": members_by_plan.get(p.id, 0)}
                         for p in owned],
         "member_plan_count": len(member_plans),
+        # [FR-062・監査 2026-11-23] 本人の行きたい場所(非公開は消す・公開は本人の思いの列だけ消す)
+        "wish_spots": count(db.query(Spot).filter(Spot.created_by == me)),
         "deleted_in_member_plans": others,
         "kept_in_member_plans": kept,
         "plan_delete_grace_days": preview_grace_days(),
@@ -144,6 +146,46 @@ def _delete_document_file(doc: Document, now: datetime) -> bool:
     except Exception:  # noqa: BLE001 - 失敗は保留にして既存の文書purgeバッチで再試行する
         doc.purge_status = DocumentPurgeStatus.PENDING.value
         return False
+
+
+# [FR-062・監査 2026-11-23] 行きたい場所のうち、本人の思い(メモ・いつ・残した元・近くの知らせ・回数)の列。
+# 公開している場所は場所の情報を残し、この列だけを消す
+_WISH_PERSONAL = {"wish_kind": None, "wish_note": None, "wish_when": None, "source_kind": None, "source_plan_id": None,
+                  "source_label": None, "remind_nearby": False, "again_count": 0, "client_id": None,
+                  "last_visited_at": None}
+
+
+def _spot_own_key(photo: Any) -> Optional[str]:
+    if isinstance(photo, dict) and photo.get("provider") == "own" and isinstance(photo.get("storage_key"), str):
+        return cast(str, photo["storage_key"])
+    return None
+
+
+def _delete_own_spots(db: Session, me: uuid.UUID) -> Dict[str, int]:
+    """本人の行きたい場所(spots)。非公開は消す(予定からの参照は外し、自分の写真のファイルも消す)。
+    公開のものは、ほかの人が使っているかもしれないので場所の情報は残し、本人の思いの列だけを消す。"""
+    own = db.query(Spot).filter(Spot.created_by == me).all()
+    private = [s for s in own if not s.is_public]
+    ids = [s.id for s in private]
+    if ids:
+        db.query(TravelEvent).filter(TravelEvent.spot_id.in_(ids)).update(
+            {TravelEvent.spot_id: None}, synchronize_session=False)
+        db.query(UserSpotFavorite).filter(UserSpotFavorite.spot_id.in_(ids)).delete(synchronize_session=False)
+        db.query(UserSpotVisit).filter(UserSpotVisit.spot_id.in_(ids)).delete(synchronize_session=False)
+    for s in private:
+        key = _spot_own_key(s.photo)
+        if key:
+            try:
+                get_storage_backend().delete(key)
+            except Exception:  # noqa: BLE001 - 行は消す。ファイルは保存先の掃除で消える
+                pass
+        db.delete(s)
+    public = [s for s in own if s.is_public]
+    for s in public:
+        for col, value in _WISH_PERSONAL.items():
+            setattr(s, col, value)
+    db.flush()
+    return {"wish_spots": len(private), "public_spots_scrubbed": len(public)}
 
 
 def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> Dict[str, int]:
@@ -227,6 +269,9 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
         synchronize_session=False)
     summary["spot_visits"] = db.query(UserSpotVisit).filter(UserSpotVisit.user_id == me).delete(
         synchronize_session=False)
+    summary.update(_delete_own_spots(db, me))
+    # [FR-063] 参加している旅行で書き出したリールの記録(数だけの記録。所有する旅行の分は旅行の削除で消える)
+    summary["reel_exports"] = db.query(ReelExport).filter(ReelExport.user_id == me).delete(synchronize_session=False)
     db.query(IdempotencyRecord).filter(IdempotencyRecord.user_id == me).delete(synchronize_session=False)
     # [Gate C1] 秘匿プロフィール・適用の記録・プロフィールから作った秘匿制約
     from app.services import private_profile as _pp
