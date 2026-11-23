@@ -1,7 +1,7 @@
 # Gate② 手の確認の手順書・観察票
 
-- 対象の版(現行): main `5d58158000d51833f2b399cb9a6c52ad8df0f646`(#185。2026-11-23)。CI run #895 で secret-scan・frontend・dependency-audit・backend・e2e・perf がすべて success。63 FR・Alembic head `a5c9e1b3d7f4`。
-- 過去の基準(履歴): `f84a7dba`(#163)で C-1〜C-10 を用意した。その後 C-11〜C-18(FC)・C-19〜C-30(FR-061〜063・#184/#185・会員の境界)を足した。過去の基準で取った結果は、どの SHA で取ったかを書いて残す。
+- 対象の版(現行): 反映する時点の最新の main(`fb07cef` 以降。2026-11-23 の CI run #908 ですべて success)。63 FR・Alembic head `a5c9e1b3d7f4`。`5d58158` から `fb07cef` までに migration の追加は無い(#186〜#189)。記録欄の「版」には実際に反映した SHA を書く
+- 過去の基準(履歴): `f84a7dba`(#163)で C-1〜C-10 を用意した。その後 C-11〜C-18(FC)・C-19〜C-30(FR-061〜063・#184/#185・会員の境界)・C-31(書き出し・退会と行きたい場所)を足した。過去の基準で取った結果は、どの SHA で取ったかを書いて残す。
 - 確認する環境: 開発環境だけ(omega-dev2 → GCP VM)。**本番・Cloud Run・Stripe Live では行わない。**
 - **状態: すべて未実施(利用者の実施待ち)。** この票は Claude が用意した。Claude は手の操作をしていない。
 - 環境の SHA が上の版と違う時は、先に反映する(手順と記入欄は `docs/audit/2026-11-20_gate2_status_addendum_d.md` §9。`214b179` から migration 9 件)。記録欄の「環境の SHA」には、`gate2_env_record.sh` が出した値を書く。

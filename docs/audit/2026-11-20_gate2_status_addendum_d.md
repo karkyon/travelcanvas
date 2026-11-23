@@ -220,3 +220,14 @@ cd ~/projects/travelcanvas && bash scripts/ops/gcp_vm.sh check
 | 画面 `/`・`/admin/ops`・`/planner/<id>/day-trip`・`/planner/<id>/social` | 200 | 未実施 | 未実施 | 未実施 | 未実施 |
 | バックアップの ID | 道具の出力 | — | 未実施 | — | 未実施 |
 | T2 重複の組 | 0 | 未実施 | — | 未実施 | — |
+
+### 9.4 2026-11-23 の注(反映する版の読み替え)
+
+- §9 を書いた時の版 `2dd854a` より後に、#181〜#189 が main に入った(画面・試験・文書・退会の修正。**migration の追加は無い**。Alembic head は `a5c9e1b3d7f4` のまま)。
+- 反映は **その時点の最新の main** で行う。必須の CI がすべて success の SHA を使う(2026-11-23 時点: `fb07cef`。run #908 で 5 ジョブとも success)。
+- SHA の取り方(omega-dev2 の作業の場所で):
+  ```bash
+  cd ~/projects/travelcanvas && git fetch origin main && git rev-parse origin/main
+  ```
+  GCP VM は `bash scripts/ops/gcp_vm.sh deploy <上で出た 40 桁の SHA>`。§9.2 の他の手順・§9.3 の記入欄はそのまま使い、「head」の欄には実際に反映した SHA を書く。
+- 環境の今の SHA は、反映の前に `gate2_env_record.sh` で取り直す(HANDOFF の `214b179` は利用者の 11-21 のログの値で、今の実測ではない)。
