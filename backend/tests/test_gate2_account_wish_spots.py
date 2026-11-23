@@ -87,3 +87,24 @@ def test_wish_spots_are_exported_and_deleted_with_the_account(auth_client, make_
     ev_row = db_session.get(TravelEvent, uuid.UUID(ev["id"]))
     assert ev_row is not None and ev_row.spot_id is None
     assert db_session.query(ReelExport).filter(ReelExport.user_id == me.id).count() == 0
+
+
+def test_data_export_is_rate_limited_per_user(auth_client, make_user, db_session, monkeypatch):
+    """[監査 2026-11-23 §3.C] 書き出しは重いので本人ごとに 1 時間の回数の上限(超えたら 429・中身は出さない)"""
+    from app.api.v1 import data_export as de
+
+    client, me = auth_client
+    monkeypatch.setattr(de, "EXPORT_ACCOUNT_PER_HOUR", 2)
+    monkeypatch.setattr(de, "EXPORT_PLAN_PER_HOUR", 1)
+    assert client.get("/api/v1/privacy/data-export").status_code == 200
+    assert client.get("/api/v1/privacy/data-export").status_code == 200
+    r = client.get("/api/v1/privacy/data-export")
+    assert r.status_code == 429 and r.json()["detail"]["code"] == "export_rate_limited"
+    assert "wish_spots" not in r.text
+    plan = client.post("/api/v1/travel-plans/", json={"title": "伊勢", "destination": "伊勢"}).json()["id"]
+    assert client.get(f"/api/v1/plans/{plan}/data-export").status_code == 200
+    assert client.get(f"/api/v1/plans/{plan}/data-export").status_code == 429
+    # ほかの人は数えない
+    other, _ = make_user(password=PASSWORD)
+    app.dependency_overrides[get_current_user] = lambda: AuthResult(user=other, is_authenticated=True, is_guest=False)
+    assert client.get("/api/v1/privacy/data-export").status_code == 200

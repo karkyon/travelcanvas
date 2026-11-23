@@ -27,6 +27,20 @@ from app.models.models import Notification, PlanCollaborator, Spot, TravelPlan, 
 from app.services import data_export as dx
 from app.services.audit_service import record_audit_event
 from app.services.quickdraft_purge import QUICK_DRAFT_EXPIRED_RETENTION_DAYS, QUICK_DRAFT_PROMOTED_RETENTION_DAYS
+from app.utils.rate_limiter import check_rate_limit
+
+# [監査 2026-11-23 §3.C] 書き出しは全旅行を読み・復号して組み立てる重い処理。前段(Tailscale Serve)に回数の制限は無いので、
+# アプリで本人ごとに数える(普段の使い方で当たらない回数。超えたら 429 で、少し待てばまた取れる)
+EXPORT_PLAN_PER_HOUR = 30
+EXPORT_ACCOUNT_PER_HOUR = 10
+
+
+def _limit(key: str, n: int) -> None:
+    if not check_rate_limit(key, n, 3600):
+        raise HTTPException(status_code=429, detail={
+            "code": "export_rate_limited",
+            "message": "書き出しが続いています。少し時間をおいてから、もう一度書き出してください(1 時間ごとに回数の上限があります)"})
+
 
 plans_router = APIRouter(prefix="/plans", tags=["data-export"])
 privacy_router = APIRouter(prefix="/privacy", tags=["data-export"])
@@ -94,6 +108,7 @@ def export_plan(plan_id: str, request: Request, db: Session = Depends(get_db),
             "code": "owner_only",
             "message": "旅行全体のエクスポートは所有者だけが行えます。自分のデータはアカウントのエクスポートで取得できます。",
         })
+    _limit(f"data_export_plan:{current_user.id}", EXPORT_PLAN_PER_HOUR)
     now = _now()
     body = dx.plan_export(db, plan, current_user.id)
     payload = dx.envelope("plan", current_user, retention_info(), now, plans=[body])
@@ -121,6 +136,7 @@ def _home_place(db: Session, user: User):
 @privacy_router.get("/data-export")
 def export_account(request: Request, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user_or_guest)):
+    _limit(f"data_export_account:{current_user.id}", EXPORT_ACCOUNT_PER_HOUR)
     now = _now()
     owned = db.query(TravelPlan).filter(TravelPlan.user_id == current_user.id).order_by(TravelPlan.created_at).all()
     member_plans = dx.accessible_member_plans(db, current_user)
