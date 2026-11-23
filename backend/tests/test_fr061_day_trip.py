@@ -210,6 +210,7 @@ def test_viewer_cannot_compute_but_can_read(auth_client, make_user, db_session, 
     client, user = auth_client
     plan = _day_plan(db_session, user)
     assert client.post(f"/api/v1/plans/{plan.id}/day-trip/route", json=_route_body()).status_code == 200
+    assert client.get(f"/api/v1/plans/{plan.id}/day-trip").json()["can_edit"] is True
     viewer, _ = make_user()
     db_session.add(
         PlanCollaborator(plan_id=plan.id, user_id=viewer.id, email=viewer.email, role="viewer", status="accepted")
@@ -222,6 +223,7 @@ def test_viewer_cannot_compute_but_can_read(auth_client, make_user, db_session, 
         assert client.post(f"/api/v1/plans/{plan.id}/day-trip/route", json=_route_body()).status_code == 403
         view = client.get(f"/api/v1/plans/{plan.id}/day-trip").json()
         assert view["trip_style"] == "day_trip" and set(view["routes"]) == {"out", "back"}
+        assert view["can_edit"] is False  # 閲覧だけの人の画面は「予定に入れる」「計算し直す」を出さない
         cmp_ = client.post(f"/api/v1/plans/{plan.id}/day-trip/compare", json={"roads": ["auto", "local"]})
         assert cmp_.status_code == 200 and [o["road"] for o in cmp_.json()["options"]] == ["auto", "local"]
     finally:

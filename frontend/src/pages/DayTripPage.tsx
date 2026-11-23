@@ -37,6 +37,7 @@ const snapName = (planId: string) => `daytrip-along:${planId}`;
 const DayTripPage: React.FC = () => {
   const { planId = '' } = useParams<{ planId: string }>();
   const [view, setView] = useState<DayTripView | null>(null);
+  const canEdit = view?.can_edit !== false;
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [leg, setLeg] = useState<'out' | 'back'>('out');
   const [genres, setGenres] = useState<string[]>(['cafe']);
@@ -185,7 +186,7 @@ const DayTripPage: React.FC = () => {
         {!out ? (
           <div className="tc-card mt-3 p-4" data-testid="dt-no-route">
             <p>ルートを計算できませんでした。もう一度試してください(道路のルートが取れない時は直線の予備で探します)。</p>
-            {pending() && <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary mt-2 min-h-11" disabled={busy}
+            {pending() && canEdit && <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary mt-2 min-h-11" disabled={busy}
               data-testid="dt-retry" onClick={() => void retry()}><RefreshCw size={14} aria-hidden="true" />もう一度</button>}
             <Link to={`/planner/${planId}`} className="tc-focus-ring tc-mbtn mt-2 ml-2 min-h-11">旅程へ戻る</Link>
           </div>
@@ -209,7 +210,7 @@ const DayTripPage: React.FC = () => {
                 {compare.map((c) => {
                   const on = c.road === out.road;
                   return (
-                    <button key={c.road} type="button" aria-pressed={on} disabled={busy || on}
+                    <button key={c.road} type="button" aria-pressed={on} disabled={busy || on || !canEdit}
                       className={`tc-focus-ring tc-card min-h-11 p-3 text-left ${on ? 'border-2 border-ink-900' : ''}`}
                       onClick={() => void recompute(c.road)}>
                       <b>{ROAD_LABEL[c.road]}</b>
@@ -294,9 +295,9 @@ const DayTripPage: React.FC = () => {
                       </div>
                     )}
                     <div className="mt-2 flex gap-2">
-                      <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary min-h-11" disabled={isAdded}
+                      {canEdit && <button type="button" className="tc-focus-ring tc-mbtn tc-mbtn--primary min-h-11" disabled={isAdded}
                         data-testid={`dt-add-${i}`} onClick={() => void addToPlan(i)}>
-                        <Plus size={14} aria-hidden="true" />{isAdded ? '予定に入れました' : '予定に入れる'}</button>
+                        <Plus size={14} aria-hidden="true" />{isAdded ? '予定に入れました' : '予定に入れる'}</button>}
                       <WishSaveButton name={r.name} latitude={r.lat} longitude={r.lng} address={r.address} genre={r.genre}
                         sourceKind="route" planId={planId} />
                     </div>
