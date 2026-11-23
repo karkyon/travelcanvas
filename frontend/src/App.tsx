@@ -56,6 +56,9 @@ function App() {
       <RouterProvider router={router} />
       <Toaster 
         position="top-right"
+        // [監査 2026-11-23] 上の帯(高さ 72px・スマホ 60px)のボタン(♡・通知・アカウント)に重ねない。
+        // 重なると押せず、指やマウスが知らせの上にある間は知らせが止まって消えない(react-hot-toast は上に乗ると止まる)
+        containerStyle={{ top: 80 }}
         toastOptions={{
           duration: 4000,
           style: {
