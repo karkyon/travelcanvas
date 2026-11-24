@@ -30,7 +30,7 @@ from app.services import plan_edits
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.core.plan_access import lock_plan_row, require_plan_access
 from app.services import member_policy
 from app.models.models import (
     ChangeSet, EventReservation, Expense, Notification, PlanAlert, PlanFinanceSettings, Replan, Reservation,
@@ -467,6 +467,7 @@ def create_alert(plan_id: str, payload: AlertCreate, request: Request, db: Sessi
         observed = observed.replace(tzinfo=dt_timezone.utc)
     if observed > now + FUTURE_TOLERANCE:
         raise HTTPException(status_code=422, detail="取得時刻に未来の時刻は指定できません")
+    lock_plan_row(db, plan)  # 上限の数え方を同じ旅行で 1 つずつに
     active = db.query(PlanAlert).filter(PlanAlert.plan_id == plan.id, PlanAlert.status == "active").count()
     if active >= MAX_ACTIVE_ALERTS:
         raise HTTPException(status_code=409, detail=f"対応中のアラートは{MAX_ACTIVE_ALERTS}件までです")

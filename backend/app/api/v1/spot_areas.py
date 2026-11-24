@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.core.plan_access import lock_plan_row, require_plan_access
 from app.models.models import (
     OpeningHours, PlaceSpecialHours, PlanCandidate, SpotArea, SpotAreaItem, SpotAreaSplit, TravelDay, TravelPlan,
     User,
@@ -350,6 +350,7 @@ def _respond(db: Session, plan: TravelPlan, area: SpotArea, user: User, role: st
 def create_area(plan_id: str, body: AreaIn, request: Request, db: Session = Depends(get_db),
                 current_user: User = Depends(get_current_user_or_guest)):
     plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    lock_plan_row(db, plan)  # 上限の数え方を同じ旅行で 1 つずつに
     if db.query(SpotArea).filter(SpotArea.plan_id == plan.id).count() >= 30:
         raise _bad("too_many_areas", "エリアは1つの旅行に30までです")
     area = SpotArea(id=uuid.uuid4(), plan_id=plan.id, created_by_user_id=current_user.id, title=body.title, revision=1)

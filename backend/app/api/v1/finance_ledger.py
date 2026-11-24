@@ -22,12 +22,14 @@ from sqlalchemy.orm import Session
 from app.api.v1 import finance as fin
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
+from app.core.plan_access import lock_plan_row
 from app.models.models import Budget, BudgetVersion, Expense, FxRate, PlanFinanceSettings, TravelPlan, User
 from app.services import finance
 from app.services import fx_provider
 from app.services.ext_http import Unavailable
 
 require_plan_access = fin.require_plan_access
+
 router = APIRouter(prefix="/plans", tags=["finance"])
 
 VERSION_KINDS = ("initial", "revised", "committed", "actual")
@@ -97,6 +99,7 @@ def create_rate(plan_id: str, payload: FxRateCreate, request: Request, db: Sessi
         raise HTTPException(status_code=422, detail="為替の値が大きすぎます")
     if payload.rate != payload.rate.quantize(Decimal("0.00000001")):
         raise HTTPException(status_code=422, detail="為替は小数8桁までで入力してください")
+    lock_plan_row(db, plan)  # 上限の数え方を同じ旅行で 1 つずつに
     if db.query(FxRate).filter(FxRate.plan_id == plan.id).count() >= MAX_RATES:
         raise HTTPException(status_code=409, detail={"code": "too_many_fx_rates",
                                                      "message": f"為替の記録は{MAX_RATES}件までです"})
@@ -148,6 +151,7 @@ def fetch_rate(plan_id: str, payload: FxFetch, request: Request, db: Session = D
             "code": "fx_unsupported", "message": "この通貨は自動で取れません。出典を書いて手で入れてください"})
     if payload.rate_date and payload.rate_date > fin._now().date():
         raise HTTPException(status_code=422, detail="未来の日の為替は取れません")
+    lock_plan_row(db, plan)  # 上限の数え方を同じ旅行で 1 つずつに
     if db.query(FxRate).filter(FxRate.plan_id == plan.id).count() >= MAX_RATES:
         raise HTTPException(status_code=409, detail={"code": "too_many_fx_rates",
                                                      "message": f"為替の記録は{MAX_RATES}件までです"})
@@ -243,6 +247,7 @@ def create_version(plan_id: str, payload: VersionCreate, request: Request, db: S
     plan, _ = require_plan_access(db, plan_id, current_user, min_role="editor")
     base = fin._base_currency(db, plan)
     rounding, _rem = fin._policy(db, plan)
+    lock_plan_row(db, plan)  # 上限の数え方を同じ旅行で 1 つずつに
     q = db.query(BudgetVersion).filter(BudgetVersion.plan_id == plan.id)
     if q.count() >= MAX_VERSIONS:
         raise HTTPException(status_code=409, detail={"code": "too_many_budget_versions",

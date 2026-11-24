@@ -43,7 +43,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.core.plan_access import lock_plan_row, require_plan_access
 from app.services import member_policy
 from app.models.models import (
     Comment,
@@ -1113,6 +1113,7 @@ def list_notices(plan_id: str, db: Session = Depends(get_db),
 def create_notice(plan_id: str, body: NoticeIn, request: Request, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user_or_guest)) -> Dict[str, Any]:
     plan, role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    lock_plan_row(db, plan)  # 上限の数え方を同じ旅行で 1 つずつに
     if db.query(PlanNotice).filter(PlanNotice.plan_id == plan.id).count() >= MAX_NOTICES_PER_PLAN:
         raise HTTPException(status_code=409, detail={"code": "too_many",
                                                      "message": f"お知らせは 1 つの旅行で {MAX_NOTICES_PER_PLAN} 件までです"})

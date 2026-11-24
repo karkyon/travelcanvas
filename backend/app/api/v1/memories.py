@@ -28,7 +28,7 @@ from app.core.auth import get_current_user_or_guest
 from app.core.config import settings
 from app.core.crypto import EncryptionNotConfigured
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.core.plan_access import lock_plan_row, require_plan_access
 from app.models.models import Memory, TravelDay, TravelEvent, TravelPlan, User
 from app.ops import metrics as ops_metrics
 from app.services import location_privacy as lp
@@ -156,6 +156,7 @@ def _check_target(db: Session, plan: TravelPlan, event_id: Optional[uuid.UUID], 
 
 
 def _count_check(db: Session, plan: TravelPlan) -> None:
+    lock_plan_row(db, plan)  # 上限の数え方を同じ旅行で 1 つずつに
     if db.query(Memory.id).filter(Memory.plan_id == plan.id).count() >= mem.MAX_MEMORIES_PER_PLAN:
         raise _bad("too_many_memories", f"1つの旅行の記録は{mem.MAX_MEMORIES_PER_PLAN}件までです")
 

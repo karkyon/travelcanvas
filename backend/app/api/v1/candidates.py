@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.core.plan_access import lock_plan_row, require_plan_access
 from app.models.models import (
     CandidateReport, FieldSource, Place, PlanCandidate, PollOption, SearchCandidate, SourceRecord, TravelDay,
     TravelEvent, TravelPlan, User,
@@ -147,6 +147,7 @@ def _require_rev(c: PlanCandidate, if_match: Optional[str]) -> None:
 
 
 def _limit(db: Session, plan: TravelPlan) -> None:
+    lock_plan_row(db, plan)  # 上限の数え方を同じ旅行で 1 つずつに
     if db.query(PlanCandidate).filter(PlanCandidate.plan_id == plan.id).count() >= MAX_CANDIDATES_PER_PLAN:
         raise _bad("too_many", f"1つの旅行の候補は{MAX_CANDIDATES_PER_PLAN}件までです", 409)
 
