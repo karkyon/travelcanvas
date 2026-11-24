@@ -223,6 +223,7 @@
 | `passkey_not_found` | 404 | no | passkey が見つかりません | api/v1/passkeys.py |
 | `passkey_state_invalid` | — | — | 手続きの期限が切れたか、正しくありません。もう一度試してください | api/v1/passkeys.py |
 | `passkey_unknown` | 401 | no | この passkey は登録されていません | api/v1/passkeys.py |
+| `plan_conflict` | — | — | 同じ旅行に別の変更が先に入りました。画面を読み直してから、もう一度お試しください | api/v1/plans.py |
 | `poll_adopted` | 409 | no | 予定に採用した投票は変えられません(先に採用を元に戻してください) | api/v1/discussion.py |
 | `poll_not_decided` | — | — | まだ決定していません(先に選択肢を決定してください) | api/v1/decisions.py |
 | `privacy_zone_not_found` | 404 | no | 守る範囲が見つかりません | api/v1/privacy_zones.py |

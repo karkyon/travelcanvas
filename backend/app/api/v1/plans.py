@@ -393,8 +393,22 @@ def _record_batch_change_and_bump_revision(
     undo_last_changeは既にChangeSet内の全ChangeItemをループ処理する設計
     だったため、本関数の追加だけでバッチUndoに対応できる。changesは
     (entity_type, entity_id, action, before_json, after_json) のタプルの
-    リスト。"""
-    base_revision = plan.revision
+    リスト。
+
+    [Gate② 縦断 1] 同じ旅行への 2 つの変更が同時に来ると(二重押し・2 人の同時の編集)、両方が同じ
+    revision を元に plan_versions へ同じ番号を入れ、後の方が一意の制約に当たって 500 になっていた。
+    旅行の行を FOR UPDATE で押さえてから revision を読み直し、要求の始めに読んだ値から進んでいれば
+    (先に別の変更が入った)何も残さず 409 plan_conflict(読み直してもう一度)で断る。"""
+    seen_revision = plan.revision
+    locked = (db.query(TravelPlan.revision).filter(TravelPlan.id == plan.id)
+              .with_for_update().scalar())
+    if locked is not None and locked != seen_revision:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+            "code": "plan_conflict",
+            "message": "同じ旅行に別の変更が先に入りました。画面を読み直してから、もう一度お試しください",
+        })
+    base_revision = seen_revision
     new_revision = base_revision + 1
 
     change_set = ChangeSet(
