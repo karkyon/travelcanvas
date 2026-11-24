@@ -77,6 +77,33 @@ DOC-10 §6 のとおり未着手(PROD-01〜09)。
 | SEC-019 | オフラインの重複・競合・失効した端末 | `backend/tests/test_gate_p11_sync.py`・`backend/tests/test_gate_k1_offline_keys.py` | 有 |
 | SEC-020 | 公開の PDF・HTML の metadata の漏れ | `backend/tests/test_gate_p4_booklet.py`・`backend/tests/test_gate_q1_photo_metadata.py` | 有(画像の撮影情報と公開の規則) |
 
+### 5.1 証拠の層ごとの状態(2026-11-24、main `19f85a3` で照合し直し)
+
+上の表の試験のファイル 31 個はすべて実在し、手元(PostgreSQL・Redis、Python 3.12)で **349 件すべて成功**した。CI は `d8c0b61`(#201。`19f85a3` との差は文書だけ)の main の run 45363139910 の backend ジョブ(全件の pytest)が success。**CI の成功は本番の運用の証拠ではない。**開発環境(omega-dev2・GCP)は Claude が接続できず、最新の main の反映も利用者のログも無いので、すべて「未」。本番は Gate② の範囲の外(すべて「未」)。
+
+| SEC | 自動の試験(件数) | CI | 開発環境(手の確認の票) | 本番・残り |
+|---|---|---|---|---|
+| SEC-001 | s4_authz_matrix 5 | 成功 | 未(C-2) | 本番: 監査ログの他人の旅行への 403/404 の監視 |
+| SEC-002 | g2_member_policy 4・f45_share_policy 7 | 成功 | 未(C-2・D-7) | — |
+| SEC-003 | gate41_guest_share_view 2・share 24 | 成功 | 未(D-7) | — |
+| SEC-004 | zz_log_leak_scan 1・o2_log_safety 35 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | 本番: ログの定期の走査(未整備) |
+| SEC-005 | sessions 9・s2_auth_hardening 40 | 成功 | 未(C-3) | — |
+| SEC-006 | r3_0_reservation 7・tripkit_security 6 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | — |
+| SEC-007 | k1_offline_keys 12・g6_offline 9 | 成功 | 未(D-5) | 実機での確認が要る |
+| SEC-008 | m7_document_hardening 9 | 成功 | 未(C-18) | 本番: ウイルス検査の実体の稼働 |
+| SEC-009 | c2_candidates_places 8・remaining6_account 10・hardening_ssrf 19 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | 本番: 出口の通信の制限 |
+| SEC-010 | hardening_prompt_injection 10・f07_turn 12 | 成功 | 未(C-26) | 実 API(A 票)は利用者 |
+| SEC-011 | remaining5_server_exports 6 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | — |
+| SEC-012 | g2_realtime 3 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | — |
+| SEC-013 | c3_search 4 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | 時間の差の計測は無い |
+| SEC-014 | c1_collaboration 7 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | **一部**(少人数の集計の閾値の試験が無い) |
+| SEC-015 | g1_keys 16・o1_ops 37 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | 本番の復元の演習は無い |
+| SEC-016 | zz_log_leak_scan 1 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | 本番の定期の検査は無い |
+| SEC-017 | p9_account_deletion 5・g3_data_keys 17 | 成功 | 未(C-31) | 保存先に残ったファイルの走査は判断待ち(#197) |
+| SEC-018 | g2_support_access 4 | 成功 | 未(対応する票は無い。反映後に試験の会員で確かめる) | — |
+| SEC-019 | p11_sync 5・k1_offline_keys 12 | 成功 | 未(C-21・D-5) | — |
+| SEC-020 | p4_booklet 11・q1_photo_metadata 5 | 成功 | 未(C-27) | — |
+
 ## 6. 監視・可用性(DOC-11 §19〜§21・DOC-07)と本番のゲート
 
 | 項目 | 今あるもの | 無いもの(本番リリースのゲート) |
