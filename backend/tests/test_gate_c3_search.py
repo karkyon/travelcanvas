@@ -9,6 +9,7 @@
 - 参加している全ての旅行を横断する(コマンドパレット)。検索語は監査・ログに残さない。回数制限
 """
 import io
+import re
 import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -138,8 +139,10 @@ def test_plan_search(auth_client, make_user, db_session, monkeypatch):
     assert _cat(plain, "reservation") is None
     rs = client.get(url, params={"q": "5678", "filter": "reservation"})
     hit = _cat(rs.json(), "reservation")["results"][0]
-    assert hit["badge"] == "予約番号の末尾に一致" and "5678" in hit["subtitle"] and "7781" not in rs.text
-    assert "9911" not in rs.text and "山田" not in rs.text and "QZ" not in rs.text
+    # 無作為の ID(UUID)に数字の並びがたまたま入ることがあるので、ID を除いた本文で「伏せた部分が出ない」を確かめる
+    body_text = re.sub(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<id>", rs.text)
+    assert hit["badge"] == "予約番号の末尾に一致" and "5678" in hit["subtitle"] and "7781" not in body_text
+    assert "9911" not in body_text and "山田" not in body_text and "QZ" not in body_text
     assert _cat(client.get(url, params={"q": "1234", "filter": "reservation"}).json(), "reservation") is None
     # チケット(中身は出さない)
     tk = client.get(url, params={"filter": "ticket"})
