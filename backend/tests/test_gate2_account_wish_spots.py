@@ -100,11 +100,24 @@ def test_data_export_is_rate_limited_per_user(auth_client, make_user, db_session
     assert client.get("/api/v1/privacy/data-export").status_code == 200
     r = client.get("/api/v1/privacy/data-export")
     assert r.status_code == 429 and r.json()["detail"]["code"] == "export_rate_limited"
+    # [監査 2026-11-24] 待つ秒を返す(最も古い 1 回が 1 時間の窓から出るまで。1〜3600 秒)
+    assert 3000 < int(r.headers["retry-after"]) <= 3601
     assert "wish_spots" not in r.text
     plan = client.post("/api/v1/travel-plans/", json={"title": "伊勢", "destination": "伊勢"}).json()["id"]
     assert client.get(f"/api/v1/plans/{plan}/data-export").status_code == 200
-    assert client.get(f"/api/v1/plans/{plan}/data-export").status_code == 429
+    r2 = client.get(f"/api/v1/plans/{plan}/data-export")
+    assert r2.status_code == 429 and int(r2.headers["retry-after"]) >= 1
     # ほかの人は数えない
     other, _ = make_user(password=PASSWORD)
     app.dependency_overrides[get_current_user] = lambda: AuthResult(user=other, is_authenticated=True, is_guest=False)
     assert client.get("/api/v1/privacy/data-export").status_code == 200
+
+
+def test_retry_after_seconds_uses_the_oldest_hit_and_falls_back_to_the_window(monkeypatch):
+    """記録が無ければ窓の長さ、あれば最も古い記録が窓から出るまで(プロセス内・Redis のどちらでも同じ)"""
+    from app.utils import rate_limiter as rl
+
+    key = f"ra-test:{uuid.uuid4().hex}"
+    assert rl.retry_after_seconds(key, 3600) == 3600
+    assert rl.check_rate_limit(key, 1, 60) and not rl.check_rate_limit(key, 1, 60)
+    assert 1 <= rl.retry_after_seconds(key, 60) <= 61
