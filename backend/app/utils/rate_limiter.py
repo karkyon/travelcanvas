@@ -259,6 +259,28 @@ def get_remaining_attempts(key: str, limit: int, window_seconds: int) -> int:
     return max(0, limit - _memory_count(key, window_seconds, now))
 
 
+def retry_after_seconds(key: str, window_seconds: int) -> int:
+    """[監査 2026-11-24] 次の 1 回が数えられるまでの秒(429 の Retry-After)。最も古い記録が窓から出る時。
+    記録が読めない時は窓の長さ(安全側)。1 以上。"""
+    now = time.time()
+    oldest: Optional[float] = None
+    if _redis_available():
+        try:
+            got = _client().zrange(redis_key(key), 0, 0, withscores=True)
+            if got:
+                oldest = float(got[0][1]) / 1000.0
+        except Exception:  # noqa: BLE001 - 読めなければ窓の長さ
+            oldest = None
+    if oldest is None:
+        with _memory_lock:
+            ts = _rate_limit_storage.get(key)
+            if ts:
+                oldest = ts[0]
+    if oldest is None:
+        return max(1, int(window_seconds))
+    return max(1, int(oldest + window_seconds - now) + 1)
+
+
 def reset_rate_limit(key: str) -> None:
     """レート制限をリセット"""
     with _memory_lock:
