@@ -169,8 +169,10 @@ def _to_candidate_response(c: ExtractionCandidate) -> CandidateResponse:
     )
 
 
-def _get_job_or_404(db: Session, plan_id, job_id) -> ImportJob:
-    j = db.query(ImportJob).filter(ImportJob.id == job_id, ImportJob.plan_id == plan_id).first()
+def _get_job_or_404(db: Session, plan_id, job_id, lock: bool = False) -> ImportJob:
+    """lock=True: 取込の行を FOR UPDATE で押さえる(確定・登録を同じ取込について直列にする)。"""
+    q = db.query(ImportJob).filter(ImportJob.id == job_id, ImportJob.plan_id == plan_id)
+    j = (q.with_for_update() if lock else q).first()
     if j is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="取込ジョブが見つかりません")
     return j
@@ -388,7 +390,9 @@ def apply_extraction(plan_id: str, job_id: str, payload: ApplyExtractionRequest,
                      db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest)):
     """確認フォームの内容で予約を登録する。空にした項目は使わない。求められた時は旅程にも予定を足す。"""
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    j = _get_job_or_404(db, plan.id, job_id)
+    # [Gate② 縦断 2] 二重押し・2 人の同時の登録で、同じ取込から予約が 2 件できていた。取込の行を押さえ、
+    # 下の確定(confirm_import_job)の commit まで 1 つの transaction で持つ。後の要求は待った後に 409
+    j = _get_job_or_404(db, plan.id, job_id, lock=True)
     _require_review_required(j)
     rows = db.query(ExtractionCandidate).filter(ExtractionCandidate.import_job_id == j.id).all()
     existing = {c.field_path: c for c in rows}
@@ -418,7 +422,7 @@ def apply_extraction(plan_id: str, job_id: str, payload: ApplyExtractionRequest,
     except EncryptionNotConfigured:
         db.rollback()
         raise _extract_error("encryption_not_configured", "候補の暗号化が設定されていません(サーバー側の設定)", 503)
-    db.commit()
+    db.flush()  # commit は確定の中で(ここで commit すると行の押さえが外れる)
     job = confirm_import_job(plan_id, job_id, request, db, current_user)
     reservation = db.get(Reservation, uuid.UUID(job.result_reservation_id or ""))
     assert reservation is not None  # confirm が作った直後の行
@@ -699,7 +703,8 @@ def confirm_import_job(
     422。確定前にドメインへ一切反映しないことを本関数内でのみ実行することで
     保証する。"""
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    j = _get_job_or_404(db, plan.id, job_id)
+    # [Gate② 縦断 2] 取込の行を押さえる。同時に 2 回確定されると、両方が review_required を読んで予約を 2 件作っていた
+    j = _get_job_or_404(db, plan.id, job_id, lock=True)
     _require_review_required(j)
 
     accepted = (
