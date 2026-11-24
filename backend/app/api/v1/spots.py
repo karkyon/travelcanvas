@@ -11,7 +11,7 @@ from datetime import datetime
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.models import Spot, User, UserSpotFavorite, UserSpotVisit
+from app.models.models import Spot, TravelEvent, User, UserSpotFavorite, UserSpotVisit
 from app.schemas.spots import (
     SpotCreate, SpotUpdate, SpotResponse, SpotQuickCreate, SpotQuickResponse, NearbyCandidatesResponse,
     FavoriteCreate, FavoriteResponse,
@@ -640,6 +640,12 @@ async def delete_spot(
 
     try:
         photo = spot.photo
+        # [監査 2026-11-24] 公開した場所はほかの人のお気に入り・訪問から指されうる。予定(古い版の spot_id・旅行の複製)からも。
+        # 外部キーに削除の規則が無いため、そのまま消すと 500 になる。お気に入り・訪問は消し、予定は参照だけ外す(予定は残す)
+        db.query(UserSpotFavorite).filter(UserSpotFavorite.spot_id == spot.id).delete(synchronize_session=False)
+        db.query(UserSpotVisit).filter(UserSpotVisit.spot_id == spot.id).delete(synchronize_session=False)
+        db.query(TravelEvent).filter(TravelEvent.spot_id == spot.id).update(
+            {TravelEvent.spot_id: None}, synchronize_session=False)
         db.delete(spot)
         db.commit()
         _drop_own_file(photo)  # [Gate SpotOwnPhoto]
