@@ -108,3 +108,26 @@ def test_data_export_is_rate_limited_per_user(auth_client, make_user, db_session
     other, _ = make_user(password=PASSWORD)
     app.dependency_overrides[get_current_user] = lambda: AuthResult(user=other, is_authenticated=True, is_guest=False)
     assert client.get("/api/v1/privacy/data-export").status_code == 200
+
+
+def test_storage_failure_does_not_stop_deletion_and_is_counted(auth_client, db_session, monkeypatch, caplog):
+    """[監査 2026-11-24] 保存先のファイルが消せなくても行は消し、消えなかった数を要約(監査)と運用の記録に残す"""
+    from app.services import account_deletion as ad
+
+    client, me = auth_client
+    s = _spot(db_session, me, "写真つきの場所", photo={"provider": "own", "storage_key": "spots/x/abc123"})
+    db_session.commit()
+
+    class Broken:
+        def delete(self, key):
+            raise OSError("storage down")
+
+    monkeypatch.setattr(ad, "get_storage_backend", lambda: Broken())
+    app.dependency_overrides[get_current_user] = lambda: AuthResult(user=me, is_authenticated=True, is_guest=False)
+    with caplog.at_level("WARNING", logger="app.services.account_deletion"):
+        res = client.post("/api/v1/privacy/account-deletion", json={"confirmation": "退会する", "password": PASSWORD})
+    assert res.status_code == 200, res.text
+    assert res.json()["summary"]["files_not_removed"] == 1 and res.json()["summary"]["wish_spots"] == 1
+    db_session.expire_all()
+    assert db_session.get(Spot, s.id) is None
+    assert any("spots/x/abc123" in r.getMessage() for r in caplog.records)
