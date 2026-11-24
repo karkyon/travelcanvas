@@ -27,7 +27,7 @@ from app.models.models import Notification, PlanCollaborator, Spot, TravelPlan, 
 from app.services import data_export as dx
 from app.services.audit_service import record_audit_event
 from app.services.quickdraft_purge import QUICK_DRAFT_EXPIRED_RETENTION_DAYS, QUICK_DRAFT_PROMOTED_RETENTION_DAYS
-from app.utils.rate_limiter import check_rate_limit
+from app.utils.rate_limiter import check_rate_limit, retry_after_seconds
 
 # [監査 2026-11-23 §3.C] 書き出しは全旅行を読み・復号して組み立てる重い処理。前段(Tailscale Serve)に回数の制限は無いので、
 # アプリで本人ごとに数える(普段の使い方で当たらない回数。超えたら 429 で、少し待てばまた取れる)
@@ -37,7 +37,8 @@ EXPORT_ACCOUNT_PER_HOUR = 10
 
 def _limit(key: str, n: int) -> None:
     if not check_rate_limit(key, n, 3600):
-        raise HTTPException(status_code=429, detail={
+        # Retry-After: 最も古い 1 回が 1 時間の窓から出るまでの秒(画面・取得の道具が待てる)
+        raise HTTPException(status_code=429, headers={"Retry-After": str(retry_after_seconds(key, 3600))}, detail={
             "code": "export_rate_limited",
             "message": "書き出しが続いています。少し時間をおいてから、もう一度書き出してください(1 時間ごとに回数の上限があります)"})
 
