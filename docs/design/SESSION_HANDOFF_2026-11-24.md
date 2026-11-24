@@ -21,11 +21,12 @@ docs/design/SESSION_HANDOFF_2026-11-24.md を読んでから、HANDOFF §3「次
 |---|---|
 | main | `1e82f8b`(#198 HANDOFF 2026-11-24) |
 | main の CI | `1e82f8b` で secret-scan・dependency-audit・backend・frontend・e2e がすべて success。`1dfc05b`(#199)も perf を含めすべて success |
-| open PR | 0 件 |
+| open PR | #200(この資料を入れる PR)の 1 件だけ。ほかは 0 件。#200 はマージ後に閉じるので、新しい会話では GitHub で取り直す |
 | 台帳 | DOC-10 v6.0-r71・63 FR: VERIFIED 38・INTEGRATED 25(うち(部分)19)・RELEASED 0。加重値は製品の完成率ではない |
 | FC-001〜100 | 実装あり 57・一部 40・未実装 3(FC-011・044・076)。`docs/audit/2026-11-23_fr_fc_recheck.md` §1・§5。FC-101〜180 は親 FR を継承・FC ごとの検証はしていない |
 | Alembic head | `a5c9e1b3d7f4` |
 | omega-dev2・GCP | 今の実測は無い(利用者の 11-21 のログ `214b179` は過去の値)。Claude は接続できない。反映は未実施 |
+| #200 の追加 | 既存の試験 `test_gate_c3_search.py` の予約番号を伏せる確かめが、無作為の UUID に数字がたまたま入ると落ちる(flaky)ので、UUID を除いた本文で確かめるよう直した |
 | Gate② | 未完了(Claude の作業も未完了。全体は環境の反映・手の確認・実機・実 API・実旅行の証拠が無い) |
 
 ## 2. この会話(11-22〜11-24)でマージした PR
