@@ -20,6 +20,7 @@
 - 時刻を過ぎたら定期の処理(tcops.py jobs account-deletions、毎日)が delete_account で削除する。管理者になっていたら
   削除せずに申し込みを残し、件数で知らせる(管理者の権限を外すまで削除しない)
 """
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, cast
@@ -36,6 +37,8 @@ from app.models.models import (
 from app.services import plan_deletion
 from app.services.plan_item_deletion import detach_collaborator_references
 from app.services.storage_backend import get_storage_backend
+
+logger = logging.getLogger(__name__)
 
 CONFIRMATION_TEXT = "退会する"
 DELETED_NAME_PREFIX = "退会済み-"
@@ -155,13 +158,23 @@ _WISH_PERSONAL = {"wish_kind": None, "wish_note": None, "wish_when": None, "sour
                   "last_visited_at": None}
 
 
+def _drop_file(key: str, kind: str, failures: List[str]) -> None:
+    """保存先のファイルを消す。失敗しても行の削除は止めない。消えなかった物は数えて運用の記録に残す
+    (保存先を走査して後から消す仕組みは無い。鍵は無作為の ID で、個人情報を含まない)。"""
+    try:
+        get_storage_backend().delete(key)
+    except Exception:  # noqa: BLE001
+        failures.append(key)
+        logger.warning("account deletion: %s file was not removed from storage: %s", kind, key)
+
+
 def _spot_own_key(photo: Any) -> Optional[str]:
     if isinstance(photo, dict) and photo.get("provider") == "own" and isinstance(photo.get("storage_key"), str):
         return cast(str, photo["storage_key"])
     return None
 
 
-def _delete_own_spots(db: Session, me: uuid.UUID) -> Dict[str, int]:
+def _delete_own_spots(db: Session, me: uuid.UUID, failures: Optional[List[str]] = None) -> Dict[str, int]:
     """本人の行きたい場所(spots)。非公開は消す(予定からの参照は外し、自分の写真のファイルも消す)。
     公開のものは、ほかの人が使っているかもしれないので場所の情報は残し、本人の思いの列だけを消す。"""
     own = db.query(Spot).filter(Spot.created_by == me).all()
@@ -175,10 +188,7 @@ def _delete_own_spots(db: Session, me: uuid.UUID) -> Dict[str, int]:
     for s in private:
         key = _spot_own_key(s.photo)
         if key:
-            try:
-                get_storage_backend().delete(key)
-            except Exception:  # noqa: BLE001 - 行は消す。ファイルは保存先の掃除で消える
-                pass
+            _drop_file(key, "wish_spot_photo", failures if failures is not None else [])
         db.delete(s)
     public = [s for s in own if s.is_public]
     for s in public:
@@ -193,6 +203,7 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     now = now or _now()
     me = user.id
     summary: Dict[str, int] = {}
+    file_failures: List[str] = []  # 保存先から消えなかったファイル(行は消す。数を要約・監査に残す)
     # [Gate G8] FR-021 この人が申し出た・受け取る手続き中の所有者の移譲は取り下げにする
     from app.api.v1 import ownership
 
@@ -242,10 +253,7 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     mems = db.query(Memory).filter(Memory.author_user_id == me, _others_plan_filter(Memory.plan_id, owned_ids)).all()
     for mm in mems:
         if mm.storage_key:
-            try:
-                get_storage_backend().delete(mm.storage_key)
-            except Exception:  # noqa: BLE001 - 行は消す。ファイルは保存先の掃除で消える(ADR-memories.md)
-                pass
+            _drop_file(mm.storage_key, "memory", file_failures)
         db.delete(mm)
     summary["memories"] = len(mems)
     # [Gate P13] 位置の軌跡は本人だけのもの。所有する旅行の分も含めてすぐ消す(点は外部キーの連鎖で消える)
@@ -269,7 +277,7 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
         synchronize_session=False)
     summary["spot_visits"] = db.query(UserSpotVisit).filter(UserSpotVisit.user_id == me).delete(
         synchronize_session=False)
-    summary.update(_delete_own_spots(db, me))
+    summary.update(_delete_own_spots(db, me, file_failures))
     # [FR-063] 参加している旅行で書き出したリールの記録(数だけの記録。所有する旅行の分は旅行の削除で消える)
     summary["reel_exports"] = db.query(ReelExport).filter(ReelExport.user_id == me).delete(synchronize_session=False)
     db.query(IdempotencyRecord).filter(IdempotencyRecord.user_id == me).delete(synchronize_session=False)
@@ -314,10 +322,7 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     db.query(MemoryTrash).filter((MemoryTrash.deleted_by_user_id == me) | (MemoryTrash.author_user_id == me)).delete(
         synchronize_session=False)
     for key in trash_files:
-        try:
-            get_storage_backend().delete(key)
-        except (OSError, ValueError):
-            pass
+        _drop_file(key, "memory_trash", file_failures)
     # [Gate G8] FR-039 本人の訂正の履歴・所有者への訂正の申し出(本人の個人データ)
     from app.models.models import DataCorrection
 
@@ -340,6 +345,7 @@ def delete_account(db: Session, user: User, now: Optional[datetime] = None) -> D
     user.is_superuser = False
     user.role = "user"
     _clear_schedule(user)  # [Gate G7] 申し込みの印も消す(削除は済んだ)
+    summary["files_not_removed"] = len(file_failures)
     db.flush()
     return summary
 
