@@ -628,7 +628,7 @@
 - **受入(抜粋):** 「すべて共有」でも機密を暗黙に公開せず、共有・Reveal・ダウンロード・印刷を監査する
 - **仕様の参照:** 画面 SC-34 / API 群 shares
 - **実装:** API `backend/app/api/v1/public_share.py`・`backend/app/api/v1/member_policy.py`・`backend/app/api/v1/share.py` / 画面 `/share/:planId` / 表 `plan_share_links`
-- **試験:** `backend/tests/test_gate_f45_share_policy.py`・`backend/tests/test_gate_g2_member_policy.py`・`frontend/e2e/member-policy.spec.ts`・`frontend/e2e/share-policy.spec.ts`・`frontend/src/pages/G2.features.test.tsx`・`frontend/src/pages/SharePage.f45.test.tsx`・`frontend/src/pages/SharePage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/f45sharePolicy.test.ts`
+- **試験:** `backend/tests/test_gate_f45_share_policy.py`・`backend/tests/test_gate_g2_member_policy.py`・`backend/tests/test_share.py`・`frontend/e2e/member-policy.spec.ts`・`frontend/e2e/share-policy.spec.ts`・`frontend/src/pages/G2.features.test.tsx`・`frontend/src/pages/SharePage.f45.test.tsx`・`frontend/src/pages/SharePage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/f45sharePolicy.test.ts`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** —
