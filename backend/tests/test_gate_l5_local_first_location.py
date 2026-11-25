@@ -218,3 +218,23 @@ def test_sampling_report(auth_client, clock):
     r = client.put(f"{tb}/sampling", json={"sampling": {"latitude": 35.0, "longitude": 135.0}})
     assert r.status_code == 422
     assert client.put(f"{tb}/sampling", json={"sampling": {}, "points": []}).status_code == 422
+
+
+def test_location_actions_are_audited_without_coordinates(auth_client, clock, audit_calls):
+    """[Gate② FC-165・FC-170] 位置の記録の始め・設定・点の削除・軌跡の削除は監査に残る(座標は残さない)"""
+    client, owner, p, base = _setup(auth_client)
+    assert _set_mode(client, base, "synced", 0).status_code == 200
+    t = client.post(f"{base}/location-tracks", json={"mode": "synced"})
+    assert t.status_code == 201, t.text
+    tb = f"{base}/location-tracks/{t.json()['id']}"
+    r = client.post(f"{tb}/points", json={"batch_id": str(uuid.uuid4()), "points": [
+        {"recorded_at": NOW.isoformat(), "latitude": 35.0123, "longitude": 135.7654, "accuracy_m": 5}]})
+    assert r.status_code == 200, r.text
+    span = {"start": (NOW - timedelta(minutes=1)).isoformat(), "end": (NOW + timedelta(minutes=1)).isoformat()}
+    assert client.delete(f"{tb}/points", params=span).status_code == 200
+    assert client.delete(tb).status_code == 204
+    actions = [c["action"] for c in audit_calls]
+    for a in ("location_settings.update", "location_track.start", "location_track.points_delete",
+              "location_track.delete"):
+        assert a in actions, actions
+    assert "35.0123" not in str(audit_calls) and "135.7654" not in str(audit_calls)

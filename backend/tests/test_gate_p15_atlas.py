@@ -83,7 +83,7 @@ def test_cells_and_aggregate():
     assert at.summarize([])["revisit_rate"] is None
 
 
-def test_atlas_across_trips_with_privacy(auth_client, make_user, db_session):
+def test_atlas_across_trips_with_privacy(auth_client, make_user, db_session, _env):
     client, owner = auth_client
     p1, base1, ev1 = _plan(client, "京都2026", "2026-11-01", [("清水寺", KYOTO), ("奈良公園", NARA), ("駅", None)])
     p2, base2, ev2 = _plan(client, "京都2027", "2027-04-01", [("清水寺再訪", KYOTO)])
@@ -136,6 +136,8 @@ def test_atlas_across_trips_with_privacy(auth_client, make_user, db_session):
     # 旅行単位で除く
     r = client.put("/api/v1/atlas/settings", json={"excluded_plan_ids": [p2]})
     assert r.status_code == 200 and r.json()["excluded_plan_ids"] == [p2]
+    # [Gate② FC-150] 除く旅行の設定は監査に残る
+    assert [c["action"] for c in _env][-1] == "atlas.settings"
     a2 = client.get("/api/v1/atlas").json()
     assert next(c for c in a2["cells"] if c["key"] == "0.1:34.9:135.7")["evidence"] == {"actual": 1}
     assert {p["title"]: p["excluded"] for p in a2["plans"]} == {"京都2026": False, "京都2027": True}

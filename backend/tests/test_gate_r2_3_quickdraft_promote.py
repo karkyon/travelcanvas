@@ -150,3 +150,19 @@ def test_promote_missing_idempotency_key_returns_400(auth_client):
     )
     assert resp.status_code == 400
     assert resp.json()["code"] == "INVALID_REQUEST"
+
+
+def test_promote_is_audited_without_the_title(client, auth_client, monkeypatch):
+    """[Gate② FC-105] 下書きを旅行にしたことは監査に残る(名前・予定の中身は残さない)"""
+    from app.api.v1 import quickdrafts as qd_api
+
+    calls = []
+    monkeypatch.setattr(qd_api, "record_audit_event", lambda **kw: calls.append(kw))
+    ac, user = auth_client
+    draft = _create_draft(client)
+    resp = ac.post(_promote_endpoint(draft["id"]), json={"device_token": draft["device_token"]},
+                   headers={"Idempotency-Key": str(uuid.uuid4())})
+    assert resp.status_code == 201, resp.text
+    promoted = [c for c in calls if c["action"] == "quickdraft_promoted"]
+    assert len(promoted) == 1 and promoted[0]["user_id"] == user.id
+    assert "テスト旅行" not in str(promoted[0]) and "浅草寺" not in str(promoted[0])

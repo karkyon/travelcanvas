@@ -28,9 +28,12 @@ WHSEC = "whsec_unit_0123456789abcdefghij"
 
 @pytest.fixture(autouse=True)
 def _no_audit(monkeypatch):
+    """監査は送らずに集める([Gate② FC-180] 監査に残ることを確かめる試験が使う)"""
     from app.api.v1 import billing as billing_api
 
-    monkeypatch.setattr(billing_api, "record_audit_event", lambda **kw: None)
+    calls = []
+    monkeypatch.setattr(billing_api, "record_audit_event", lambda **kw: calls.append(kw))
+    return calls
 
 
 @pytest.fixture()
@@ -109,7 +112,7 @@ def test_not_configured_and_live_key_refused(auth_client, db_session, monkeypatc
     assert db_session.query(BillingPayment).filter(BillingPayment.user_id == user.id).count() == 0
 
 
-def test_subscription_flow_grants_and_revokes(auth_client, db_session, stripe):
+def test_subscription_flow_grants_and_revokes(auth_client, db_session, stripe, _no_audit):
     client, user = auth_client
     _registered(user, db_session)
     product = _product(db_session, "journey_month")
@@ -151,6 +154,11 @@ def test_subscription_flow_grants_and_revokes(auth_client, db_session, stripe):
              "data": {"object": {"id": "sub_1", "status": "canceled", "cancel_at_period_end": False}}}
     assert _hook(client, ended).json()["result"] == "ended"
     assert cost_guard.user_class(db_session, user) == ("free", "default")
+    # [Gate② FC-180] 申し込み・止める・続けるは本人の監査に残る(カード・鍵は残さない)
+    actions = [c["action"] for c in _no_audit if c["user_id"] == user.id]
+    for a in ("billing.checkout_started", "billing.subscription_cancel", "billing.subscription_resume"):
+        assert a in actions, actions
+    assert not any(w in str(_no_audit) for w in ("sk_test", "whsec_", "card"))
 
 
 def test_trip_pass_flow_and_refund(auth_client, db_session, stripe, make_user):
