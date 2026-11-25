@@ -224,7 +224,7 @@ def get_visits(plan_id: str, db: Session = Depends(get_db), current_user: User =
 def assess_visits(plan_id: str, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user_or_guest)):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    lock_plan_row(db, plan)  # [Gate② FC-149] 同時の判定・訂正で同じ行を 2 回作らない(一意の制約で 500 になっていた)
+    lock_plan_row(db, plan)  # [Gate② FC-139・FC-144] 同時の判定・訂正で同じ行を 2 回作らない(一意の制約で 500 になっていた)
     _days, events, _unlocated = _located_events(db, plan)
     points = _own_points(db, plan, current_user)
     evidence = _evidence(db, plan, current_user, events)
@@ -262,7 +262,7 @@ class DeviceResults(BaseModel):
 def device_results(plan_id: str, body: DeviceResults, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user_or_guest)):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    lock_plan_row(db, plan)  # [Gate② FC-149] 同時の判定・訂正で同じ行を 2 回作らない(一意の制約で 500 になっていた)
+    lock_plan_row(db, plan)  # [Gate② FC-139・FC-144] 同時の判定・訂正で同じ行を 2 回作らない(一意の制約で 500 になっていた)
     _days, events, _unlocated = _located_events(db, plan)
     by_id = {e.id: e for e in events}
     seen = set()
@@ -301,7 +301,7 @@ def correct_visit(plan_id: str, event_id: str, body: Correction, db: Session = D
                   if_match: Optional[str] = Header(None, alias="If-Match"),
                   current_user: User = Depends(get_current_user_or_guest)):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    lock_plan_row(db, plan)  # [Gate② FC-149] 同時の判定・訂正で同じ行を 2 回作らない(一意の制約で 500 になっていた)
+    lock_plan_row(db, plan)  # [Gate② FC-139・FC-144] 同時の判定・訂正で同じ行を 2 回作らない(一意の制約で 500 になっていた)
     if body.action not in va.USER_ACTIONS:
         raise _bad("invalid_field", "訂正の操作が不正です")
     try:

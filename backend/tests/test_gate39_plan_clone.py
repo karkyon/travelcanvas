@@ -234,7 +234,7 @@ def test_clone_as_template_keeps_structure_and_drops_free_text(auth_client, db_s
 
 
 def test_title_length_limits_and_clone_is_audited(auth_client, monkeypatch):
-    """[Gate② FC-101・FC-136・FC-140] 旅行の名前・行き先・説明の長さの上限(作成・更新・複製)と、複製の監査。
+    """[Gate② FC-101・FC-121・FC-125] 旅行の名前・行き先・説明の長さの上限(作成・更新・複製)と、複製の監査。
     以前は上限が無く(本文の上限 2MB まで入った)、複製は監査に残っていなかった。"""
     import app.api.v1.travel as travel_api
 

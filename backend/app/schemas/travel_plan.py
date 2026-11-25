@@ -20,7 +20,7 @@ DESCRIPTION_MAX = 10000
 
 class TravelPlanBase(BaseModel):
     """旅行プラン基本スキーマ"""
-    # [Gate② FC-101/FC-136] 名前・行き先・説明の長さの上限(下書きの名前と同じ 200。以前は上限が無かった)
+    # [Gate② FC-101・FC-121] 名前・行き先・説明の長さの上限(下書きの名前と同じ 200。以前は上限が無かった)
     title: str = Field(..., max_length=TITLE_MAX)
     description: Optional[str] = Field(None, max_length=DESCRIPTION_MAX)
     destination: Optional[str] = Field(None, max_length=TITLE_MAX)

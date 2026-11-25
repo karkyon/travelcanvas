@@ -124,7 +124,7 @@ def _cells(db: Session, t: LocationTrack) -> List[Dict[str, Any]]:
 
 def _get_own(db: Session, plan: TravelPlan, track_id: str, user: User, lock: bool = False) -> LocationTrack:
     """lock=True: 軌跡の行を FOR UPDATE で押さえる(点・区画の送信を同じ軌跡で 1 つずつにする)。
-    [Gate② FC-154] 圏外からの再送が先の要求と重なると、同じ batch_id の 2 件目が一意の制約で 500 になり、
+    [Gate② FC-164・FC-169] 圏外からの再送が先の要求と重なると、同じ batch_id の 2 件目が一意の制約で 500 になり、
     別の batch でも point_count の足し算が片方消えていた。"""
     try:
         tid = uuid.UUID(str(track_id))
