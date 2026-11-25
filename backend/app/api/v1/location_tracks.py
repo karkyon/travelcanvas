@@ -122,17 +122,23 @@ def _cells(db: Session, t: LocationTrack) -> List[Dict[str, Any]]:
             for c in rows]
 
 
-def _get_own(db: Session, plan: TravelPlan, track_id: str, user: User) -> LocationTrack:
+def _get_own(db: Session, plan: TravelPlan, track_id: str, user: User, lock: bool = False) -> LocationTrack:
+    """lock=True: 軌跡の行を FOR UPDATE で押さえる(点・区画の送信を同じ軌跡で 1 つずつにする)。
+    [Gate② FC-154] 圏外からの再送が先の要求と重なると、同じ batch_id の 2 件目が一意の制約で 500 になり、
+    別の batch でも point_count の足し算が片方消えていた。"""
     try:
         tid = uuid.UUID(str(track_id))
     except ValueError:
         raise HTTPException(status_code=404, detail="軌跡が見つかりません")
-    t = db.query(LocationTrack).filter(LocationTrack.id == tid, LocationTrack.plan_id == plan.id).first()
+    q = db.query(LocationTrack).filter(LocationTrack.id == tid, LocationTrack.plan_id == plan.id)
+    t = (q.with_for_update() if lock else q).first()
     # 他の人の軌跡は存在も知らせない(旅行の所有者にも見せない)
     if not t or t.user_id != user.id:
         raise HTTPException(status_code=404, detail="軌跡が見つかりません")
     if _refresh(t, _now()):
         db.commit()
+        if lock:  # commit で押さえが外れるので押さえ直す
+            q.with_for_update().populate_existing().first()
     return t
 
 
@@ -313,7 +319,7 @@ def change_track(plan_id: str, track_id: str, body: TrackAction, db: Session = D
 def upload_points(plan_id: str, track_id: str, body: PointsUpload, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user_or_guest)):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    t = _get_own(db, plan, track_id, current_user)
+    t = _get_own(db, plan, track_id, current_user, lock=True)
     if t.mode == "device_only":
         raise _bad("device_only", "この軌跡は「この端末だけ」に保存する設定のため、サーバーへは送れません", 409)
     if t.mode == "areas_only":
@@ -478,7 +484,7 @@ def upload_area_cells(plan_id: str, track_id: str, body: AreaCellsUpload, db: Se
     """「訪問地域だけ同期」の軌跡: 端末が生の座標から集計した区画(0.1度)を受け取る。
     同じ区画は合わせる(最初・最後の時刻を広げ、滞在時間・件数は大きい方)。送り直しても増えない。"""
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="viewer")
-    t = _get_own(db, plan, track_id, current_user)
+    t = _get_own(db, plan, track_id, current_user, lock=True)  # 同じ区画の同時の送信で二重に作らない
     if t.mode != "areas_only":
         raise _bad("not_areas_only", "訪問地域を送れるのは「訪問地域だけ同期」の軌跡だけです", 409)
     if not cs.has_consent(_db_user(db, current_user), "location"):

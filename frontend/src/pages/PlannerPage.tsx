@@ -1918,6 +1918,7 @@ const PlannerPage: React.FC = () => {
                 </div>
                 <Input
                   label="旅行の名前(任意、未入力なら自動で名付けます)"
+                  maxLength={200}
                   value={newPlanTitle}
                   onChange={(e) => setNewPlanTitle(e.target.value)}
                   placeholder="例: 東京旅行"

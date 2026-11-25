@@ -7,18 +7,23 @@ import uuid
 from datetime import date, datetime
 from typing import Literal, Optional, Dict, Any
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, Field, validator
 
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 _JOURNEY_MODES = {"walking", "driving", "train", "bus", "ferry", "flight", "bicycle", "taxi", "shinkansen",
                   "express_bus", "helicopter", "transit"}
 
 
+TITLE_MAX = 200
+DESCRIPTION_MAX = 10000
+
+
 class TravelPlanBase(BaseModel):
     """旅行プラン基本スキーマ"""
-    title: str
-    description: Optional[str] = None
-    destination: Optional[str] = None
+    # [Gate② FC-101/FC-136] 名前・行き先・説明の長さの上限(下書きの名前と同じ 200。以前は上限が無かった)
+    title: str = Field(..., max_length=TITLE_MAX)
+    description: Optional[str] = Field(None, max_length=DESCRIPTION_MAX)
+    destination: Optional[str] = Field(None, max_length=TITLE_MAX)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     budget: Optional[float] = None
@@ -46,9 +51,9 @@ class TravelPlanCreate(TravelPlanBase):
 
 class TravelPlanUpdate(BaseModel):
     """旅行プラン更新スキーマ(部分更新)"""
-    title: Optional[str] = None
-    description: Optional[str] = None
-    destination: Optional[str] = None
+    title: Optional[str] = Field(None, max_length=TITLE_MAX)
+    description: Optional[str] = Field(None, max_length=DESCRIPTION_MAX)
+    destination: Optional[str] = Field(None, max_length=TITLE_MAX)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     budget: Optional[float] = None

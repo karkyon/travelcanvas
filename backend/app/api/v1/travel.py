@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
 from sqlalchemy import or_
@@ -311,7 +311,7 @@ async def update_travel_plan(
 
 class PlanCloneRequest(BaseModel):
     """[Gate #39] 旅程複製リクエスト。全項目任意。"""
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, max_length=200)  # [Gate② FC-136] 旅行の名前と同じ上限
     start_date: Optional[date] = None
     # [Gate② FC-007] テンプレートとして保存: 構造(日・予定の名前・種類・時刻・場所)だけを写し、
     # 自由に書いた文(説明・メモ)・電話・予算・旅行の説明を写さない。予約・実費・コメント・位置の記録は複製でも写さない
@@ -449,6 +449,12 @@ async def clone_travel_plan(
 
         db.commit()
         db.refresh(new_plan)
+        # [Gate② FC-140] 複製を監査に残す(元の旅行・テンプレートか・日をずらしたか。名前は残さない)
+        record_audit_event(
+            action="plan.clone", resource_type="travel_plan", user_id=current_user.id, resource_id=new_plan.id,
+            details={"source_plan_id": str(original_plan.id), "as_template": bool(clone_data.as_template),
+                     "shifted": clone_data.start_date is not None, "days": len(original_days)},
+        )
         return new_plan
 
     except HTTPException:

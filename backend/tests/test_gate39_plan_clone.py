@@ -231,3 +231,26 @@ def test_clone_as_template_keeps_structure_and_drops_free_text(auth_client, db_s
     # 普通の複製は前と同じく説明を写す
     plain = client.post(f"/api/v1/travel-plans/{plan_id}/clone", json={}).json()
     assert db_session.get(TravelPlan, uuid.UUID(plain["id"])).description == "家族 4 人。父の誕生日"
+
+
+def test_title_length_limits_and_clone_is_audited(auth_client, monkeypatch):
+    """[Gate② FC-101・FC-136・FC-140] 旅行の名前・行き先・説明の長さの上限(作成・更新・複製)と、複製の監査。
+    以前は上限が無く(本文の上限 2MB まで入った)、複製は監査に残っていなかった。"""
+    import app.api.v1.travel as travel_api
+
+    client, owner = auth_client
+    calls = []
+    monkeypatch.setattr(travel_api, "record_audit_event", lambda **kw: calls.append(kw))
+    long = "あ" * 201
+    assert client.post("/api/v1/travel-plans/", json={"title": long}).status_code == 422
+    assert client.post("/api/v1/travel-plans/", json={"title": "x", "destination": long}).status_code == 422
+    assert client.post("/api/v1/travel-plans/", json={"title": "x", "description": "a" * 10001}).status_code == 422
+    plan_id, _day = _create_plan_with_days_and_events(client)
+    assert client.put(f"/api/v1/travel-plans/{plan_id}", json={"title": long}).status_code == 422
+    assert client.post(f"/api/v1/travel-plans/{plan_id}/clone", json={"title": long}).status_code == 422
+    ok = client.post(f"/api/v1/travel-plans/{plan_id}/clone", json={"title": "あ" * 200, "as_template": True})
+    assert ok.status_code == 201, ok.text
+    audit = [c for c in calls if c["action"] == "plan.clone"]
+    assert len(audit) == 1 and audit[0]["user_id"] == owner.id and str(audit[0]["resource_id"]) == ok.json()["id"]
+    assert audit[0]["details"] == {"source_plan_id": plan_id, "as_template": True, "shifted": False, "days": 1}
+    assert "あ" not in str(audit[0])  # 名前は監査に残さない
