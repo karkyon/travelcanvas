@@ -78,7 +78,8 @@ def _problem(status_code: int, code: str, message: str) -> QuickDraftProblemErro
 class QuickDraftEventIn(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     local_date: Optional[date_cls] = None
-    start_time: Optional[str] = Field(None, max_length=5)  # "HH:MM"
+    # [Gate② FC-101] "HH:MM" だけ(以前は 5 文字以内なら "99:99" も入り、旅程の予定へそのまま移った)
+    start_time: Optional[str] = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     description: Optional[str] = Field(None, max_length=2000)
 
 

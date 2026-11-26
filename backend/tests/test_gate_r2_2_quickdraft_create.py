@@ -197,3 +197,20 @@ def test_fault_injection_failure_leaves_no_orphan_draft_and_marks_idempotency_fa
     resp = client.post(ENDPOINT, json=_body(), headers={"Idempotency-Key": key})
     assert resp.status_code == 201, resp.text
     assert db_session.query(QuickDraft).count() == 1
+
+
+def test_undecided_values_are_saved_and_boundaries_are_checked(client):
+    """[Gate② FC-101] 場所・時刻・日が未定の予定も保存でき、境界(名前 200・予定 100 件・時刻の形・日の順)は 422"""
+    def post(body):
+        return client.post(ENDPOINT, json=body, headers={"Idempotency-Key": str(uuid.uuid4())})
+
+    undecided = post(_body(title=None, events=[{"title": "どこかで昼食"}]))
+    assert undecided.status_code == 201, undecided.text
+    ev = undecided.json()["events"][0]
+    assert ev["local_date"] is None and ev["start_time"] is None
+    assert post(_body(title="あ" * 200, events=[{"title": "x", "start_time": "23:59"}])).status_code == 201
+    assert post(_body(title="あ" * 201)).status_code == 422
+    assert post(_body(events=[{"title": "x"}] * 101)).status_code == 422
+    for bad in ("24:00", "99:99", "9:00", "ab:cd"):
+        assert post(_body(events=[{"title": "x", "start_time": bad}])).status_code == 422, bad
+    assert post(_body(start_date=str(date.today()), end_date=str(date.today() - timedelta(days=1)))).status_code == 422
