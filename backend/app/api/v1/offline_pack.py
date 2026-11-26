@@ -75,6 +75,12 @@ def _device_row(db: Session, user: User, device_id: str, request: Request) -> Of
         raise _error(422, "invalid_device_id", "端末の ID の形が正しくありません")
     row = db.query(OfflineDevice).filter(OfflineDevice.user_id == user.id, OfflineDevice.device_id == dev).first()
     if row is None:
+        # [Gate② 縦断 6] 同じ端末の初めての鍵の取得が 2 つ重なる(2 つのタブ・起動時の 2 つの要求)と、両方が「まだ無い」を
+        # 読み一意の制約(uq_offline_devices_user_device)でサーバーの誤りになり、台数の上限も 1 台超えうる。本人の行を押さえて読み直す
+        db.query(User.id).filter(User.id == user.id).with_for_update().first()
+        row = db.query(OfflineDevice).filter(OfflineDevice.user_id == user.id,
+                                             OfflineDevice.device_id == dev).first()
+    if row is None:
         active = db.query(OfflineDevice).filter(OfflineDevice.user_id == user.id,
                                                 OfflineDevice.revoked_at.is_(None)).count()
         if active >= ok.MAX_DEVICES:

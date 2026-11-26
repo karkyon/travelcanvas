@@ -23,7 +23,7 @@ from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload
 from app.core.database import get_db
-from app.core.plan_access import require_plan_access
+from app.core.plan_access import lock_plan_row, require_plan_access
 from app.services import member_policy
 from app.models.models import (
     EventActual, LocationPointBatch, LocationTrack, Memory, TravelDay, TravelEvent, TravelPlan, User,
@@ -186,6 +186,9 @@ def put_actual(plan_id: str, event_id: str, body: ActualInput, db: Session = Dep
     if body.actual_start_at and body.actual_end_at and body.actual_end_at < body.actual_start_at:
         raise _bad("invalid_field", "出発は到着より後にしてください")
     note = (body.note or "").strip() or None
+    # [Gate② 縦断 7] 初めての「行った」を同時に 2 回送ると、両方が「まだ無い」を読み一意の制約
+    # (uq_event_actuals_plan_event)でサーバーの誤りになっていた。旅行の行を押さえてから読む
+    lock_plan_row(db, plan)
     a = db.query(EventActual).filter(EventActual.plan_id == plan.id, EventActual.event_id == ev.id).first()
     if a:
         if if_match is None or not if_match.strip():
