@@ -374,18 +374,18 @@ def _store_idempotency(
 def _record_change_and_bump_revision(
     db: Session, plan: TravelPlan, user: User, source: str,
     entity_type: str, entity_id, action: str,
-    before_json: Optional[dict], after_json: Optional[dict],
+    before_json: Optional[dict], after_json: Optional[dict], commit: bool = True,
 ) -> int:
     """1件の変更を記録し、plan.revisionを1つ進める。ChangeSet 1件につき
     ChangeItem 1件という単純な粒度にしている(Undoは直近1件を対象とする)。"""
     return _record_batch_change_and_bump_revision(
-        db, plan, user, source, [(entity_type, entity_id, action, before_json, after_json)]
+        db, plan, user, source, [(entity_type, entity_id, action, before_json, after_json)], commit=commit
     )
 
 
 def _record_batch_change_and_bump_revision(
     db: Session, plan: TravelPlan, user: User, source: str,
-    changes: List[tuple],
+    changes: List[tuple], commit: bool = True,
 ) -> int:
     """[Gate #33] 複数の変更を単一のChangeSet(単一のrevision進行)として
     記録する。最適化提案の適用のように「複数イベントの並べ替えをまとめて
@@ -430,7 +430,12 @@ def _record_batch_change_and_bump_revision(
         summary=f"{source}: {len(changes)}件の変更" if len(changes) > 1 else f"{changes[0][2]} {changes[0][0]}",
     ))
 
-    db.commit()
+    # [Gate② 縦断 6] commit=False: 呼び出し側が自分の記録(同期の操作の記録など)と同じ transaction で commit する。
+    # ここで commit すると旅行の行の押さえが外れ、記録を書く前に同じ操作の再送が「まだ当てていない」を読んでしまう
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     return new_revision
 
 

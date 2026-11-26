@@ -28,6 +28,7 @@ from app.services import plan_edits
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
+from app.core.plan_access import lock_plan_row
 from app.services import member_policy
 from app.models.models import ChangeItem, ChangeSet, SyncOperation, TravelDay, TravelEvent, TravelPlan, User
 from datetime import date as date_cls
@@ -200,6 +201,11 @@ CODE_MESSAGES = {
 
 def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str], op: OperationIn,
              hidden=member_policy.EMPTY) -> Dict[str, Any]:
+    # [Gate② 縦断 6] 圏外からの再送が先の要求と重なると、両方が「まだ無い操作」を読んで二重に当てようとし、後の方が
+    # 旅行の版の重なり(409 plan_conflict)や一意の制約に当たっていた。端末は成功した操作を「競合」と見てしまう。
+    # 操作ごとに旅行の行を押さえ、旅行を読み直してから「もう当てたか」を見る(同じ操作は再送の結果になる)
+    lock_plan_row(db, plan)
+    db.refresh(plan)
     existing = (db.query(SyncOperation)
                 .filter(SyncOperation.user_id == user.id, SyncOperation.operation_id == uuid.UUID(op.operation_id))
                 .first())
@@ -253,7 +259,7 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
         _apply_fields(db, plan, created, {k: v for k, v in fields.items() if k != "day_id"})
         db.flush()
         rev = plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_event", created.id, "create",
-                                                         None, plans_api._event_to_dict(created))
+                                                         None, plans_api._event_to_dict(created), commit=False)
         row = _store(db, plan, user, device_id, op, "applied", entity_id=created.id, resulting_revision=rev,
                      fields=fields)
         return _row_result(row, replay=False)
@@ -296,7 +302,7 @@ def _process(db: Session, plan: TravelPlan, user: User, device_id: Optional[str]
             return reject(e.code, str(e), fields=fields, entity_id=target_id)
         db.flush()
         rev = plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_event", ev.id, "update",
-                                                         before, plans_api._event_to_dict(ev))
+                                                         before, plans_api._event_to_dict(ev), commit=False)
         row = _store(db, plan, user, device_id, op, "applied", entity_id=target_id, resulting_revision=rev,
                      fields=fields)
         return _row_result(row, replay=False)
@@ -405,7 +411,7 @@ def _process_day(db: Session, plan: TravelPlan, user: User, device_id: Optional[
         db.add(day)
         db.flush()
         rev = plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_day", day.id, "create",
-                                                         None, plans_api._day_to_dict(day))
+                                                         None, plans_api._day_to_dict(day), commit=False)
         row = _store(db, plan, user, device_id, op, "applied", entity_id=day.id, resulting_revision=rev,
                      fields=fields)
         return _row_result(row, replay=False)
@@ -441,7 +447,7 @@ def _process_day(db: Session, plan: TravelPlan, user: User, device_id: Optional[
             setattr(day, f, v)
         db.flush()
         rev = plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_day", day.id, "update",
-                                                         before, plans_api._day_to_dict(day))
+                                                         before, plans_api._day_to_dict(day), commit=False)
         row = _store(db, plan, user, device_id, op, "applied", entity_id=target, resulting_revision=rev,
                      fields=fields)
         return _row_result(row, replay=False)
@@ -472,7 +478,7 @@ def _delete_day(db: Session, plan: TravelPlan, user: User, day: TravelDay) -> in
     db.delete(day)
     db.flush()
     return plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_day", did, "delete", before,
-                                                      None)
+                                                      None, commit=False)
 
 
 def _day_events(db: Session, day: TravelDay) -> List[TravelEvent]:
@@ -501,7 +507,7 @@ def _apply_order(db: Session, plan: TravelPlan, user: User, day: TravelDay, orde
     db.flush()
     if not changes:
         return plan.revision, "no_change"
-    return plans_api._record_batch_change_and_bump_revision(db, plan, user, "sync", changes), None
+    return plans_api._record_batch_change_and_bump_revision(db, plan, user, "sync", changes, commit=False), None
 
 
 def _process_order(db: Session, plan: TravelPlan, user: User, device_id: Optional[str], op: OperationIn, reject):
@@ -545,7 +551,7 @@ def _delete_event(db: Session, plan: TravelPlan, user: User, ev: TravelEvent) ->
     db.delete(ev)
     db.flush()
     return plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_event", eid, "delete", before,
-                                                      None)
+                                                      None, commit=False)
 
 
 def _audit(action: str, request: Request, user: User, plan: TravelPlan, details: Dict[str, Any]) -> None:
@@ -691,7 +697,7 @@ def resolve_conflict(plan_id: str, operation_id: str, payload: ResolveRequest, r
             raise HTTPException(status_code=409, detail={"code": e.code, "message": str(e)})
         db.flush()
         rev = plans_api._record_change_and_bump_revision(db, plan, current_user, "sync", "travel_event", ev.id,
-                                                         "update", before, plans_api._event_to_dict(ev))
+                                                         "update", before, plans_api._event_to_dict(ev), commit=False)
     else:  # delete
         rev = plan.revision
         if ev is not None:
@@ -737,7 +743,7 @@ def _resolve_day_or_order(db: Session, plan: TravelPlan, user: User, r: Any) -> 
                 setattr(day, f, v)
         db.flush()
         return plans_api._record_change_and_bump_revision(db, plan, user, "sync", "travel_day", day.id, "update",
-                                                          before, plans_api._day_to_dict(day))
+                                                          before, plans_api._day_to_dict(day), commit=False)
     if db.query(TravelEvent.id).filter(TravelEvent.day_id == day.id).first() is not None:
         raise HTTPException(status_code=409, detail={"code": "day_not_empty",
                                                      "message": CODE_MESSAGES["day_not_empty"]})
