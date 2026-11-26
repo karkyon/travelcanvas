@@ -10,6 +10,12 @@ import type {
   Settlement, SettlementCreateData,
 } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
+
+/** [Gate② 縦断 7] 1 回の記録に 1 つの印。通信のやり直し(ログインの更新の後など)で支出・精算を二重に記録しない */
+function onceKey(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID() : `idem_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
 // [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
 const DL = () => import('../decoders');
 
@@ -58,7 +64,7 @@ export class FinanceApi extends PreparationApi {
   }
 
   async createExpense(planId: string, data: ExpenseCreateData): Promise<Expense> {
-    const response = await this.client.post(`/plans/${planId}/expenses`, data);
+    const response = await this.client.post(`/plans/${planId}/expenses`, data, { headers: { 'Idempotency-Key': onceKey() } });
     return decodeResponse(response.data, (await DL()).expense, 'POST /plans/{plan_id}/expenses');
   }
 
@@ -82,7 +88,7 @@ export class FinanceApi extends PreparationApi {
   }
 
   async createSettlement(planId: string, data: SettlementCreateData): Promise<Settlement> {
-    const response = await this.client.post(`/plans/${planId}/settlements`, data);
+    const response = await this.client.post(`/plans/${planId}/settlements`, data, { headers: { 'Idempotency-Key': onceKey() } });
     return decodeResponse(response.data, (await DL()).settlement, 'POST /plans/{plan_id}/settlements');
   }
 

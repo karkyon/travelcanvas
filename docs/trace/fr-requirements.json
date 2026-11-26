@@ -2191,7 +2191,8 @@
     "frontend/e2e/gate-g5.spec.ts",
     "frontend/src/pages/ExpensesPage.test.tsx",
     "frontend/src/services/api/contract.test.ts",
-    "frontend/src/services/api/p2finance.test.ts"
+    "frontend/src/services/api/p2finance.test.ts",
+    "backend/tests/test_gate2_expense_resend.py"
    ],
    "external_providers": [
     "為替(ECB の参考値)",
@@ -2270,7 +2271,8 @@
     "frontend/e2e/expenses.spec.ts",
     "frontend/src/pages/ExpensesPage.test.tsx",
     "frontend/src/services/api/contract.test.ts",
-    "frontend/src/services/api/p2finance.test.ts"
+    "frontend/src/services/api/p2finance.test.ts",
+    "backend/tests/test_gate2_expense_resend.py"
    ],
    "external_providers": [],
    "day_of_travel": false,

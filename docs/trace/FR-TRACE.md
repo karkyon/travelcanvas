@@ -409,7 +409,7 @@
 - **受入(抜粋):** 人別・カテゴリ別・日別の予算と差異を出す
 - **仕様の参照:** 画面 SC-23 / API 群 EXPENSE
 - **実装:** API `backend/app/api/v1/finance.py`・`backend/app/api/v1/finance_ledger.py`・`backend/app/api/v1/receipts.py` / 画面 `/planner/:planId/expenses` / 表 `budgets`・`budget_versions`・`expenses`・`fx_rates`
-- **試験:** `backend/tests/test_gate_g5_finance.py`・`backend/tests/test_gate_p2_finance.py`・`frontend/e2e/expenses.spec.ts`・`frontend/e2e/gate-g5.spec.ts`・`frontend/src/pages/ExpensesPage.test.tsx`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p2finance.test.ts`
+- **試験:** `backend/tests/test_gate_g5_finance.py`・`backend/tests/test_gate_p2_finance.py`・`frontend/e2e/expenses.spec.ts`・`frontend/e2e/gate-g5.spec.ts`・`frontend/src/pages/ExpensesPage.test.tsx`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p2finance.test.ts`・`backend/tests/test_gate2_expense_resend.py`
 - **外部の提供元:** 為替(ECB の参考値)・レシートの読み取り(AI)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API ○(実の提供元での確認なし(CI は模擬): 為替(ECB の参考値)・レシートの読み取り(AI)) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 為替は ECB の参考値を自動で取れる(Remaining-2。対応外の通貨は出典つきの手入力)、本番での確認(RELEASE-1)。レシートの読み取りは実物と実の AI では未確認
@@ -421,7 +421,7 @@
 - **受入(抜粋):** 領収書の原本と紐付ける
 - **仕様の参照:** 画面 SC-23 / API 群 EXPENSE
 - **実装:** API `backend/app/api/v1/finance.py` / 画面 `/planner/:planId/expenses` / 表 `expense_shares`・`settlements`
-- **試験:** `backend/tests/test_gate_p2_finance.py`・`frontend/e2e/expenses.spec.ts`・`frontend/src/pages/ExpensesPage.test.tsx`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p2finance.test.ts`
+- **試験:** `backend/tests/test_gate_p2_finance.py`・`frontend/e2e/expenses.spec.ts`・`frontend/src/pages/ExpensesPage.test.tsx`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p2finance.test.ts`・`backend/tests/test_gate2_expense_resend.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 本番での確認(RELEASE-1)
