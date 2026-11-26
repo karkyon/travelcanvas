@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.config import settings
 from app.core.crypto import EncryptionNotConfigured
+from app.core import idempotent_create
 from app.core.database import get_db
 from app.core.plan_access import lock_plan_row, require_plan_access
 from app.models.models import Memory, TravelDay, TravelEvent, TravelPlan, User
@@ -251,8 +252,18 @@ def list_memories(plan_id: str, db: Session = Depends(get_db),
 
 @router.post("/{plan_id}/memories", status_code=201)
 def create_memory(plan_id: str, body: MemoryCreate, db: Session = Depends(get_db),
-                  current_user: User = Depends(get_current_user_or_guest)):
+                  current_user: User = Depends(get_current_user_or_guest),
+                  idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    # [Gate② 縦断 7] 再送の印(任意)。同じ印は先に作った記録を返す(app/core/idempotent_create.py)
+    endpoint = f"POST /plans/{plan.id}/memories"
+    replay = idempotent_create.begin(db, plan, current_user, idempotency_key, endpoint, body)
+    if replay is not None:
+        first = db.query(Memory).filter(Memory.id == uuid.UUID(replay), Memory.plan_id == plan.id).first()
+        if first is None:
+            raise HTTPException(status_code=409, detail={"code": "idempotency_key_used",
+                                                         "message": "この操作はもう行いました(作った記録は消されています)"})
+        return _to_dict(first, current_user, plan, _names(db, plan))
     if body.kind not in ("note", "video"):
         raise _bad("invalid_kind", "写真・音声メモはファイルを付けて登録してください(/memories/upload)")
     _count_check(db, plan)
@@ -271,6 +282,8 @@ def create_memory(plan_id: str, body: MemoryCreate, db: Session = Depends(get_db
     m = Memory(plan_id=plan.id, author_user_id=current_user.id, kind=body.kind, video_url=video,
                include_in_journal=body.include_in_journal, **f)
     db.add(m)
+    db.flush()
+    idempotent_create.remember(db, current_user, idempotency_key, endpoint, body, m.id)
     db.commit()
     db.refresh(m)
     _audit("memory.create", current_user, m)
@@ -316,6 +329,9 @@ async def handle_upload(request: Optional[Request], db: Session, plan: TravelPla
         raise _bad("invalid_field", "再送の ID の形式が不正です")
     if client_upload_id:
         # [Gate PhotoQR] 通信が切れて再送しても、同じ写真を二重に保存しない
+        # [Gate② 縦断 7] 再送が先の送信と同時に届くと、両方が「まだ無い」を読み、後の方が一意の索引
+        # (uq_memories_client_upload)でサーバーの誤りになっていた。旅行の行を押さえてから読む
+        lock_plan_row(db, plan)
         existing = db.query(Memory).filter(Memory.plan_id == plan.id, Memory.author_user_id == current_user.id,
                                            Memory.client_upload_id == client_upload_id).first()
         if existing is not None:

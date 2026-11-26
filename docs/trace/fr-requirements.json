@@ -2984,7 +2984,8 @@
     "frontend/src/pages/memories/FaceCheckButton.test.tsx",
     "frontend/src/services/api.surface.test.ts",
     "frontend/src/services/api/contract.test.ts",
-    "frontend/src/services/api/p12memories.test.ts"
+    "frontend/src/services/api/p12memories.test.ts",
+    "backend/tests/test_gate2_memory_resend.py"
    ],
    "external_providers": [
     "顔の検査(Google Cloud Vision。鍵の後)"

@@ -531,7 +531,7 @@
 - **受入(抜粋):** 公開の範囲を確かめる(顔・同行者・位置・予約の公開前の検査)
 - **仕様の参照:** 画面 SC-28 / API 群 MEMORY
 - **実装:** API `backend/app/api/v1/memories.py`・`backend/app/api/v1/memory_publish.py`・`backend/app/api/v1/photo_upload.py`・`backend/app/api/v1/spot_media.py` / 画面 `/planner/:planId/memories`・`/journal/:token`・`/u/:token` / 表 `memories`・`memory_publications`・`photo_upload_links`
-- **試験:** `backend/tests/test_gate_p12_memories.py`・`backend/tests/test_gate_remaining5_server_exports.py`・`frontend/e2e/gate-g11-media.spec.ts`・`frontend/e2e/memories.spec.ts`・`frontend/src/pages/MemoriesPage.test.tsx`・`frontend/src/pages/memories/FaceCheckButton.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p12memories.test.ts`
+- **試験:** `backend/tests/test_gate_p12_memories.py`・`backend/tests/test_gate_remaining5_server_exports.py`・`frontend/e2e/gate-g11-media.spec.ts`・`frontend/e2e/memories.spec.ts`・`frontend/src/pages/MemoriesPage.test.tsx`・`frontend/src/pages/memories/FaceCheckButton.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p12memories.test.ts`・`backend/tests/test_gate2_memory_resend.py`
 - **外部の提供元:** 顔の検査(Google Cloud Vision。鍵の後)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API ○(実の提供元での確認なし(CI は模擬): 顔の検査(Google Cloud Vision。鍵の後)) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 顔の検査は Google Cloud Vision の接続口(Remaining-5。鍵の後に実通信で未確認)。写真の地図・QR の投稿は実機未確認。印のまとめ表示は Remaining-6

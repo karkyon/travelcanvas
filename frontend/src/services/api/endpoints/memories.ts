@@ -12,6 +12,7 @@ import type {
   JournalDraft, JournalOptions, MemoryInput, MemoryList, MemoryUpdateInput, MemoryUploadInput, TravelMemory,
 } from '../types';
 import { decodeResponse } from '../decode';
+import { onceKey } from '../onceKey';
 // [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
 const DL = () => import('../decoders');
 
@@ -24,7 +25,8 @@ export class MemoriesApi extends SyncApi {
   }
 
   async createMemory(planId: string, input: MemoryInput): Promise<TravelMemory> {
-    const response = await this.client.post(`/plans/${planId}/memories`, input, SILENT);
+    // [Gate② 縦断 7] 1 回の作成に 1 つの再送の印(通信のやり直しで同じ記録を 2 つ作らない)
+    const response = await this.client.post(`/plans/${planId}/memories`, input, { ...SILENT, headers: { 'Idempotency-Key': onceKey() } });
     return decodeResponse(response.data, (await DL()).travelMemory, 'POST /plans/{plan_id}/memories');
   }
 
@@ -43,6 +45,8 @@ export class MemoriesApi extends SyncApi {
       if (value) form.append(key, value);
     }
     if (input.include_in_journal !== undefined) form.append('include_in_journal', String(input.include_in_journal));
+    // [Gate② 縦断 7] 1 回の保存に 1 つの再送の ID(通信のやり直しで同じ写真を 2 枚保存しない。サーバーは同じ ID を 1 つにする)
+    form.append('client_upload_id', onceKey());
     // boundary付きのContent-Typeをaxiosに作らせる(documents.tsのGate M10と同じ理由)
     const response = await this.client.post(`/plans/${planId}/memories/upload`, form, {
       ...SILENT, headers: { 'Content-Type': undefined },
