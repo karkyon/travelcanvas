@@ -573,7 +573,7 @@ def create_candidate(
     current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    j = _get_job_or_404(db, plan.id, job_id)
+    j = _get_job_or_404(db, plan.id, job_id, lock=True)  # [Gate② #201 の見直し] 確定と同時に変えない
     _require_review_required(j)
 
     try:
@@ -603,7 +603,7 @@ def _review_candidate(
     db: Session, current_user: User,
 ) -> CandidateResponse:
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    j = _get_job_or_404(db, plan.id, job_id)
+    j = _get_job_or_404(db, plan.id, job_id, lock=True)  # [Gate② #201 の見直し] 確定と同時に変えない
     _require_review_required(j)
     c = _get_candidate_or_404(db, j.id, candidate_id)
 
@@ -827,7 +827,7 @@ def delete_import_job(plan_id: str, job_id: str, request: Request, db: Session =
                       current_user: User = Depends(get_current_user_or_guest)) -> None:
     """[Gate BookingImportYahoo] 取込ジョブを一覧から消す(読み取った候補も消す)。登録済みの予約は消さない。"""
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    j = _get_job_or_404(db, plan.id, job_id)
+    j = _get_job_or_404(db, plan.id, job_id, lock=True)  # [Gate② #201 の見直し] 確定の途中で候補を消さない
     db.query(ExtractionCandidate).filter(ExtractionCandidate.import_job_id == j.id).delete(synchronize_session=False)
     status_before = j.status
     db.delete(j)
@@ -846,7 +846,7 @@ def reject_import_job(
     current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
-    j = _get_job_or_404(db, plan.id, job_id)
+    j = _get_job_or_404(db, plan.id, job_id, lock=True)  # [Gate② #201 の見直し] 確定と同時に変えない
     _require_review_required(j)
 
     j.status = ImportJobStatus.REJECTED.value

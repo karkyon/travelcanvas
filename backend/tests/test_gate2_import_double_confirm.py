@@ -19,7 +19,7 @@ from app.api.v1.auth import hash_password
 from app.core.auth import AuthResult, get_current_user
 from app.core.database import SessionLocal
 from app.main import app
-from app.models.models import IdempotencyRecord, Reservation, TravelPlan, User, UserType
+from app.models.models import IdempotencyRecord, ImportJob, Reservation, TravelPlan, User, UserType
 from tests.test_gate_booking_import import HOTEL
 
 
@@ -55,7 +55,7 @@ def _cleanup(user_id, plan_id):
         s.close()
 
 
-@pytest.mark.parametrize("mode", ["confirm", "apply"])
+@pytest.mark.parametrize("mode", ["confirm", "apply", "confirm_vs_reject"])
 def test_double_submit_makes_one_reservation(mode, monkeypatch):
     monkeypatch.setattr(imports_api, "record_audit_event", lambda **kw: None)
     user = _user()
@@ -70,7 +70,7 @@ def test_double_submit_makes_one_reservation(mode, monkeypatch):
         assert r.status_code == 201, r.text
         job = r.json()
         fields = {x["field_path"]: x["value"] for x in job["candidates"]}
-        if mode == "confirm":
+        if mode in ("confirm", "confirm_vs_reject"):
             for x in job["candidates"]:
                 ok = c.post(f"{base}/imports/{job['id']}/candidates/{x['id']}/accept", headers=_ik())
                 assert ok.status_code == 200, ok.text
@@ -89,23 +89,31 @@ def test_double_submit_makes_one_reservation(mode, monkeypatch):
         monkeypatch.setattr(imports_api, "_require_review_required", _both_read_then_race)
         out = []
 
-        def _go():
+        def _go(i):
             cc = TestClient(app, raise_server_exceptions=False)
-            if mode == "confirm":
+            if mode == "confirm" or (mode == "confirm_vs_reject" and i == 0):
                 res = cc.post(f"{base}/imports/{job['id']}/confirm")
+            elif mode == "confirm_vs_reject":
+                res = cc.post(f"{base}/imports/{job['id']}/reject")
             else:
                 res = cc.post(f"{base}/imports/{job['id']}/apply", json={"fields": fields, "add_to_itinerary": True})
             out.append(res.status_code)
 
-        threads = [threading.Thread(target=_go) for _ in range(2)]
+        threads = [threading.Thread(target=_go, args=(i,)) for i in range(2)]
         [t.start() for t in threads]
         [t.join(timeout=60) for t in threads]
         assert sorted(out) == [200, 409], out
         s = SessionLocal()
         try:
-            assert s.query(Reservation).filter(Reservation.plan_id == pid).count() == 1
+            made = s.query(Reservation).filter(Reservation.plan_id == pid).count()
+            state = s.query(ImportJob.status).filter(ImportJob.id == uuid.UUID(job["id"])).scalar()
         finally:
             s.close()
+        if mode == "confirm_vs_reject":
+            # [Gate② #201 の見直し] 確定と却下が重なっても、取込の状態と予約の有無が食い違わない
+            assert (state, made) in (("confirmed", 1), ("rejected", 0)), (state, made)
+        else:
+            assert made == 1
     finally:
         app.dependency_overrides.pop(get_current_user, None)
         _cleanup(user.id, pid)
