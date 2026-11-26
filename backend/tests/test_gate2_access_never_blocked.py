@@ -2,7 +2,8 @@
 
 内部の会員クラス(Free/Trip/…)は「外部の有料API・AIの原価枠」を決めるもので、利用者自身のデータの
 閲覧・書き出し・削除の権利を決めるものではない(FR-059)。これを自動試験で固定する。
-販売(FR-058)・Stripe は未実装。ここは内部枠の挙動だけを確かめる(価格・商品は仮説で、試験しない)。
+販売(FR-058)は Stripe の test mode だけ(Live・価格・商品は Owner の判断待ち)。ここは内部枠の挙動だけを確かめる
+(価格・商品は仮説で、試験しない。購読の終わりで Free に戻ることは test_gate_remaining4_billing.py)。
 """
 import uuid
 from datetime import datetime, timedelta, timezone

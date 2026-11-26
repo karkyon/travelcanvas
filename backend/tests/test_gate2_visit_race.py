@@ -93,3 +93,69 @@ def test_device_results_double_submit(monkeypatch):
             s.commit()
         finally:
             s.close()
+
+
+def test_first_correction_twice_at_once(monkeypatch):
+    """[Gate② FC-144] 判定の無い予定への初めての訂正(「行った」)を同時に 2 回送る → 行は 1 つ・サーバーの誤りにしない"""
+    monkeypatch.setattr(visits_api, "_audit", lambda *a, **k: None)
+    s = SessionLocal()
+    user = User(id=uuid.uuid4(), email=f"vis_{uuid.uuid4().hex[:10]}@example.com",
+                username=f"vis_{uuid.uuid4().hex[:10]}", hashed_password=hash_password("TestPass123!"),
+                user_type=UserType.REGISTERED, is_active=True, is_verified=True)
+    s.add(user)
+    s.commit()
+    s.refresh(user)
+    s.expunge(user)
+    s.close()
+    app.dependency_overrides[get_current_user] = lambda: AuthResult(user=user, is_authenticated=True, is_guest=False)
+    pid = None
+    try:
+        c = TestClient(app, raise_server_exceptions=False)
+        pid = uuid.UUID(c.post("/api/v1/travel-plans/", json={"title": "訂正"}).json()["id"])
+        base = f"/api/v1/plans/{pid}"
+        day = c.post(f"{base}/days", json={"local_date": "2026-11-01", "timezone_id": "Asia/Tokyo"},
+                     headers=_ik()).json()
+        ev = c.post(f"{base}/events", headers=_ik(), json={
+            "day_id": day["id"], "title": "清水寺", "latitude": 34.9948, "longitude": 135.7850})
+        assert ev.status_code == 201, ev.text
+        barrier = threading.Barrier(2)
+        orig = visits_api._now
+
+        def _read_then_race():
+            try:
+                barrier.wait(timeout=3)
+            except threading.BrokenBarrierError:
+                pass
+            return orig()
+
+        monkeypatch.setattr(visits_api, "_now", _read_then_race)
+        out = []
+
+        def _go():
+            res = TestClient(app, raise_server_exceptions=False).patch(
+                f"{base}/visits/{ev.json()['id']}", json={"action": "confirm"})
+            out.append(res.status_code)
+
+        threads = [threading.Thread(target=_go) for _ in range(2)]
+        [t.start() for t in threads]
+        [t.join(timeout=60) for t in threads]
+        # 後の方は先の行を読み、If-Match が無いので 400(読み直して送る)。サーバーの誤りにはしない
+        assert sorted(out) in ([200, 200], [200, 400]), out
+        s = SessionLocal()
+        try:
+            assert s.query(VisitAssessment).filter(VisitAssessment.plan_id == pid).count() == 1
+        finally:
+            s.close()
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        s = SessionLocal()
+        try:
+            s.execute(text("SET CONSTRAINTS ALL DEFERRED"))
+            if pid:
+                s.query(TravelPlan).filter(TravelPlan.id == pid).delete(synchronize_session=False)
+            s.query(IdempotencyRecord).filter(IdempotencyRecord.user_id == user.id).delete(synchronize_session=False)
+            s.execute(text("DELETE FROM audit_logs WHERE user_id = :u"), {"u": user.id})
+            s.query(User).filter(User.id == user.id).delete(synchronize_session=False)
+            s.commit()
+        finally:
+            s.close()
