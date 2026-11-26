@@ -547,7 +547,8 @@
     "frontend/src/pages/candidates/CandidateVoting.test.tsx",
     "frontend/src/services/api.surface.test.ts",
     "frontend/src/services/api/c2candidates.test.ts",
-    "frontend/src/services/api/contract.test.ts"
+    "frontend/src/services/api/contract.test.ts",
+    "backend/tests/test_gate2_candidate_resend.py"
    ],
    "external_providers": [
     "画像の場所の推定(AI・同意つき)",
@@ -636,7 +637,8 @@
     "frontend/src/pages/PlacePage.test.tsx",
     "frontend/src/services/api.surface.test.ts",
     "frontend/src/services/api/c2candidates.test.ts",
-    "frontend/src/services/api/contract.test.ts"
+    "frontend/src/services/api/contract.test.ts",
+    "backend/tests/test_gate2_candidate_resend.py"
    ],
    "external_providers": [
     "地図・ジオコードの提供元",

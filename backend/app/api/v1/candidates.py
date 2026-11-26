@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from app.api.v1 import plans as plans_api
 from app.core.auth import get_current_user_or_guest
 from app.core.database import get_db
+from app.core import idempotent_create
 from app.core.plan_access import lock_plan_row, require_plan_access
 from app.models.models import (
     CandidateReport, FieldSource, Place, PlanCandidate, PollOption, SearchCandidate, SourceRecord, TravelDay,
@@ -178,8 +179,14 @@ def list_candidates(plan_id: str, db: Session = Depends(get_db),
 
 @router.post("/{plan_id}/candidates", status_code=201)
 def create_candidate(plan_id: str, body: CandidateInput, db: Session = Depends(get_db),
-                     current_user: User = Depends(get_current_user_or_guest)):
+                     current_user: User = Depends(get_current_user_or_guest),
+                     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    # [Gate② 縦断 1] 再送の印(任意)。同じ印は先に作った候補を返す(app/core/idempotent_create.py)
+    endpoint = f"POST /plans/{plan.id}/candidates"
+    replay = idempotent_create.begin(db, plan, current_user, idempotency_key, endpoint, body)
+    if replay is not None:
+        return {"id": replay, **_list(db, plan)}
     _limit(db, plan)
     url = _guard(lambda: cs.canonical_url(body.source_url))
     title = _guard(lambda: cs.clean_text(body.title, 200, "名前"))
@@ -210,6 +217,8 @@ def create_candidate(plan_id: str, body: CandidateInput, db: Session = Depends(g
                       priority=body.priority, status="open", provider=provider, retrieved_at=retrieved,
                       tags=_guard(lambda: cs.clean_tags(body.tags)))
     db.add(c)
+    db.flush()
+    idempotent_create.remember(db, current_user, idempotency_key, endpoint, body, c.id)
     db.commit()
     _audit("candidate.create", current_user, plan, {"source_kind": kind})
     return {"id": str(c.id), **_list(db, plan)}
@@ -223,8 +232,13 @@ class FromSearchInput(BaseModel):
 
 @router.post("/{plan_id}/candidates/from-search", status_code=201)
 def create_from_search(plan_id: str, body: FromSearchInput, db: Session = Depends(get_db),
-                       current_user: User = Depends(get_current_user_or_guest)):
+                       current_user: User = Depends(get_current_user_or_guest),
+                       idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
     plan, _role = require_plan_access(db, plan_id, current_user, min_role="editor")
+    endpoint = f"POST /plans/{plan.id}/candidates/from-search"
+    replay = idempotent_create.begin(db, plan, current_user, idempotency_key, endpoint, body)
+    if replay is not None:
+        return {"id": replay, **_list(db, plan)}
     _limit(db, plan)
     sc = db.query(SearchCandidate).filter(SearchCandidate.id == body.search_candidate_id,
                                           SearchCandidate.searched_by_user_id == current_user.id).first()
@@ -244,6 +258,8 @@ def create_from_search(plan_id: str, body: FromSearchInput, db: Session = Depend
                       retrieved_at=sc.retrieved_at, category=sc.category, address=sc.address,
                       latitude=sc.latitude, longitude=sc.longitude, priority=body.priority, status="open")
     db.add(c)
+    db.flush()
+    idempotent_create.remember(db, current_user, idempotency_key, endpoint, body, c.id)
     db.commit()
     _audit("candidate.create", current_user, plan, {"source_kind": "search", "provider": sc.provider})
     return {"id": str(c.id), **_list(db, plan)}

@@ -162,7 +162,7 @@
 - **受入(抜粋):** 旅程へ置いても元の出典を失わない
 - **仕様の参照:** 画面 SC-08 / API 群 PLACE/SEARCH
 - **実装:** API `backend/app/api/v1/candidates.py`・`backend/app/api/v1/spot_intake.py` / 画面 `/planner/:planId/candidates` / 表 `plan_candidates`・`source_records`
-- **試験:** `backend/tests/test_gate_c2_candidates_places.py`・`backend/tests/test_gate_g11_discover.py`・`backend/tests/test_gate_remaining6_account.py`・`frontend/e2e/candidates.spec.ts`・`frontend/e2e/gate-g11-family-vote.spec.ts`・`frontend/src/components/Remaining7.test.tsx`・`frontend/src/pages/CandidatesPage.test.tsx`・`frontend/src/pages/candidates/CandidateVoting.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/c2candidates.test.ts`・`frontend/src/services/api/contract.test.ts`
+- **試験:** `backend/tests/test_gate_c2_candidates_places.py`・`backend/tests/test_gate_g11_discover.py`・`backend/tests/test_gate_remaining6_account.py`・`frontend/e2e/candidates.spec.ts`・`frontend/e2e/gate-g11-family-vote.spec.ts`・`frontend/src/components/Remaining7.test.tsx`・`frontend/src/pages/CandidatesPage.test.tsx`・`frontend/src/pages/candidates/CandidateVoting.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/c2candidates.test.ts`・`frontend/src/services/api/contract.test.ts`・`backend/tests/test_gate2_candidate_resend.py`
 - **外部の提供元:** 画像の場所の推定(AI・同意つき)・Web ページの読み取り(1ページ)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API ○(実の提供元での確認なし(CI は模擬): 画像の場所の推定(AI・同意つき)・Web ページの読み取り(1ページ)) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 画像の文字(OCR)・声(ブラウザの音声認識)から候補の名前を入れる(Remaining-7)。画像そのものから場所を当てる AI は場所の登録の画面だけ(同意つき)。SNS 以外の URL は押した時に 1 ページだけ読む(Remaining-6)
@@ -174,7 +174,7 @@
 - **受入(抜粋):** 地図・イベント・予約・移動・PDF が同じ場所 ID を参照し、同名施設を地理 ID と提供元 ID で区別する
 - **仕様の参照:** 画面 SC-09 / API 群 PLACE
 - **実装:** API `backend/app/api/v1/places.py`・`backend/app/api/v1/holidays.py`・`backend/app/api/v1/hours_check.py`・`backend/app/api/v1/home_place.py` / 画面 `/planner/:planId/places/:placeId` / 表 `places`・`opening_hours`・`place_special_hours`・`place_entrances`・`field_sources`・`user_home_places`
-- **試験:** `backend/tests/test_gate_c2_candidates_places.py`・`frontend/e2e/candidates.spec.ts`・`frontend/e2e/gate-g11-planner.spec.ts`・`frontend/src/hooks/usePlanHolidays.test.ts`・`frontend/src/pages/PlacePage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/c2candidates.test.ts`・`frontend/src/services/api/contract.test.ts`
+- **試験:** `backend/tests/test_gate_c2_candidates_places.py`・`frontend/e2e/candidates.spec.ts`・`frontend/e2e/gate-g11-planner.spec.ts`・`frontend/src/hooks/usePlanHolidays.test.ts`・`frontend/src/pages/PlacePage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/c2candidates.test.ts`・`frontend/src/services/api/contract.test.ts`・`backend/tests/test_gate2_candidate_resend.py`
 - **外部の提供元:** 地図・ジオコードの提供元・祝日(Nager.Date)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API ○(実の提供元での確認なし(CI は模擬): 地図・ジオコードの提供元・祝日(Nager.Date)) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** ジオコードの確認(地図の提供元 MAP-05)。祝日は日本は計算・日本の外は Nager.Date(Remaining-2。例外の日は手で登録できる)

@@ -11,6 +11,7 @@ import { api } from './index';
 import {
   arrayOf, bool, decodeResponse, int, nullable, num, object, oneOf, optional, record, str, type Decoder,
 } from './decode';
+import { onceKey } from './onceKey';
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 
@@ -262,7 +263,7 @@ export async function keepForNextTrip(planId: string, input: { title: string; ad
     title: input.title, note: '旅の当日に行けなかった場所', priority: 2,
     ...(input.address ? { address: input.address } : {}),
     ...(input.latitude != null && input.longitude != null ? { latitude: input.latitude, longitude: input.longitude } : {}),
-  }, SILENT);
+  }, { ...SILENT, headers: { 'Idempotency-Key': onceKey() } });
 }
 /** 寄り道を旅程に足す(POST /plans/{id}/events)。時刻は旅行先の現地時間の "HH:MM" */
 export async function addDetourEvent(planId: string, input: { day_id: string; title: string; local_start_time: string;

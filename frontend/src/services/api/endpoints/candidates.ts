@@ -8,11 +8,14 @@ import type { AxiosRequestConfig } from 'axios';
 import { VisitsApi } from './visits';
 import type { CandidateInput, CandidateList, CandidatePatch, OpeningHoursItem, PlaceInfo, PlacePatch, PlanPlaces } from '../types';
 import { decodeResponse } from '../decode';
+import { onceKey } from '../onceKey';
 // [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
 const DL = () => import('../decoders');
 
 const SILENT: AxiosRequestConfig = { skipGlobalErrorHandler: true };
 const withRev = (revision: number): AxiosRequestConfig => ({ ...SILENT, headers: { 'If-Match': String(revision) } });
+// [Gate② 縦断 1] 1 回の作成に 1 つの再送の印(通信のやり直しで同じ候補を二重に作らない)
+const once = (): AxiosRequestConfig => ({ ...SILENT, headers: { 'Idempotency-Key': onceKey() } });
 
 export class CandidatesApi extends VisitsApi {
   async getCandidates(planId: string): Promise<CandidateList> {
@@ -21,13 +24,13 @@ export class CandidatesApi extends VisitsApi {
   }
 
   async createCandidate(planId: string, input: CandidateInput): Promise<CandidateList> {
-    const response = await this.client.post(`/plans/${planId}/candidates`, input, SILENT);
+    const response = await this.client.post(`/plans/${planId}/candidates`, input, once());
     return decodeResponse(response.data, (await DL()).candidateList, 'POST /plans/{plan_id}/candidates');
   }
 
   async createCandidateFromSearch(planId: string, searchCandidateId: string, priority = 2): Promise<CandidateList> {
     const response = await this.client.post(`/plans/${planId}/candidates/from-search`,
-      { search_candidate_id: searchCandidateId, priority }, SILENT);
+      { search_candidate_id: searchCandidateId, priority }, once());
     return decodeResponse(response.data, (await DL()).candidateList, 'POST /plans/{plan_id}/candidates/from-search');
   }
 
