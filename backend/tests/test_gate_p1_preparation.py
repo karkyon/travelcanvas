@@ -590,3 +590,27 @@ def test_readiness_links_budget_spent_and_unpaid_reservations(auth_client, make_
     finally:
         _act_as(owner)
     assert rv["budget"] is None and not any(i["category"] == "budget" for i in rv["items"])
+
+
+def test_create_resend_with_same_key_makes_one(auth_client, db_session):
+    """[Gate② 縦断 5] 持ち物・準備の作業の作成の再送(通信のやり直し)は、同じ印なら先に作った物を返す(違う内容は 409)"""
+    client, _owner = auth_client
+    plan_id = client.post("/api/v1/travel-plans/", json={"title": "準備の再送"}).json()["id"]
+    for kind, url, body, other in (
+            ("packing", f"/api/v1/plans/{plan_id}/packing-items", {"name": "歯ブラシ", "category": "toiletries"},
+             {"name": "タオル", "category": "toiletries"}),
+            ("personal", f"/api/v1/plans/{plan_id}/packing-items",
+             {"name": "常備薬", "category": "toiletries", "scope": "personal"}, {"name": "目薬", "category": "toiletries",
+                                                                              "scope": "personal"}),
+            ("task", f"/api/v1/plans/{plan_id}/preparation-tasks", {"title": "両替する"}, {"title": "保険に入る"})):
+        key = str(uuid.uuid4())
+        first = client.post(url, json=body, headers={"Idempotency-Key": key})
+        assert first.status_code == 201, (kind, first.text)
+        again = client.post(url, json=body, headers={"Idempotency-Key": key})
+        assert again.status_code == 201 and again.json()["id"] == first.json()["id"], kind
+        label = lambda b: b.get("name", b.get("title"))  # noqa: E731
+        assert label(again.json()) == label(first.json())
+        assert client.post(url, json=other, headers={"Idempotency-Key": key}).status_code == 409, kind
+    items = client.get(f"/api/v1/plans/{plan_id}/packing-items").json()
+    names = [i["name"] for i in (items["items"] if isinstance(items, dict) else items)]
+    assert sorted(names) == ["常備薬", "歯ブラシ"]

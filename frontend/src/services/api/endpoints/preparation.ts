@@ -10,6 +10,7 @@ import type {
   PlanMember, PreparationTask, PreparationTaskCreateData, PreparationTaskUpdateData, Readiness,
 } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
+import { onceKey } from '../onceKey';
 // [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
 const DL = () => import('../decoders');
 
@@ -34,7 +35,7 @@ export class PreparationApi extends PlanTrashApi {
   }
 
   async createPackingItem(planId: string, data: PackingItemCreateData): Promise<PackingItem> {
-    const response = await this.client.post(`/plans/${planId}/packing-items`, data);
+    const response = await this.client.post(`/plans/${planId}/packing-items`, data, { headers: { 'Idempotency-Key': onceKey() } });
     return decodeResponse(response.data, (await DL()).packingItem, 'POST /plans/{plan_id}/packing-items');
   }
 
@@ -67,7 +68,7 @@ export class PreparationApi extends PlanTrashApi {
   }
 
   async createPreparationTask(planId: string, data: PreparationTaskCreateData): Promise<PreparationTask> {
-    const response = await this.client.post(`/plans/${planId}/preparation-tasks`, data);
+    const response = await this.client.post(`/plans/${planId}/preparation-tasks`, data, { headers: { 'Idempotency-Key': onceKey() } });
     return decodeResponse(response.data, (await DL()).preparationTask, 'POST /plans/{plan_id}/preparation-tasks');
   }
 

@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
+from app.core import idempotent_create
 from app.core.database import get_db
 from app.core.plan_access import require_plan_access
 from app.models.models import (
@@ -390,10 +391,20 @@ def create_packing_item(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
     min_role = "viewer" if payload.scope == "personal" else "editor"
     plan, _role = require_plan_access(db, plan_id, current_user, min_role=min_role)
     members = member_user_ids(db, plan)
+    # [Gate② 縦断 5] 再送の印(任意)。同じ印は先に作った持ち物を返す(app/core/idempotent_create.py)
+    endpoint = f"POST /plans/{plan.id}/packing-items"
+    replay = idempotent_create.begin(db, plan, current_user, idempotency_key, endpoint, payload)
+    if replay is not None:
+        first = _packing_query(db, plan).filter(PackingItem.id == uuid.UUID(replay)).first()
+        if first is None:
+            raise HTTPException(status_code=409, detail={"code": "idempotency_key_used",
+                                                         "message": "この操作はもう行いました(作った持ち物は消されています)"})
+        return _packing_response(first, current_user, members, _names(db, [first.assignee_user_id]))
     if payload.scope == "personal" and payload.assignee_user_id:
         raise HTTPException(status_code=422, detail="個人の持ち物には担当者を設定できません(本人が用意します)")
     assignee = _resolve_assignee(payload.assignee_user_id, members) if payload.scope == "shared" else None
@@ -429,6 +440,8 @@ def create_packing_item(
         item.note = note
     db.add(item)
     try:
+        db.flush()  # 印の記録の前に、候補の重複(一意の制約)はここで 409 にする
+        idempotent_create.remember(db, current_user, idempotency_key, endpoint, payload, item.id)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -676,9 +689,15 @@ def create_task(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
     plan, role, hidden = member_policy.require_access(db, plan_id, current_user, "editor")
     members = member_user_ids(db, plan)
+    endpoint = f"POST /plans/{plan.id}/preparation-tasks"
+    replay = idempotent_create.begin(db, plan, current_user, idempotency_key, endpoint, payload)
+    if replay is not None:
+        first = _get_task_or_404(db, plan, replay)
+        return _task_response(db, plan, first, current_user, role, members, _task_names(db, [first]))
     assignee = _resolve_assignee(payload.assignee_user_id, members)
     related_type, related_id = _validate_related(db, plan, payload.related_type, payload.related_id, current_user,
                                                  hidden)
@@ -711,6 +730,8 @@ def create_task(
     )
     db.add(t)
     try:
+        db.flush()  # 印の記録の前に、項目の重複(一意の制約)はここで 409 にする
+        idempotent_create.remember(db, current_user, idempotency_key, endpoint, payload, t.id)
         db.commit()
     except IntegrityError:
         db.rollback()

@@ -44,7 +44,8 @@ describe('持ち物・準備タスク・レディネスAPIクライアント (Ga
   it('持ち物の作成・変更・削除。変更と削除は持ち物のrevisionをIf-Matchで送る', async () => {
     let calls = respondWith(fx.packing_item_shared);
     await createPackingItem('p1', { name: 'x', category: 'electronics' });
-    expect(calls[0]).toEqual({ url: '/plans/p1/packing-items', method: 'POST', data: { name: 'x', category: 'electronics' }, config: undefined });
+    expect(calls[0]).toEqual({ url: '/plans/p1/packing-items', method: 'POST', data: { name: 'x', category: 'electronics' },
+      config: { headers: { 'Idempotency-Key': expect.any(String) } } }); // [Gate② 縦断 5] 1 回の作成に 1 つの再送の印
     calls = respondWith(fx.packing_item_updated);
     await updatePackingItem('p1', 'i1', { status: 'packed' }, 3);
     expect(calls[0]).toEqual({ url: '/plans/p1/packing-items/i1', method: 'PATCH', data: { status: 'packed' }, config: { headers: { 'If-Match': '3' } } });
