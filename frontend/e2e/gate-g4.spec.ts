@@ -50,6 +50,8 @@ test('MAP-03 コマンドは確認の後だけ実行し、元に戻せる', asyn
   await send('post', `/plans/${planId}/days`, { local_date: '2026-11-03', timezone_id: 'Asia/Tokyo' });
   await page.goto(`/planner/${planId}`);
   await page.waitForURL(new RegExp(`/planner/${planId}$`));
+  // Ctrl+K を受け取るのはヘッダーの検索の入口。描かれる前に押すと失われる(遷移の直後は描画を待つ。手元で 3 回とも落ちた)
+  await expect(page.getByRole('button', { name: '検索(Ctrl+K)' })).toBeVisible();
   await page.keyboard.press('Control+k');
   const dialog = page.getByRole('dialog', { name: '検索' });
   await expect(dialog).toBeVisible();
