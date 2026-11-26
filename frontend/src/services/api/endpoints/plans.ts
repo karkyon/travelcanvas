@@ -53,7 +53,9 @@ export class PlansApi extends SpotsApi {
   }
 
   async createPlan(planData: Partial<TravelPlan>): Promise<ApiResponse<TravelPlan>> {
-    const response = await this.client.post<unknown>('/travel-plans/', this.planToApi(planData));
+    // [Gate② 縦断 1] 1 回の作成に 1 つの再送の印(通信のやり直しで旅行を 2 つ作らない)
+    const response = await this.client.post<unknown>('/travel-plans/', this.planToApi(planData),
+      { headers: { 'Idempotency-Key': onceKey() } });
     return apiOk<TravelPlan>(this.planFromApi(decodeResponse(response.data, legacyTravelPlan, 'POST /travel-plans/')));
   }
 

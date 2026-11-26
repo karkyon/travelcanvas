@@ -30,6 +30,7 @@ from sqlalchemy import or_
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
+from app.core import idempotent_create
 from app.core.plan_access import accessible_plan_ids_subquery, lock_plan_row, require_plan_access
 from app.models.models import IdempotencyRecord, PlanCollaborator, TravelPlan, TravelDay, TravelEvent, User
 from app.services import member_policy, plan_deletion
@@ -72,8 +73,17 @@ async def create_travel_plan(
     plan_data: TravelPlanCreate,
     current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
     """新しい旅行プランを作成(metadataのみ。itineraryはこのAPIでは受け付けない)"""
+    # [Gate② 縦断 1] 再送の印(任意)。同じ印は先に作った旅行を返す(旅行がまだ無いので本人の行を押さえる)
+    replay = idempotent_create.begin(db, None, current_user, idempotency_key, CREATE_ENDPOINT, plan_data)
+    if replay is not None:
+        first = db.query(TravelPlan).filter(TravelPlan.id == uuid.UUID(replay), TravelPlan.deleted_at.is_(None)).first()
+        if first is None:
+            raise HTTPException(status_code=409, detail={"code": "idempotency_key_used",
+                                                         "message": "この操作はもう行いました(作った旅行は消されています)"})
+        return first
     try:
         new_plan = TravelPlan(
             user_id=current_user.id,
@@ -89,6 +99,8 @@ async def create_travel_plan(
         )
 
         db.add(new_plan)
+        db.flush()
+        idempotent_create.remember(db, current_user, idempotency_key, CREATE_ENDPOINT, plan_data, new_plan.id)
         db.commit()
         db.refresh(new_plan)
 
@@ -310,6 +322,7 @@ async def update_travel_plan(
 
 
 CLONE_ENDPOINT = "POST /travel-plans/{id}/clone"
+CREATE_ENDPOINT = "POST /travel-plans/"
 
 
 class PlanCloneRequest(BaseModel):

@@ -254,3 +254,19 @@ def test_title_length_limits_and_clone_is_audited(auth_client, monkeypatch):
     assert len(audit) == 1 and audit[0]["user_id"] == owner.id and str(audit[0]["resource_id"]) == ok.json()["id"]
     assert audit[0]["details"] == {"source_plan_id": plan_id, "as_template": True, "shifted": False, "days": 1}
     assert "あ" not in str(audit[0])  # 名前は監査に残さない
+
+
+def test_create_plan_resend_with_same_key_makes_one(auth_client, db_session):
+    """[Gate② 縦断 1] 旅行の作成の再送(通信のやり直し)は、同じ印なら先に作った旅行を返す(違う内容は 409・鍵なしは今まで通り)"""
+    from app.models.models import TravelPlan
+
+    client, owner = auth_client
+    key = str(uuid.uuid4())
+    first = client.post("/api/v1/travel-plans/", json={"title": "伊勢"}, headers={"Idempotency-Key": key})
+    assert first.status_code == 201, first.text
+    again = client.post("/api/v1/travel-plans/", json={"title": "伊勢"}, headers={"Idempotency-Key": key})
+    assert again.status_code == 201 and again.json()["id"] == first.json()["id"]
+    other = client.post("/api/v1/travel-plans/", json={"title": "京都"}, headers={"Idempotency-Key": key})
+    assert other.status_code == 409 and other.json()["detail"]["code"] == "idempotency_key_reused"
+    assert client.post("/api/v1/travel-plans/", json={"title": "伊勢"}).json()["id"] != first.json()["id"]
+    assert db_session.query(TravelPlan).filter(TravelPlan.user_id == owner.id, TravelPlan.title == "伊勢").count() == 2

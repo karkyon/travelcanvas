@@ -42,12 +42,17 @@ def _hash(payload: Any) -> str:
     return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")).hexdigest()
 
 
-def begin(db: Session, plan: TravelPlan, user: User, key: Optional[str], endpoint: str, payload: Any) -> Optional[str]:
-    """印があれば旅行の行を押さえて、先に作った物の ID を返す(無ければ None)。違う内容なら 409。"""
+def begin(db: Session, plan: Optional[TravelPlan], user: User, key: Optional[str], endpoint: str,
+          payload: Any) -> Optional[str]:
+    """印があれば旅行の行(旅行がまだ無い作成では本人の行)を押さえて、先に作った物の ID を返す(無ければ None)。
+    違う内容なら 409。"""
     k = _clean(key)
     if k is None:
         return None
-    lock_plan_row(db, plan)
+    if plan is not None:
+        lock_plan_row(db, plan)
+    else:
+        db.query(User.id).filter(User.id == user.id).with_for_update().first()
     done = (db.query(IdempotencyRecord)
             .filter(IdempotencyRecord.key == k, IdempotencyRecord.user_id == user.id,
                     IdempotencyRecord.endpoint == endpoint).first())

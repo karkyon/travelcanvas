@@ -114,7 +114,7 @@
 | `has_relations` | 409 | no | 予約・移動・文書と紐付いた予定は入れ替えられません(先に紐付けを外す) | api/v1/day_variants.py, api/v1/sync.py |
 | `idempotency_key_required` | 400, 422 | no | Idempotency-Key(100文字まで)が必要です | api/v1/commands.py, api/v1/discussion.py, api/v1/paid_actions.py |
 | `idempotency_key_reused` | 409 | no | この Idempotency-Key は別の操作に使われています | api/v1/commands.py, api/v1/finance.py, core/idempotent_create.py |
-| `idempotency_key_used` | 409 | no | この操作はもう行いました(作った持ち物は消されています) | api/v1/preparation.py |
+| `idempotency_key_used` | 409 | no | この操作はもう行いました(作った持ち物は消されています) | api/v1/preparation.py, api/v1/travel.py |
 | `if_match_required` | 428 | after_reload | If-Match(保存されている版。まだ無ければ 0)が必要です | api/v1/home_place.py, api/v1/movement.py, api/v1/private_profile.py, api/v1/spot_areas.py |
 | `inbound_mail_unavailable` | 409 | no | この環境ではメールの転送を受け付けていません(管理者の設定が必要です)。本文の貼り付け・ファイルで取り込めます | api/v1/inbound_mail.py |
 | `input_too_long` | — | — | … は … 文字までです | api/v1/paid_actions.py |
