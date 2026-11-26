@@ -10,7 +10,12 @@ from app.main import app
 from app.models.models import Spot, TravelDay, TravelEvent, TravelPlan, UserSpotFavorite, UserSpotVisit
 
 
-def test_deleting_a_public_spot_used_by_others_succeeds_and_keeps_their_events(auth_client, make_user, db_session):
+def test_deleting_a_public_spot_used_by_others_succeeds_and_keeps_their_events(auth_client, make_user, db_session,
+                                                                               monkeypatch):
+    import app.api.v1.spots as spots_api
+
+    calls = []
+    monkeypatch.setattr(spots_api, "record_audit_event", lambda **kw: calls.append(kw))
     client, me = auth_client
     other, _ = make_user()
     spot = Spot(id=uuid.uuid4(), name="公開の場所", category="sightseeing", created_by=me.id, is_public=True)
@@ -42,3 +47,8 @@ def test_deleting_a_public_spot_used_by_others_succeeds_and_keeps_their_events(a
     assert db_session.query(UserSpotVisit).filter(UserSpotVisit.spot_id == spot.id).count() == 0
     kept = db_session.get(TravelEvent, ev.id)
     assert kept is not None and kept.spot_id is None and kept.title == "公開の場所"
+    # [Gate② #199 の見直し] ほかの人のお気に入り・訪問を消したことが監査に残る(数だけ。名前・ほかの人は残さない)
+    audit = [c for c in calls if c["action"] == "spot.delete"]
+    assert len(audit) == 1 and audit[0]["user_id"] == me.id
+    assert audit[0]["details"] == {"public": True, "favorites_removed": 1, "visits_removed": 1, "events_unlinked": 1}
+    assert "公開の場所" not in str(audit[0]) and str(other.id) not in str(audit[0])

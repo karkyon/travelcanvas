@@ -19,6 +19,7 @@ from app.schemas.spots import (
 )
 from app.core.auth import get_current_active_user, get_current_user_or_guest
 from app.services import dining, event_urls, wishes
+from app.services.audit_service import record_audit_event
 from app.utils.rate_limiter import check_rate_limit
 
 logger = logging.getLogger("travelcanvas")
@@ -642,13 +643,19 @@ async def delete_spot(
         photo = spot.photo
         # [監査 2026-11-24] 公開した場所はほかの人のお気に入り・訪問から指されうる。予定(古い版の spot_id・旅行の複製)からも。
         # 外部キーに削除の規則が無いため、そのまま消すと 500 になる。お気に入り・訪問は消し、予定は参照だけ外す(予定は残す)
-        db.query(UserSpotFavorite).filter(UserSpotFavorite.spot_id == spot.id).delete(synchronize_session=False)
-        db.query(UserSpotVisit).filter(UserSpotVisit.spot_id == spot.id).delete(synchronize_session=False)
-        db.query(TravelEvent).filter(TravelEvent.spot_id == spot.id).update(
+        favorites = db.query(UserSpotFavorite).filter(UserSpotFavorite.spot_id == spot.id).delete(
+            synchronize_session=False)
+        visits = db.query(UserSpotVisit).filter(UserSpotVisit.spot_id == spot.id).delete(synchronize_session=False)
+        events = db.query(TravelEvent).filter(TravelEvent.spot_id == spot.id).update(
             {TravelEvent.spot_id: None}, synchronize_session=False)
+        was_public = bool(getattr(spot, "is_public", False))
         db.delete(spot)
         db.commit()
         _drop_own_file(photo)  # [Gate SpotOwnPhoto]
+        # [Gate② #199 の見直し] ほかの人のお気に入り・訪問を消す操作なので監査に残す(数だけ。ほかの人・場所の名前は残さない)
+        record_audit_event(action="spot.delete", resource_type="spot", user_id=current_user.id, resource_id=spot_id,
+                           details={"public": was_public, "favorites_removed": favorites, "visits_removed": visits,
+                                    "events_unlinked": events})
         return {"message": "スポットを削除しました"}
     except Exception:
         db.rollback()
