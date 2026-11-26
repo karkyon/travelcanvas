@@ -777,6 +777,9 @@ def put_votes(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user_or_guest),
 ):
     plan, role = require_plan_access(db, plan_id, current_user, min_role="viewer")
+    # [Gate② 縦断 4] 同じ人の回答を同時に 2 回送ると(二重押し・再送)、両方が「まだ無い」を読んで一意の制約
+    # (uq_votes_option_user)に当たり、サーバーの誤りになっていた。旅行の行を押さえてから投票を読む(締め切りも新しく読む)
+    lock_plan_row(db, plan)
     p = _get_poll(db, plan, poll_id)
     if _is_closed(p) or p.decided_option_id is not None:
         raise HTTPException(status_code=409, detail="この投票は締め切られています")
