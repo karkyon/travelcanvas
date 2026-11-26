@@ -2,7 +2,7 @@
 
 > この文書は `python3 scripts/ci/render_fr_trace.py` が `docs/trace/fr-requirements.json` と `docs/trace/fr-status.json` から作る(手で直さない)。
 > 要求の原文の正本は DOC-02 v6.0(`docs/spec/DOC-02_要件定義書_v6.0.md`。所在の一覧は [CANONICAL-SOURCES.md](../spec/CANONICAL-SOURCES.md))。ここの要約・受入は抜粋の言い換え。
-> 状態の正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。基準 commit `32c7db6`。
+> 状態の正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。基準 commit `a648021`。
 
 ## 1. 証拠の区分の一覧
 

@@ -2,7 +2,9 @@
  "_meta": {
   "description": "全63 FR の要求の根拠(DOC-02 v6.0・FR-059 正本・承認済みの変更。旧版は資料室の v5.1 で保管)と、画面・API・表・試験・証拠の区分の対応。状態そのものの正本は fr-status.json、VERIFIED の証拠は v1-verification-ledger.json。backend/tests/test_gate_hardening_trace.py が一致と実在を確かめる。",
   "gate": "Hardening-A",
-  "baseline": "32c7db6ab12169dc05a9d5821d565f591714c0b4",
+  "baseline": "a648021456ff51e683017e147ccbf8b6b89f0f24",
+  "baseline_note": "2026-11-26 に main a648021(と作業ブランチ claude/lucid-johnson-paosud の未マージの試験)で、全 63 FR の参照するファイルの実在(test_gate_hardening_trace.py)と backend の全件の試験(2093 件)を確かめて基準を移した。証拠の区分(done/partial/pending/na)は変えていない(実機・実 API・運用の新しい証拠は無い)。証拠の区分による暫定の充足は 60.6%(done 253・partial 62・pending 154・na 35)で、完成率ではない",
+  "baseline_history": ["32c7db6ab12169dc05a9d5821d565f591714c0b4"],
   "evidence_states": {
    "done": "証拠あり",
    "partial": "一部",
