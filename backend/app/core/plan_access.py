@@ -110,5 +110,9 @@ def lock_plan_row(db: Session, plan: TravelPlan) -> None:
     """[Gate② 縦断] 旅行の行を FOR UPDATE で押さえる(この transaction の終わりまで)。
 
     「旅行ごとの件数を数えてから 1 件足す」上限は、同時の 2 つの要求が両方とも上限の手前を数えると 1 件超える。
-    数える前にこれを呼ぶと、同じ旅行への要求は 1 つずつになる(後の要求は先の commit の後の件数を数える)。"""
-    db.query(TravelPlan.id).filter(TravelPlan.id == plan.id).with_for_update().first()
+    数える前にこれを呼ぶと、同じ旅行への要求は 1 つずつになる(後の要求は先の commit の後の件数を数える)。
+
+    FOR NO KEY UPDATE(key_share=True)にする: FOR UPDATE だと、外部キーの確かめ(FOR KEY SHARE)も止めるため、
+    押さえたまま別の接続で書く監査など(子の行の外部キー)が待ち、要求が止まったままになる(11-26 に手元の E2E で見つけた)。
+    NO KEY UPDATE どうしは互いに待つので、1 つずつにする働きは同じ。"""
+    db.query(TravelPlan.id).filter(TravelPlan.id == plan.id).with_for_update(key_share=True).first()

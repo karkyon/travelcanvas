@@ -172,7 +172,7 @@ def _to_candidate_response(c: ExtractionCandidate) -> CandidateResponse:
 def _get_job_or_404(db: Session, plan_id, job_id, lock: bool = False) -> ImportJob:
     """lock=True: 取込の行を FOR UPDATE で押さえる(確定・登録を同じ取込について直列にする)。"""
     q = db.query(ImportJob).filter(ImportJob.id == job_id, ImportJob.plan_id == plan_id)
-    j = (q.with_for_update() if lock else q).first()
+    j = (q.with_for_update(key_share=True) if lock else q).first()
     if j is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="取込ジョブが見つかりません")
     return j

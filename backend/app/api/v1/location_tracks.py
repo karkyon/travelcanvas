@@ -131,14 +131,14 @@ def _get_own(db: Session, plan: TravelPlan, track_id: str, user: User, lock: boo
     except ValueError:
         raise HTTPException(status_code=404, detail="軌跡が見つかりません")
     q = db.query(LocationTrack).filter(LocationTrack.id == tid, LocationTrack.plan_id == plan.id)
-    t = (q.with_for_update() if lock else q).first()
+    t = (q.with_for_update(key_share=True) if lock else q).first()
     # 他の人の軌跡は存在も知らせない(旅行の所有者にも見せない)
     if not t or t.user_id != user.id:
         raise HTTPException(status_code=404, detail="軌跡が見つかりません")
     if _refresh(t, _now()):
         db.commit()
         if lock:  # commit で押さえが外れるので押さえ直す
-            q.with_for_update().populate_existing().first()
+            q.with_for_update(key_share=True).populate_existing().first()
     return t
 
 

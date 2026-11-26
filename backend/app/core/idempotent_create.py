@@ -52,7 +52,7 @@ def begin(db: Session, plan: Optional[TravelPlan], user: User, key: Optional[str
     if plan is not None:
         lock_plan_row(db, plan)
     else:
-        db.query(User.id).filter(User.id == user.id).with_for_update().first()
+        db.query(User.id).filter(User.id == user.id).with_for_update(key_share=True).first()
     done = (db.query(IdempotencyRecord)
             .filter(IdempotencyRecord.key == k, IdempotencyRecord.user_id == user.id,
                     IdempotencyRecord.endpoint == endpoint).first())

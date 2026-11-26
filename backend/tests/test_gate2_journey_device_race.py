@@ -113,3 +113,22 @@ def test_first_offline_key_from_two_tabs(committed_user, monkeypatch):
         assert s.query(OfflineDevice).filter(OfflineDevice.user_id == committed_user.id).count() == 1
     finally:
         s.close()
+
+
+def test_first_offline_key_with_real_audit_does_not_hang(committed_user, monkeypatch):
+    """[Gate② 11-26] 本人の行を FOR UPDATE で押さえたまま、別の接続で監査(audit_logs → users の外部キー)を書くと、
+    外部キーの確かめが押さえを待ち、要求が止まったままになった(手元の E2E で見つけた)。押さえは FOR NO KEY UPDATE。
+    監査を差し替えずに本当に書き、時間内に終わることを確かめる"""
+    monkeypatch.setattr(settings, "OFFLINE_PACK_KEY_SECRET", "test-only-offline-pack-secret")
+    monkeypatch.setattr(settings, "ENCRYPTION_KEY", "test-only-encryption-key")
+    out = []
+
+    def _get():
+        out.append(TestClient(app, raise_server_exceptions=False).get(
+            "/api/v1/offline-pack/key", params={"device_id": str(uuid.uuid4())}).status_code)
+
+    t = threading.Thread(target=_get, daemon=True)
+    t.start()
+    t.join(timeout=20)
+    assert not t.is_alive(), "オフラインの鍵の初めての取得が止まったまま(押さえと監査の外部キーが待ち合っている)"
+    assert out == [200]

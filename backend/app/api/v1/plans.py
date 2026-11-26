@@ -401,7 +401,7 @@ def _record_batch_change_and_bump_revision(
     (先に別の変更が入った)何も残さず 409 plan_conflict(読み直してもう一度)で断る。"""
     seen_revision = plan.revision
     locked = (db.query(TravelPlan.revision).filter(TravelPlan.id == plan.id)
-              .with_for_update().scalar())
+              .with_for_update(key_share=True).scalar())
     if locked is not None and locked != seen_revision:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
