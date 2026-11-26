@@ -796,7 +796,8 @@
     "backend/tests/test_gate_r3_1_reservation_participants.py",
     "backend/tests/test_gate_r3_3_event_reservations.py",
     "backend/tests/test_gate_remaining3_mail.py",
-    "frontend/e2e/reservations.spec.ts"
+    "frontend/e2e/reservations.spec.ts",
+    "backend/tests/test_gate2_reservation_resend.py"
    ],
    "external_providers": [
     "外部の予約サービス(同期は未実装)"

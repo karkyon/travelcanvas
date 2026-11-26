@@ -35,6 +35,7 @@ from app.core.crypto import (
     encrypt_payload,
     plan_subject,
 )
+from app.core import idempotent_create
 from app.core.database import get_db
 from app.services import reservation_duplicates  # [Gate② FC-042]
 from app.services import member_policy  # [Gate G2] FR-045 同行者向けの項目の規則
@@ -386,8 +387,14 @@ def create_reservation(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
     plan, _role, _hidden = member_policy.require_access(db, plan_id, current_user, "editor", "reservations")
+    # [Gate② 縦断 3] 再送の印(任意)。同じ印は先に作った予約を返し、二重に作らない(app/core/idempotent_create.py)
+    endpoint = f"POST /plans/{plan.id}/reservations"
+    replay = idempotent_create.begin(db, plan, current_user, idempotency_key, endpoint, payload)
+    if replay is not None:
+        return _to_response(_get_reservation_or_404(db, plan.id, replay))
 
     r = Reservation(
         plan_id=plan.id,
@@ -437,6 +444,8 @@ def create_reservation(
             )
 
     db.add(r)
+    db.flush()
+    idempotent_create.remember(db, current_user, idempotency_key, endpoint, payload, r.id)
     db.commit()
     db.refresh(r)
     _sync_primary_event_link(db, r)

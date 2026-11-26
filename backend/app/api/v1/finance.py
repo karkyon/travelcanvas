@@ -27,7 +27,6 @@
 集計・精算から除外したことを件数(unconverted_expenses)で示す(EX-013、検証不能を問題なしにしない)。
 監査ログには題名・メモ・金額を記録しない。
 """
-import hashlib
 import json
 import uuid
 from datetime import date, datetime, timezone as dt_timezone
@@ -43,13 +42,12 @@ from sqlalchemy.orm import Session
 from app.core.auth import get_current_user_or_guest
 from app.core.crypto import EncryptionNotConfigured, decrypt_payload, encrypt_payload, plan_subject
 from app.core.database import get_db
-from app.core.plan_access import lock_plan_row
+from app.core import idempotent_create
 from app.services import member_policy
 from app.models.models import (
     Budget,
     Document,
     Expense,
-    IdempotencyRecord,
     ExpenseShare,
     FxRate,
     PlanFinanceSettings,
@@ -757,27 +755,14 @@ def create_expense(
     plan, _ = require_plan_access(db, plan_id, current_user, min_role="editor")
     assert_unlocked(db, plan)
     # [Gate② 縦断 7] 支出の記録も精算と同じく Idempotency-Key(任意)で二重の記録を防ぐ。以前は無く、通信のやり直しで
-    # 同じ支出が 2 件になり、精算の額が狂った。同じ鍵・同じ内容は最初の記録、違う内容は 409。
-    # 同時の 2 つは旅行の行を押さえて 1 つずつにし、鍵の記録は支出と同じ transaction で書く
-    key = (idempotency_key or "").strip() or None
-    payload_hash = None
-    if key is not None:
-        if len(key) > 100 or not key.isprintable():
-            raise HTTPException(status_code=422, detail="Idempotency-Keyは100文字までの印字できる文字です")
-        lock_plan_row(db, plan)
-        payload_hash = hashlib.sha256(json.dumps(payload.model_dump(mode="json"), sort_keys=True,
-                                                 ensure_ascii=False).encode("utf-8")).hexdigest()
-        done = (db.query(IdempotencyRecord)
-                .filter(IdempotencyRecord.key == key, IdempotencyRecord.user_id == current_user.id,
-                        IdempotencyRecord.endpoint == f"POST /plans/{plan.id}/expenses").first())
-        if done is not None:
-            if (done.response_json or {}).get("hash") != payload_hash:
-                raise HTTPException(status_code=409, detail={
-                    "code": "idempotency_key_reused", "message": "同じ操作の印で、違う内容の支出が送られました"})
-            first = _get_expense(db, plan, (done.response_json or {}).get("id"))
-            base0, members0 = _base_currency(db, plan), member_user_ids(db, plan)
-            return _expense_response(db, plan, first, base0, members0, _all_names(db, plan, [first], members0),
-                                     _refunded_totals(db, plan))
+    # 同じ支出が 2 件になり、精算の額が狂った(共通の処理 app/core/idempotent_create.py)
+    key_endpoint = f"POST /plans/{plan.id}/expenses"
+    replay = idempotent_create.begin(db, plan, current_user, idempotency_key, key_endpoint, payload)
+    if replay is not None:
+        first = _get_expense(db, plan, replay)
+        base0, members0 = _base_currency(db, plan), member_user_ids(db, plan)
+        return _expense_response(db, plan, first, base0, members0, _all_names(db, plan, [first], members0),
+                                 _refunded_totals(db, plan))
     base = _base_currency(db, plan)
     members = member_user_ids(db, plan)
     data = payload.model_dump()
@@ -821,9 +806,8 @@ def create_expense(
                 refund_of_expense_id=refund_of.id if refund_of else None)
     _apply_expense(db, plan, e, data, base, members, current_user, set())
     db.add(e)
-    if key is not None:
-        db.add(IdempotencyRecord(key=key, user_id=current_user.id, endpoint=f"POST /plans/{plan.id}/expenses",
-                                 response_status=201, response_json={"id": str(e.id), "hash": payload_hash}))
+    db.flush()
+    idempotent_create.remember(db, current_user, idempotency_key, key_endpoint, payload, e.id)
     db.commit()
     db.refresh(e)
     _audit("expense_created", "expense", request, current_user, e.id, plan.id,

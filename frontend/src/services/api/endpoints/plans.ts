@@ -8,6 +8,7 @@ import type { TravelPlan } from '@/types';
 import { SpotsApi } from './spots';
 import type { ApiResponse, ItemDeleteResult, NormalizedDay, NormalizedEvent, NormalizedPlanDetail, PromoteQuickDraftResult } from '../types';
 import { apiOk, apiOkVoid } from '../response';
+import { onceKey } from '../onceKey';
 import { arrayOf, decodeResponse } from '../decode';
 import { itemDeleteResult, legacyTravelPlan, normalizedDay, normalizedEvent, normalizedPlanDetail, planDeleteResult, promoteQuickDraftResult, revisionResult } from '../decodersCore';
 
@@ -78,10 +79,8 @@ export class PlansApi extends SpotsApi {
   // パターン)。
   async clonePlan(planId: string, data?: { title?: string; start_date?: string; as_template?: boolean }): Promise<ApiResponse<TravelPlan>> {
     // [Gate② FC-124] 同じ要求の送り直し(ログインの更新の後のやり直しなど)で旅行を 2 つ作らないよう、1 回の操作に 1 つの鍵
-    const key = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID() : `idem_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const response = await this.client.post<unknown>(`/travel-plans/${planId}/clone`, data ?? {},
-      { headers: { 'Idempotency-Key': key } });
+      { headers: { 'Idempotency-Key': onceKey() } });
     return apiOk<TravelPlan>(this.planFromApi(decodeResponse(response.data, legacyTravelPlan, 'POST /travel-plans/{plan_id}/clone')));
   }
 

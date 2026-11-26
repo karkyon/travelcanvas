@@ -6,6 +6,7 @@
 import { PlansApi } from './plans';
 import type { Reservation, ReservationCreateData, ReservationEventLink, ReservationEventLinkCreateData, ReservationEventLinkUpdateData, ReservationParticipant, ReservationRevealResult, ReservationUpdateData } from '../types';
 import { arrayOf, decodeResponse } from '../decode';
+import { onceKey } from '../onceKey';
 // [Gate G9] Q03 decoder は使う時に読み込む(最初に読む JS を小さく保つ)
 const DL = () => import('../decoders');
 
@@ -24,7 +25,7 @@ export class ReservationsApi extends PlansApi {
   }
 
   async createReservation(planId: string, data: ReservationCreateData): Promise<Reservation> {
-    const response = await this.client.post(`/plans/${planId}/reservations`, data);
+    const response = await this.client.post(`/plans/${planId}/reservations`, data, { headers: { 'Idempotency-Key': onceKey() } });
     return decodeResponse(response.data, (await DL()).reservation, 'POST /plans/{plan_id}/reservations');
   }
 

@@ -198,7 +198,7 @@
 - **受入(抜粋):** 予約を旅程の固定の制約にできる
 - **仕様の参照:** 画面 SC-11 / API 群 RESERVATION
 - **実装:** API `backend/app/api/v1/reservations.py` / 画面 `/planner/:planId/reservations` / 表 `reservations`・`event_reservations`・`reservation_participants`
-- **試験:** `backend/tests/test_gate_r3_0_reservation.py`・`backend/tests/test_gate_r3_1_reservation_participants.py`・`backend/tests/test_gate_r3_3_event_reservations.py`・`backend/tests/test_gate_remaining3_mail.py`・`frontend/e2e/reservations.spec.ts`
+- **試験:** `backend/tests/test_gate_r3_0_reservation.py`・`backend/tests/test_gate_r3_1_reservation_participants.py`・`backend/tests/test_gate_r3_3_event_reservations.py`・`backend/tests/test_gate_remaining3_mail.py`・`frontend/e2e/reservations.spec.ts`・`backend/tests/test_gate2_reservation_resend.py`
 - **外部の提供元:** 外部の予約サービス(同期は未実装)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結) / 実 API ○(実の提供元での確認なし(CI は模擬): 外部の予約サービス(同期は未実装)) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 外部予約サービスとの同期(取消期限の 48 時間前・6 時間前の知らせは Remaining-3)
