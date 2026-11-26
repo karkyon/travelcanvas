@@ -278,3 +278,21 @@ def test_atlas_places_groups_and_limits(auth_client, monkeypatch):
     assert region["name"] == "東京都" and region["state"] == "PLANNED"
     assert region["municipalities"][0]["name"] == "千代田区"
     assert body["visited"] == {"countries": 0, "regions": 0, "municipalities": 0}  # 予定だけは訪問に数えない
+
+
+def test_atlas_places_when_the_place_provider_fails(auth_client, monkeypatch):
+    """[Gate② FC-149] 地名の提供元(国土地理院・Nominatim)が落ちていても、Atlas の地名のまとめは 500 にせず、
+    引けない区画を unresolved に数える(作り話の地名を出さない)。後で提供元が戻れば引ける(失敗は使い回しに残さない)"""
+    from app.api.v1 import atlas as atlas_api
+
+    client, _ = auth_client
+    _mock("gsi_revgeo", lambda request: httpx.Response(503))
+    _mock("jma_area", lambda request: httpx.Response(200, json=AREA))
+    monkeypatch.setattr(atlas_api, "ATLAS_LOOKUPS_PER_CALL", 8)
+    _plan(client, local_date=date.today() + timedelta(days=30))
+    down = client.get("/api/v1/atlas/places")
+    assert down.status_code == 200, down.text
+    assert down.json()["countries"] == [] and down.json()["unresolved"] == 1 and down.json()["pending"] == 0
+    _gsi_and_area()
+    back = client.get("/api/v1/atlas/places").json()
+    assert back["unresolved"] == 0 and back["countries"][0]["country"] == "日本"

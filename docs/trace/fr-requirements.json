@@ -3775,7 +3775,8 @@
    },
    "tests": [
     "backend/tests/test_gate39_plan_clone.py",
-    "frontend/e2e/share-clone.spec.ts"
+    "frontend/e2e/share-clone.spec.ts",
+    "backend/tests/test_gate2_clone_resend.py"
    ],
    "external_providers": [],
    "day_of_travel": false,
@@ -3846,7 +3847,9 @@
     "backend/tests/test_gate_g6_offline.py",
     "backend/tests/test_gate_k1_offline_keys.py",
     "frontend/e2e/gate-g6.spec.ts",
-    "frontend/e2e/offline-pack.spec.ts"
+    "frontend/e2e/offline-pack.spec.ts",
+    "backend/tests/test_gate2_sync_race.py",
+    "backend/tests/test_gate2_journey_device_race.py"
    ],
    "external_providers": [],
    "day_of_travel": true,
@@ -3923,7 +3926,8 @@
     "frontend/src/pages/VisitsPage.test.tsx",
     "frontend/src/services/api.surface.test.ts",
     "frontend/src/services/api/contract.test.ts",
-    "frontend/src/services/api/v2visits.test.ts"
+    "frontend/src/services/api/v2visits.test.ts",
+    "backend/tests/test_gate2_visit_race.py"
    ],
    "external_providers": [
     "地図タイル(OpenStreetMap)"
@@ -3996,7 +4000,8 @@
    },
    "tests": [
     "backend/tests/test_gate_v2_visits.py",
-    "frontend/e2e/visits.spec.ts"
+    "frontend/e2e/visits.spec.ts",
+    "backend/tests/test_gate2_visit_race.py"
    ],
    "external_providers": [],
    "day_of_travel": false,
@@ -4070,7 +4075,8 @@
     "backend/tests/test_gate_g6_location_memory.py",
     "backend/tests/test_gate_v2_visits.py",
     "frontend/e2e/visits.spec.ts",
-    "frontend/src/utils/protectedZones.test.ts"
+    "frontend/src/utils/protectedZones.test.ts",
+    "backend/tests/test_gate2_visit_race.py"
    ],
    "external_providers": [],
    "day_of_travel": false,
@@ -4146,7 +4152,8 @@
     "frontend/src/pages/atlas/AtlasPlacesPanel.test.tsx",
     "frontend/src/services/api.surface.test.ts",
     "frontend/src/services/api/contract.test.ts",
-    "frontend/src/services/api/p15atlas.test.ts"
+    "frontend/src/services/api/p15atlas.test.ts",
+    "backend/tests/test_gate_remaining2_external.py"
    ],
    "external_providers": [
     "地域の判定(国土地理院・Nominatim)"
@@ -4223,7 +4230,8 @@
     "frontend/src/pages/JourneyPage.test.tsx",
     "frontend/src/services/api.surface.test.ts",
     "frontend/src/services/api/contract.test.ts",
-    "frontend/src/services/api/p14journey.test.ts"
+    "frontend/src/services/api/p14journey.test.ts",
+    "backend/tests/test_gate2_journey_device_race.py"
    ],
    "external_providers": [],
    "day_of_travel": false,
@@ -4298,7 +4306,8 @@
     "frontend/src/pages/JourneyPage.test.tsx",
     "frontend/src/services/api.surface.test.ts",
     "frontend/src/services/api/contract.test.ts",
-    "frontend/src/services/api/p14journey.test.ts"
+    "frontend/src/services/api/p14journey.test.ts",
+    "backend/tests/test_gate2_journey_device_race.py"
    ],
    "external_providers": [],
    "day_of_travel": false,
@@ -4371,7 +4380,8 @@
    "tests": [
     "backend/tests/test_gate_l5_local_first_location.py",
     "frontend/e2e/location-local-first.spec.ts",
-    "frontend/src/services/api/l5location.test.ts"
+    "frontend/src/services/api/l5location.test.ts",
+    "backend/tests/test_gate2_location_points_race.py"
    ],
    "external_providers": [],
    "day_of_travel": true,
@@ -4444,7 +4454,8 @@
     "backend/tests/test_gate_l5_local_first_location.py",
     "frontend/e2e/location-local-first.spec.ts",
     "frontend/src/services/api/l5location.test.ts",
-    "frontend/src/utils/adaptiveSampler.test.ts"
+    "frontend/src/utils/adaptiveSampler.test.ts",
+    "backend/tests/test_gate2_location_points_race.py"
    ],
    "external_providers": [],
    "day_of_travel": true,
@@ -4600,7 +4611,8 @@
    },
    "tests": [
     "backend/tests/test_gate_remaining4_billing.py",
-    "frontend/src/pages/BillingPage.test.tsx"
+    "frontend/src/pages/BillingPage.test.tsx",
+    "backend/tests/test_gate2_access_never_blocked.py"
    ],
    "external_providers": [
     "Stripe(テストモードの鍵の後)"

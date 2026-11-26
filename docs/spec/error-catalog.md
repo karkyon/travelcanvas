@@ -54,6 +54,7 @@
 | `changed_on_server` | 409 | no | 日程の予定が変わっているため、この並びは使えません(画面で並べ直してください) | api/v1/sync.py |
 | `changed_since` | 409 | no | 訂正の後に値が変わっているため取り消せません(新しく訂正してください) | api/v1/corrections.py |
 | `client_policy_ignored` | — | — | 上限・クラス・提供元は指定できません(サーバーが決めます) | api/v1/planning_usage.py |
+| `clone_key_used` | 409 | no | この操作はもう行いました(複製した旅行は消されています) | api/v1/travel.py |
 | `clone_not_allowed` | — | — | この共有では複製が許されていません | api/v1/public_share.py |
 | `command_forbidden` | 403 | no | この旅行では閲覧だけの権限のため、実行できません | api/v1/commands.py |
 | `command_not_executable` | — | — | 画面を開くコマンドは実行しません(画面で開いてください) | api/v1/commands.py |

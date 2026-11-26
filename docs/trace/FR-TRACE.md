@@ -652,7 +652,7 @@
 - **受入(抜粋):** 別の日では時差・営業時間・予約・区間を再検証し、予約番号・券・個人情報は既定で複製しない
 - **仕様の参照:** 画面 SC-37 / API 群 duplicates
 - **実装:** API `backend/app/api/v1/plans.py`・`backend/app/api/v1/share.py` / 画面 `/planner/:planId?` / 表 `travel_plans`
-- **試験:** `backend/tests/test_gate39_plan_clone.py`・`frontend/e2e/share-clone.spec.ts`
+- **試験:** `backend/tests/test_gate39_plan_clone.py`・`frontend/e2e/share-clone.spec.ts`・`backend/tests/test_gate2_clone_resend.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** —
@@ -664,7 +664,7 @@
 - **受入(抜粋):** 最終同期と STALE を出し、端末の紛失で失効・期限・自動削除。オフラインの更新は列に入れ再接続で競合を解く
 - **仕様の参照:** 画面 SC-38 / API 群 offline-packs
 - **実装:** API `backend/app/api/v1/offline_pack.py` / 画面 `/planner/:planId/today` / 表 `offline_devices`
-- **試験:** `backend/tests/test_gate_g6_offline.py`・`backend/tests/test_gate_k1_offline_keys.py`・`frontend/e2e/gate-g6.spec.ts`・`frontend/e2e/offline-pack.spec.ts`
+- **試験:** `backend/tests/test_gate_g6_offline.py`・`backend/tests/test_gate_k1_offline_keys.py`・`frontend/e2e/gate-g6.spec.ts`・`frontend/e2e/offline-pack.spec.ts`・`backend/tests/test_gate2_sync_race.py`・`backend/tests/test_gate2_journey_device_race.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 本番での確認(RELEASE-1)。通信しない端末は鍵の期限(30日)の後は開けない(消去は次の通信の時)。sw.js の登録は Remaining-1(実機で未確認)
@@ -676,7 +676,7 @@
 - **受入(抜粋):** 単純なグリッドの開放をまねず、計画・通過・滞在・確認を区別する
 - **仕様の参照:** 画面 SC-39 / API 群 visits
 - **実装:** API `backend/app/api/v1/visits.py` / 画面 `/planner/:planId/visits` / 表 `location_area_cells`
-- **試験:** `backend/tests/test_gate_v2_visits.py`・`frontend/e2e/remaining7.spec.ts`・`frontend/e2e/visits.spec.ts`・`frontend/src/pages/VisitsPage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/v2visits.test.ts`
+- **試験:** `backend/tests/test_gate_v2_visits.py`・`frontend/e2e/remaining7.spec.ts`・`frontend/e2e/visits.spec.ts`・`frontend/src/pages/VisitsPage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/v2visits.test.ts`・`backend/tests/test_gate2_visit_race.py`
 - **外部の提供元:** 地図タイル(OpenStreetMap)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API ○(実の提供元での確認なし(CI は模擬): 地図タイル(OpenStreetMap)) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 候補の層・地図タイル(OpenStreetMap)の上への表示は Remaining-7。実機の位置の記録での確認は UAT
@@ -688,7 +688,7 @@
 - **受入(抜粋):** 信頼度・根拠・判定時刻・アルゴリズムの版を保存し、低い時は確定せず確認を求める
 - **仕様の参照:** 画面 SC-40 / API 群 visits/assess
 - **実装:** API `backend/app/api/v1/visits.py` / 画面 `/planner/:planId/visits` / 表 `visit_assessments`
-- **試験:** `backend/tests/test_gate_v2_visits.py`・`frontend/e2e/visits.spec.ts`
+- **試験:** `backend/tests/test_gate_v2_visits.py`・`frontend/e2e/visits.spec.ts`・`backend/tests/test_gate2_visit_race.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** —
@@ -700,7 +700,7 @@
 - **受入(抜粋):** 削除の要求の後に生の位置を監査ログへ写さない
 - **仕様の参照:** 画面 SC-40・SC-43 / API 群 visits
 - **実装:** API `backend/app/api/v1/visits.py`・`backend/app/api/v1/privacy_zones.py` / 画面 `/planner/:planId/visits` / 表 `visit_assessments`・`privacy_zones`
-- **試験:** `backend/tests/test_gate_g6_location_memory.py`・`backend/tests/test_gate_v2_visits.py`・`frontend/e2e/visits.spec.ts`・`frontend/src/utils/protectedZones.test.ts`
+- **試験:** `backend/tests/test_gate_g6_location_memory.py`・`backend/tests/test_gate_v2_visits.py`・`frontend/e2e/visits.spec.ts`・`frontend/src/utils/protectedZones.test.ts`・`backend/tests/test_gate2_visit_race.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 実機の GPS での訂正・除外の確認(PoC)
@@ -712,7 +712,7 @@
 - **受入(抜粋):** Atlas から過去の記録・未訪問の候補・次の計画へ移れ、公開範囲を旅行・地点単位で設定
 - **仕様の参照:** 画面 SC-41 / API 群 atlas
 - **実装:** API `backend/app/api/v1/atlas.py` / 画面 `/atlas` / 表 `location_area_cells`
-- **試験:** `backend/tests/test_gate_p15_atlas.py`・`frontend/e2e/atlas.spec.ts`・`frontend/src/pages/AtlasPage.test.tsx`・`frontend/src/pages/atlas/AtlasPlacesPanel.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p15atlas.test.ts`
+- **試験:** `backend/tests/test_gate_p15_atlas.py`・`frontend/e2e/atlas.spec.ts`・`frontend/src/pages/AtlasPage.test.tsx`・`frontend/src/pages/atlas/AtlasPlacesPanel.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p15atlas.test.ts`・`backend/tests/test_gate_remaining2_external.py`
 - **外部の提供元:** 地域の判定(国土地理院・Nominatim)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API ○(実の提供元での確認なし(CI は模擬): 地域の判定(国土地理院・Nominatim)) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** テーマ別は予定の種類から(Remaining-6)。国・都道府県・市区町村は Remaining-2(国土地理院・Nominatim。実通信は omega-dev2 で未確認)
@@ -724,7 +724,7 @@
 - **受入(抜粋):** 健康・安全・費用を害する競争を誘わず、ランキングは作らず、数値は隠せる
 - **仕様の参照:** 画面 SC-42 / API 群 journey-metrics
 - **実装:** API `backend/app/api/v1/journey.py` / 画面 `/planner/:planId/journey` / 表 `event_actuals`
-- **試験:** `backend/tests/test_gate_p14_journey.py`・`frontend/e2e/journey.spec.ts`・`frontend/src/pages/JourneyPage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p14journey.test.ts`
+- **試験:** `backend/tests/test_gate_p14_journey.py`・`frontend/e2e/journey.spec.ts`・`frontend/src/pages/JourneyPage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p14journey.test.ts`・`backend/tests/test_gate2_journey_device_race.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** —
@@ -736,7 +736,7 @@
 - **受入(抜粋):** 予定を実績で上書きせず、予定と実績の時刻・経路と軌跡を比べ、行かなかった候補を次の旅行へ戻せる
 - **仕様の参照:** 画面 SC-42 / API 群 memories
 - **実装:** API `backend/app/api/v1/journey.py` / 画面 `/planner/:planId/journey` / 表 `event_actuals`
-- **試験:** `backend/tests/test_gate_p14_journey.py`・`backend/tests/test_gate_v2_visits.py`・`frontend/e2e/journey.spec.ts`・`frontend/src/components/Remaining7.test.tsx`・`frontend/src/pages/JourneyPage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p14journey.test.ts`
+- **試験:** `backend/tests/test_gate_p14_journey.py`・`backend/tests/test_gate_v2_visits.py`・`frontend/e2e/journey.spec.ts`・`frontend/src/components/Remaining7.test.tsx`・`frontend/src/pages/JourneyPage.test.tsx`・`frontend/src/services/api.surface.test.ts`・`frontend/src/services/api/contract.test.ts`・`frontend/src/services/api/p14journey.test.ts`・`backend/tests/test_gate2_journey_device_race.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 予定の経路と GPS の軌跡の比べ(到達・寄り道・経路からの外れ)は Remaining-7。予定の経路は直線(道の形ではない)
@@ -748,7 +748,7 @@
 - **受入(抜粋):** 端末内のみでは生の GPS をサーバーへ送らず、AI の入力から正確な位置を既定で除く
 - **仕様の参照:** 画面 SC-43 / API 群 location-batches
 - **実装:** API `backend/app/api/v1/location_tracks.py` / 画面 `/planner/:planId/track` / 表 `location_point_batches`・`trip_location_settings`
-- **試験:** `backend/tests/test_gate_l5_local_first_location.py`・`frontend/e2e/location-local-first.spec.ts`・`frontend/src/services/api/l5location.test.ts`
+- **試験:** `backend/tests/test_gate_l5_local_first_location.py`・`frontend/e2e/location-local-first.spec.ts`・`frontend/src/services/api/l5location.test.ts`・`backend/tests/test_gate2_location_points_race.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** 端末のバックグラウンド記録、端末内の点の暗号化
@@ -760,7 +760,7 @@
 - **受入(抜粋):** 記録中をアプリ内でも常に示し、低電力・一時停止・旅行終了の自動停止、電池の消費と欠測を観測する
 - **仕様の参照:** 画面 SC-43 / API 群 location-batches
 - **実装:** API `backend/app/api/v1/location_tracks.py` / 画面 `/planner/:planId/track` / 表 `location_point_batches`
-- **試験:** `backend/tests/test_gate_l5_local_first_location.py`・`frontend/e2e/location-local-first.spec.ts`・`frontend/src/services/api/l5location.test.ts`・`frontend/src/utils/adaptiveSampler.test.ts`
+- **試験:** `backend/tests/test_gate_l5_local_first_location.py`・`frontend/e2e/location-local-first.spec.ts`・`frontend/src/services/api/l5location.test.ts`・`frontend/src/utils/adaptiveSampler.test.ts`・`backend/tests/test_gate2_location_points_race.py`
 - **外部の提供元:** なし
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ。旅行当日に直結) / 実 API —(外部の提供元を使わない) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** OS の geofence、電池の計測
@@ -785,7 +785,7 @@
 - **承認済みの変更 2026-11-13:** 料金・決済は Stripe のテストモードで仕組みだけ。価格は仮で管理画面から変える。本番の鍵は断る(出典: 利用者の決定(DOC-10 §3 FR-058 の主な不足に記録)・確度 高)
 - **仕様の参照:** 画面 (DOC-04 に画面 ID なし) / API 群 entitlements
 - **実装:** API `backend/app/api/v1/billing.py` / 画面 `/settings/billing` / 表 `billing_products`・`billing_subscriptions`・`billing_payments`・`entitlements`
-- **試験:** `backend/tests/test_gate_remaining4_billing.py`・`frontend/src/pages/BillingPage.test.tsx`
+- **試験:** `backend/tests/test_gate_remaining4_billing.py`・`frontend/src/pages/BillingPage.test.tsx`・`backend/tests/test_gate2_access_never_blocked.py`
 - **外部の提供元:** Stripe(テストモードの鍵の後)
 - **証拠:** 実機 ○(実機(iPhone・Android・iPad)の確認の記録なし。Playwright の画面の大きさの模擬だけ) / 実 API ○(実の提供元での確認なし(CI は模擬): Stripe(テストモードの鍵の後)) / 運用(本番) ○(本番での提供なし(RELEASED 0)。開発環境の横断の運用の証拠は ledger の cross_cutting.ops)
 - **主な不足(fr-status.json):** Stripe のテストモードだけ(本番の鍵 sk_live_ は断る。利用者の決定 2026-11-13)。価格は仮(管理画面で変える)。実の Stripe のテストの鍵での確認は鍵の登録の後。組織でまとめる支払い(FR-041)・指定した支払う人は未実装。E2E は鍵の無い時の案内だけ

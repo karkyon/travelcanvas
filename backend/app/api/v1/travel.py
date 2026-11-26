@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime, date, timedelta
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 
@@ -30,8 +30,8 @@ from sqlalchemy import or_
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.auth import get_current_user_or_guest
-from app.core.plan_access import require_plan_access, accessible_plan_ids_subquery
-from app.models.models import PlanCollaborator, TravelPlan, TravelDay, TravelEvent, User
+from app.core.plan_access import accessible_plan_ids_subquery, lock_plan_row, require_plan_access
+from app.models.models import IdempotencyRecord, PlanCollaborator, TravelPlan, TravelDay, TravelEvent, User
 from app.services import member_policy, plan_deletion
 from app.services import plan_cover
 from app.services.audit_service import record_audit_event
@@ -309,6 +309,9 @@ async def update_travel_plan(
         )
 
 
+CLONE_ENDPOINT = "POST /travel-plans/{id}/clone"
+
+
 class PlanCloneRequest(BaseModel):
     """[Gate #39] 旅程複製リクエスト。全項目任意。"""
     title: Optional[str] = Field(None, max_length=200)  # [Gate② FC-121] 旅行の名前と同じ上限
@@ -324,6 +327,7 @@ async def clone_travel_plan(
     clone_data: PlanCloneRequest,
     current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key", max_length=200),
 ):
     """旅行プランを複製する(CA-005)。
 
@@ -344,6 +348,20 @@ async def clone_travel_plan(
       除外する理由は元プラン固有の判断のため、複製先では引き継がない)。
     """
     original_plan, _role = require_plan_access(db, plan_id, current_user, min_role="owner")
+    # [Gate② FC-124] Idempotency-Key があれば、二重押し・通信の再送で旅行を 2 つ作らない(同じ鍵は先の複製を返す)。
+    # 同時の 2 つの要求は元の旅行の行を押さえて 1 つずつにし、鍵の記録は複製と同じ transaction で書く
+    if idempotency_key:
+        lock_plan_row(db, original_plan)
+        done = (db.query(IdempotencyRecord)
+                .filter(IdempotencyRecord.key == idempotency_key, IdempotencyRecord.user_id == current_user.id,
+                        IdempotencyRecord.endpoint == CLONE_ENDPOINT).first())
+        if done is not None:
+            again = db.query(TravelPlan).filter(TravelPlan.id == uuid.UUID(str((done.response_json or {}).get("id"))),
+                                                TravelPlan.deleted_at.is_(None)).first()
+            if again is None:
+                raise HTTPException(status_code=409, detail={
+                    "code": "clone_key_used", "message": "この操作はもう行いました(複製した旅行は消されています)"})
+            return again
 
     # [Gate PlanB] 複製は日ごとの案(控え・しまった案)もすべて写す(切り替えの記録は写さない)
     from app.services.day_variants import all_variants
@@ -447,6 +465,9 @@ async def clone_travel_plan(
             db.add(PlanMovementSettings(plan_id=new_plan.id, settings=dict(settings_row.settings), revision=1,
                                         updated_by_user_id=current_user.id))
 
+        if idempotency_key:
+            db.add(IdempotencyRecord(key=idempotency_key, user_id=current_user.id, endpoint=CLONE_ENDPOINT,
+                                     response_status=201, response_json={"id": str(new_plan.id)}))
         db.commit()
         db.refresh(new_plan)
         # [Gate② FC-125] 複製を監査に残す(元の旅行・テンプレートか・日をずらしたか。名前は残さない)

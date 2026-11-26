@@ -77,7 +77,11 @@ export class PlansApi extends SpotsApi {
   // frontendから一切到達不能だった(Gate #25等と同じ「実装済みだが未到達」
   // パターン)。
   async clonePlan(planId: string, data?: { title?: string; start_date?: string; as_template?: boolean }): Promise<ApiResponse<TravelPlan>> {
-    const response = await this.client.post<unknown>(`/travel-plans/${planId}/clone`, data ?? {});
+    // [Gate② FC-124] 同じ要求の送り直し(ログインの更新の後のやり直しなど)で旅行を 2 つ作らないよう、1 回の操作に 1 つの鍵
+    const key = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID() : `idem_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const response = await this.client.post<unknown>(`/travel-plans/${planId}/clone`, data ?? {},
+      { headers: { 'Idempotency-Key': key } });
     return apiOk<TravelPlan>(this.planFromApi(decodeResponse(response.data, legacyTravelPlan, 'POST /travel-plans/{plan_id}/clone')));
   }
 
